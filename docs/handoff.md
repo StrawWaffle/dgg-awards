@@ -83,7 +83,12 @@ The source zip (`dgga25.zip`) was deleted at StrawWaffle's request, so commit 1 
 
 ## Open questions
 
-- **R2 bucket for clips:** StrawWaffle needs to create one on his Cloudflare account. Until then, clips can be stored locally behind the same storage interface.
+- ~~**R2 bucket for clips.**~~ **Set up 2026-11-09:**
+  - Bucket `dgg-awards-media`, location hint Eastern North America, Standard class.
+  - Public at `https://dgg-awards-media.strawwaffle.dev`, a custom domain cached by Cloudflare. It isn't on `r2.dev`.
+  - Account API token with Object Read & Write on that bucket only. The key ID and secret are only in the live `.env`, and all five `R2_*` settings are set there.
+  - **Verified:** a real clip built into R2 played on the visitor page from the custom domain, with seeking. The test files were deleted afterwards, so the bucket is empty.
+  - The Cloudflare "token value" and the jurisdiction endpoints aren't used: the S3 API only needs the key ID and secret, and the bucket has no jurisdiction.
 - **Real 2025 results for the archive:** ask rinlux whether they have the 2025 production database, an export or the final numbers. The zip had none, and the live site shows fake votes. Fallbacks are rebuilding from the stream (incomplete, with garbled captions) or archiving the nominees and winners only.
   - **The 2025 code double-counted** (found 2026-11-09). A nominee in several categories got the votes from all of them, because votes joined nominees on id only. On the stream that would have affected Hasan Piker, Asmongold, Legal Mindset and "Destiny Uses his Premonition Powers". With seeded data it inflated Brainlet's total by 46% and changed its winner.
   - The zip predates the stream version, so the live 2025 site may or may not have had the bug. With rinlux's raw votes, the archive can show the **correct** results. Ask whether the announced winners match a correct count.
