@@ -42,13 +42,13 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
   - emote reactions, and the big screen with chat characters (a live relay or the simulator)
   - clips, and the results reveal
 
-**Built, waiting for StrawWaffle's go-ahead to deploy:** branch `worktree-lab-polish-2` (`dc57d56`, one commit on top of `main`):
+**Built, waiting for StrawWaffle's go-ahead to deploy:** branch `worktree-lab-polish-2` (one commit on top of `main`):
 - the results reveal drawn like a person would, with rows starting scrambled and a race for the winner
 - a calmer stage cast
 - combos in the chat column
 - the beat as a shared gust on the background emotes
 
-It's tested: 83 unit tests and 42 API tests pass, with both snapshots unchanged, and it was checked in the browser. To deploy it: rebase it onto `main` (`main` has a docs-only commit since; it merges cleanly), fast-forward `main`, after the usual backup (see "Deploying" below).
+It's tested: 83 unit tests and 42 API tests pass, with both snapshots unchanged, and it was checked in the browser. To deploy it: rebase it onto `main` if `main` has moved (it touches no docs, so that is clean), then fast-forward `main`, after the usual backup (see "Deploying" below).
 
 **Waiting on rinlux** (StrawWaffle is asking):
 - What they think of the lab. It's the candidate design for the 2026 voting page and presentation.
