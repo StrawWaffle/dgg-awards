@@ -34,9 +34,11 @@ export const stages: { id: Stage; label: string }[] = [
 
 /**
  * Where an address leads. Previews live under `/preview/<stage>/<page>`
- * (`/preview/<stage>` is the front page). `/preview` and `/lab` alone preview
- * the stage the site is in now (`stage: null` until the settings are in).
- * The old `?preview=` addresses still lead to their preview.
+ * (`/preview/<stage>` is the front page). The lab, which has no stages, is
+ * `/preview/lab`. `/preview` alone previews the stage the site is in now
+ * (`stage: null` until the settings are in); in the lab, that stage is where
+ * the tabs lead. `/lab`, `/preview/<stage>/lab` and the old `?preview=`
+ * addresses still lead to their preview.
  */
 type Route = { page: Page; preview: boolean; stage: Stage | null };
 function routeOf(loc: Location): Route {
@@ -45,6 +47,7 @@ function routeOf(loc: Location): Route {
   if (path === "/vote" && asked === "voting") return { page: "vote", preview: true, stage: "voting" };
   if ((path === "/vote" && asked === "results") || (path === "/results" && asked === "1")) return { page: "results", preview: true, stage: "results" };
   if (path === "/lab") return { page: "lab", preview: true, stage: null };
+  if (path === "/preview/lab") return { page: "lab", preview: true, stage: null };
   const m = path.match(/^\/preview(?:\/([a-z]+))?(?:\/([0-9a-z]+))?$/);
   if (m) {
     const stage = stages.find((x) => x.id === m[1])?.id ?? null;
@@ -55,7 +58,7 @@ function routeOf(loc: Location): Route {
 }
 
 const pathOf = (page: Page, stage: Stage | null) =>
-  stage ? `/preview/${stage}${page === "home" ? "" : `/${page}`}` : paths[page];
+  page === "lab" ? "/preview/lab" : stage ? `/preview/${stage}${page === "home" ? "" : `/${page}`}` : paths[page];
 
 /** The stage the site is in now, by its settings. */
 function stageNow(config: SiteConfig): Stage {
@@ -169,18 +172,20 @@ export function Site() {
   const shown = useMemo(() => (config && stage ? stageConfig(config, stage) : config), [config, stage]);
 
   const leaveTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const go = (next: Page) => (e?: React.MouseEvent) => {
+  const go = (next: Page) => (e?: React.MouseEvent, toStage = stage) => {
     if (e && (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0)) return; // new tab etc.
     e?.preventDefault();
-    if (next === page) return;
-    history.pushState(null, "", pathOf(next, stage));
+    if (next === page && toStage === stage) return;
+    history.pushState(null, "", pathOf(next, toStage));
     setLeaving({ page, dir: order.indexOf(next) > order.indexOf(page) ? 1 : -1 });
     clearTimeout(leaveTimer.current);
     leaveTimer.current = setTimeout(() => setLeaving(null), 400);
-    setRoute({ ...route, page: next, stage });
+    setRoute({ ...route, page: next, stage: toStage });
     scrollTo({ top: 0 });
   };
+  /** Another stage, on the same page; from the lab (which has none), its front page. */
   const goStage = (next: Stage) => {
+    if (page === "lab") return go("home")(undefined, next);
     if (next === stage) return;
     history.pushState(null, "", pathOf(page, next) + location.hash);
     setRoute({ page, preview: true, stage: next });
@@ -334,14 +339,14 @@ export function Site() {
             {stages.map((x) => (
               <a
                 key={x.id}
-                href={pathOf(page, x.id)}
+                href={pathOf(page === "lab" ? "home" : page, x.id)}
                 onClick={(e) => {
                   if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
                   e.preventDefault();
                   goStage(x.id);
                 }}
                 className="cozy-tab text-sm"
-                aria-current={stage === x.id ? "page" : undefined}
+                aria-current={page !== "lab" && stage === x.id ? "page" : undefined}
               >
                 {x.label}
               </a>

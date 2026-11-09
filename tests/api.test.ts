@@ -98,6 +98,7 @@ describe("static and public routes", () => {
       ["/preview/before", "DGG Awards"],
       ["/preview/voting/vote", "DGG Awards"],
       ["/preview/results/results", "DGG Awards"],
+      ["/preview/lab", "DGG Awards"],
       ["/preview/closed/lab", "DGG Awards"],
     ] as const) {
       const res = await req(path);

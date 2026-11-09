@@ -528,8 +528,9 @@ StrawWaffle, after the one-site deploy:
 ### Previews by stage, simulated votes on the big screen, and the music start (branch `worktree-preview-stages`, 2026-11-09)
 
 StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, and the previews should all live under `/preview/<stage>/<page>`, with a stage per part of the year, and the front page previewable too.
-- **Addresses:** `/preview/<stage>` is the front page, then `/vote`, `/results`, `/2025` and `/lab` under it. The stages are `before` (Before voting), `voting` (Voting open), `closed` (Voting closed) and `results` (Results out).
-  - `/preview` alone, and `/lab`, go to the stage the site is in now.
+- **Addresses:** `/preview/<stage>` is the front page, then `/vote`, `/results` and `/2025` under it. The stages are `before` (Before voting), `voting` (Voting open), `closed` (Voting closed) and `results` (Results out).
+  - **The lab is `/preview/lab`**, with no stage (StrawWaffle). There, no stage is marked, the stage buttons go to that stage's front page, and the tabs lead to the stage the site is in now. `/lab` and `/preview/<stage>/lab` lead there.
+  - `/preview` alone goes to the stage the site is in now.
   - The old `/vote?preview=voting`, `/vote?preview=results` and `/results?preview=1` lead to their new addresses. The address bar is updated to the full one.
 - **In a preview** the header has a second row: a Preview chip, the four stages (switching keeps the page) and "Leave preview" (back to the same page as visitors have it; from the lab, to the front page).
   - The pages get the settings as visitors would have them at that stage (`stageConfig()` in `Site.tsx`). The real dates are kept where they fit, otherwise made-up ones that do: before voting, a start a week out; voting open, a close 11 days out; closed, an hour ago; results out, reviewing mode.
@@ -537,7 +538,7 @@ StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, an
   - **Voting open → Vote** is the voting preview (nothing saved). **Results out → Results** is the results preview with the simulated-votes switch. At other stages these pages show the notices visitors would see.
   - Non-admins on a preview address get "Previews are for admins" and a sign-in.
 - **Outside a preview, admins see the site as visitors do:** no Lab tab and no preview rows.
-- **The admin sidebar** links to Preview the site (`/preview`), Preview voting (`/preview/voting/vote`), Preview results (`/preview/results/results`), Open the site, and Open the lab (`/lab`).
+- **The admin sidebar** links to Preview the site (`/preview`), Preview voting (`/preview/voting/vote`), Preview results (`/preview/results/results`), Open the site, and Open the lab (`/preview/lab`).
 - **Simulated votes on the big screen:** the settings (gear) have "Votes: Real / Simulated". It starts on simulated when there are no real votes, using the same made-up numbers as the results preview (`loadSimulated()`), and a "Simulated votes" chip shows in the controls. The big screen's nominees now come from `/api/admin/nominees`, so pictures and clips show while the site is locked.
 - **The music started slowly.** The track opens with 2 s of silence and a 4 s fade-in (measured: silent to 2 s, −62 dB rising to −17 dB at 6 s). Loading wasn't the cause: the file is 2.5 MB with its index up front. Now:
   - The first start jumps to 6.02 s (a bar line on the beat map's grid), where the music is in fully, with a 0.4 s fade-in of our own.

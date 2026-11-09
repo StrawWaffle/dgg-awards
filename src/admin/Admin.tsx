@@ -161,7 +161,7 @@ function AdminPage() {
           <SideLink href="/" icon={<HomeIcon />} collapsed={collapsed}>
             Open the site
           </SideLink>
-          <SideLink href="/lab" icon={<MagicWandIcon />} collapsed={collapsed}>
+          <SideLink href="/preview/lab" icon={<MagicWandIcon />} collapsed={collapsed}>
             Open the lab
           </SideLink>
           <ThemeSwitch theme={theme} setTheme={setTheme} collapsed={collapsed} />
