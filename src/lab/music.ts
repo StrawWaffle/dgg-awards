@@ -110,7 +110,7 @@ class Music {
     this.applyVolume();
   }
 
-  /** While a clip plays the music drops to a fifth, gliding down and back. */
+  /** While a clip plays the music fades out completely, and back after. */
   private ducked = false;
   setDucked(on: boolean) {
     this.ducked = on;
@@ -119,7 +119,7 @@ class Music {
 
   private applyVolume(glide = 0.05) {
     if (!this.gain || !this.ctx) return;
-    const target = this.prefs.muted ? 0 : gainOf(this.prefs.volume) * (this.ducked ? 0.2 : 1);
+    const target = this.prefs.muted ? 0 : gainOf(this.prefs.volume) * (this.ducked ? 0 : 1);
     this.gain.gain.setTargetAtTime(target, this.ctx.currentTime, glide / 3);
   }
 

@@ -306,6 +306,21 @@ StrawWaffle's notes after the last deploy, built:
 - **Volume:** while the volume changes (held slider, and 1.2 s after), the music button shows MMMM under 10%, otherwise OOOO animating at 0–150% speed with the slider (`Emote` takes a `rate`). The slider is now loudness as heard: gain = slider³ (−18 dB at half, −60 dB at 10%; sources suggested powers of 3–4, a square was too gentle at the low end). Saved volumes from before are moved so the music stays as loud (`curve` in the saved prefs).
 - **Background emotes:** the beat is now one shared gust in screen directions (right and a little up, harder on the one) with a spring back, applied before each emote's own turn. Each one keeps a gentle sway of its own.
 
+### Lab polish, round 3 (branch `worktree-lab-polish-3`, 2026-11-09, not deployed)
+
+StrawWaffle's notes, built:
+- **Music button:** OverRustle at full volume, OOOO at 0–200% speed. The emotes slide up in and out as they change (`SwapEmote` in `MusicBar.tsx`).
+- **Background emotes:** the one under the pointer fades to its colours and back. The backdrop takes no pointer events, so it's a distance check each frame.
+- **Voting:** the Klappa burst draws above the cards (`z-40` on the burst layer).
+- **Tabs** slide sideways in the direction of the tab. The old page stays mounted while it slides out.
+- **Big screen fills the window** below the top bar. The presenter's controls are a panel over its bottom edge, and the chat column is a toggle in the top bar (remembered, `lab.chat`).
+- **Clips on the big screen:**
+  - lowered in from the top to just above the controls, and raised away after
+  - the cast walks out of its way, left or right, and sits still: no hops, no newcomers, no leaving and no speech bubbles
+  - characters already out still change emote when they send a new one
+  - the music now fades out completely during a clip (it used to drop to a fifth)
+- **Clip controls** are our own in the lab look: play, a seek bar, the time, sound and full screen. They hide 2 s after the pointer stops while playing.
+
 ### Next: the lab page (StrawWaffle's answers, 2026-11-09)
 
 StrawWaffle wants the front page and the presentation to feel fun, quirky and wholesome. It gets built on an experimental page first (`/lab`, admins only) until rinlux approves. Order: the follow-ups above, merge and deploy, then the lab.

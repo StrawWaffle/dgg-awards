@@ -10,9 +10,11 @@ import { music, useMusic } from "@/lab/music";
  * click unless it was muted last time.
  *
  * While the volume is being changed, the button shows how loud it is: MMMM
- * under 10%, otherwise OOOO, animating at 0–150% speed with the volume.
+ * under 10%, OOOO swimming at 0–200% speed with the volume, and OverRustle at
+ * full. The emotes slide in and out as they change.
  */
 const QUIET = 0.1;
+const FULL = 0.995;
 /** How long the volume emote stays after the last change. */
 const LINGER_MS = 1200;
 export function MusicBar() {
@@ -38,12 +40,20 @@ export function MusicBar() {
     timer.current = setTimeout(() => setRecent(false), LINGER_MS);
   };
   const adjusting = held || recent;
-  const emote = adjusting ? (level < QUIET ? "MMMM" : "OOOO") : audible ? "Listening" : "MMMM";
+  const emote = adjusting
+    ? level < QUIET
+      ? "MMMM"
+      : level >= FULL
+        ? "OverRustle"
+        : "OOOO"
+    : audible
+      ? "Listening"
+      : "MMMM";
   return (
     <div className="flex items-center gap-2">
       <button type="button" onClick={toggle} className="cozy-btn round group relative h-10 w-10" aria-label={label} title={label}>
-        <span className="transition-opacity group-hover:opacity-0">
-          <Emote name={emote} size={0.75} title="" rate={emote === "OOOO" ? level * 1.5 : 1} />
+        <span className="absolute inset-0 overflow-hidden rounded-full transition-opacity group-hover:opacity-0">
+          <SwapEmote name={emote} rate={emote === "OOOO" ? level * 2 : 1} />
         </span>
         <span className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
           {audible ? <SpeakerOffIcon width={18} height={18} /> : <SpeakerLoudIcon width={18} height={18} />}
@@ -70,5 +80,34 @@ export function MusicBar() {
         title={`Volume ${Math.round(level * 100)}%`}
       />
     </div>
+  );
+}
+
+/** An emote that slides up and out when it changes, as the next slides in. */
+function SwapEmote({ name, rate }: { name: string; rate: number }) {
+  const [gone, setGone] = useState<{ name: string; key: number }[]>([]);
+  const last = useRef(name);
+  const keys = useRef(0);
+  useEffect(() => {
+    if (last.current === name) return;
+    const old = { name: last.current, key: keys.current++ };
+    last.current = name;
+    setGone((g) => [...g, old]);
+    setTimeout(() => setGone((g) => g.filter((x) => x !== old)), 280);
+  }, [name]);
+  // Slide in on a change (from this render, before the effect has run).
+  const sliding = last.current !== name || gone.length > 0;
+  const place = "absolute inset-0 flex items-center justify-center";
+  return (
+    <>
+      {gone.map((g) => (
+        <span key={`gone-${g.key}`} className={`${place} lab-swap-out`}>
+          <Emote name={g.name} size={0.75} title="" />
+        </span>
+      ))}
+      <span key={name} className={`${place} ${sliding ? "lab-swap-in" : ""}`}>
+        <Emote name={name} size={0.75} title="" rate={rate} />
+      </span>
+    </>
   );
 }

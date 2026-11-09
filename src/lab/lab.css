@@ -98,12 +98,19 @@
   left: 0;
   top: 0;
   opacity: 0.07;
-  filter: brightness(0);
+  filter: brightness(0) invert(0);
   will-change: transform;
+  transition: opacity 500ms ease, filter 500ms ease;
 }
 .lab.lab-dark .lab-silhouette {
   opacity: 0.06;
   filter: brightness(0) invert(1);
+}
+/* Under the pointer, a silhouette shows its colours, then fades back. */
+.emote.lab-silhouette.lab-lit,
+.lab.lab-dark .emote.lab-silhouette.lab-lit {
+  opacity: 0.9;
+  filter: brightness(1) invert(0);
 }
 .lab-silhouette,
 .lab-silhouette * {
@@ -307,9 +314,106 @@ input[type="range"].cozy-range {
   color: var(--coral);
 }
 
+/* The music button's emote changing: the new one slides up in, the old one up out. */
+@keyframes lab-swap-in {
+  from {
+    translate: 0 110%;
+  }
+}
+@keyframes lab-swap-out {
+  to {
+    translate: 0 -110%;
+  }
+}
+.lab-swap-in {
+  animation: lab-swap-in 260ms ease-out;
+}
+.lab-swap-out {
+  animation: lab-swap-out 260ms ease-in forwards;
+}
+
+/* Switching tabs: pages slide sideways, in the direction of the tab. */
+@keyframes lab-page-in {
+  from {
+    translate: calc(var(--dir) * 100%) 0;
+  }
+}
+@keyframes lab-page-out {
+  to {
+    translate: calc(var(--dir) * -100%) 0;
+  }
+}
+.lab-page-in {
+  animation: lab-page-in 380ms cubic-bezier(0.3, 0.7, 0.3, 1);
+}
+.lab-page-out {
+  animation: lab-page-out 380ms cubic-bezier(0.3, 0.7, 0.3, 1) forwards;
+}
+
+/* A clip lowered onto the big screen like a sign on ropes, and raised away. */
+@keyframes lab-lower {
+  0% {
+    translate: 0 -120vh;
+  }
+  75% {
+    translate: 0 12px;
+  }
+  100% {
+    translate: 0 0;
+  }
+}
+@keyframes lab-raise {
+  to {
+    translate: 0 -120vh;
+  }
+}
+.lab-lower {
+  animation: lab-lower 900ms cubic-bezier(0.3, 0.6, 0.4, 1);
+}
+.lab-raise {
+  animation: lab-raise 600ms ease-in forwards;
+}
+
+/* The clip's own controls: a cream bar over the bottom of the video. */
+.lab-video-bar {
+  background: color-mix(in oklab, var(--panel) 92%, transparent);
+  border: 2px solid var(--panel-border);
+  border-radius: 9999px;
+  box-shadow: 0 3px 0 var(--panel-shadow);
+  transition: opacity 200ms ease;
+}
+.lab-seek {
+  appearance: none;
+  height: 10px;
+  border-radius: 9999px;
+  background: linear-gradient(to right, var(--primary-shadow) var(--done, 0%), var(--cream-shadow) var(--done, 0%));
+  cursor: pointer;
+}
+.lab-seek::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--cream);
+  border: 3px solid var(--primary-shadow);
+}
+.lab-seek::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--cream);
+  border: 3px solid var(--primary-shadow);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .lab-burst,
-  .lab-pop {
+  .lab-pop,
+  .lab-swap-in,
+  .lab-swap-out,
+  .lab-page-in,
+  .lab-page-out,
+  .lab-lower,
+  .lab-raise {
     animation-duration: 0.01s;
   }
   .cozy-btn {

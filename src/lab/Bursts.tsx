@@ -26,7 +26,8 @@ export function useBursts(): [ReactNode, (emote: string, x: number, y: number, c
     setTimeout(() => setBursts((b) => b.filter((x) => !added.includes(x))), 2000 + count * 70);
   }, []);
   const layer = (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+    // Above the cards and buttons it's fired from.
+    <div className="pointer-events-none absolute inset-0 z-40 overflow-hidden" aria-hidden>
       {bursts.map((b) => (
         <div
           key={b.id}

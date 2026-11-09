@@ -30,6 +30,10 @@ type Leaf = {
   size: number;
   /** Where in its sway it is. */
   phase: number;
+  /** Showing its colours, under the pointer. */
+  lit?: boolean;
+  w?: number;
+  h?: number;
 };
 
 const STEP = 230;
@@ -61,7 +65,8 @@ function scatter(width: number, height: number): Leaf[] {
  * Faint emote silhouettes drifting behind the page like leaves on a breeze:
  * each floats slowly right and up, swaying and turning, and comes back round
  * when it leaves the window. The music blows through them: each beat nudges
- * them all the same way, the first beat of each bar harder.
+ * them all the same way, the first beat of each bar harder. Under the pointer
+ * one shows its colours, and fades back when the pointer moves on.
  * Still for people who ask for less motion.
  */
 export function EmoteBackdrop() {
@@ -83,6 +88,40 @@ export function EmoteBackdrop() {
     return () => removeEventListener("resize", update);
   }, []);
 
+  // The pointer, for lighting up the leaf under it. The backdrop sits behind
+  // the page and takes no pointer events, so this is checked by distance.
+  const pointer = useRef<{ x: number; y: number } | null>(null);
+  useEffect(() => {
+    const move = (e: PointerEvent) => void (pointer.current = { x: e.clientX, y: e.clientY });
+    const out = () => void (pointer.current = null);
+    addEventListener("pointermove", move);
+    document.documentElement.addEventListener("pointerleave", out);
+    return () => {
+      removeEventListener("pointermove", move);
+      document.documentElement.removeEventListener("pointerleave", out);
+    };
+  }, []);
+  const light = (el: HTMLSpanElement, l: Leaf) => {
+    const p = pointer.current;
+    let lit = false;
+    if (p) {
+      // Scaled about its centre: the centre is where its unscaled box's is.
+      // Measured once, when the emote sheet has loaded.
+      if (!l.w) {
+        l.w = el.offsetWidth;
+        l.h = el.offsetHeight;
+      }
+      const w = l.w;
+      const h = l.h!;
+      const reach = (Math.max(w, h) * l.size) / 2;
+      lit = Math.hypot(p.x - (l.x + w / 2), p.y - (l.y + h / 2)) < reach;
+    }
+    if (lit !== !!l.lit) {
+      l.lit = lit;
+      el.classList.toggle("lab-lit", lit);
+    }
+  };
+
   /** The gust: one push shared by every leaf, in screen directions. */
   const gust = useRef({ x: 0, y: 0, vx: 0, vy: 0 });
 
@@ -99,7 +138,12 @@ export function EmoteBackdrop() {
     const list = state.current;
     if (list.length === 0) return;
     if (still.current) {
-      list.forEach((l, i) => els.current[i] && place(els.current[i]!, l));
+      list.forEach((l, i) => {
+        const el = els.current[i];
+        if (!el) return;
+        place(el, l);
+        light(el, l);
+      });
       return;
     }
     time.current += dt;
@@ -129,7 +173,9 @@ export function EmoteBackdrop() {
       if (l.x > w) l.x -= w + MARGIN;
       if (l.y < -MARGIN) l.y += h + MARGIN;
       const el = els.current[i];
-      if (el) place(el, l);
+      if (!el) return;
+      place(el, l);
+      light(el, l);
     });
   }, []);
   useFrame(onFrame);
