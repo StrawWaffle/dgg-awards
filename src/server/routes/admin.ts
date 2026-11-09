@@ -18,6 +18,7 @@ import {
   updateNominee,
   updateUserMakeAdmin,
 } from "@/lib/data/driver";
+import { slugify, uniqueId } from "@/lib/ids";
 import { checkAwards } from "@/lib/nominee-checks";
 import { effectiveStyle, withEffectiveStyles } from "@/lib/voting";
 import {
@@ -32,8 +33,10 @@ import { categoriesWithMediaUrls } from "@/server/present";
 import { storage } from "@/server/storage";
 import { type SessionEnv, rejectInvalid, requireAdmin, zValidator } from "@/server/middleware";
 import {
+  categoryCreate,
   categoryForm,
   categoryPatch,
+  nomineeCreate,
   configForm,
   idQuery,
   importForm,
@@ -140,6 +143,41 @@ export const adminRoutes = new Hono<SessionEnv>()
       if (key) await storage.delete(key).catch(() => {});
     }
     return c.body(null, 200);
+  })
+
+  // Creating from the editor (JSON). The old form endpoints above stay for
+  // the Management tab. Ids are made from the title and kept unique.
+  .post("/categories", zValidator("json", categoryCreate, rejectInvalid), async (c) => {
+    const body = c.req.valid("json");
+    const taken = new Set((await getNominees()).map((cat) => cat.id));
+    const id = body.id ?? uniqueId(slugify(body.title), taken);
+    if (taken.has(id)) return c.text(`A category with the id "${id}" already exists.`, 409);
+    await insertCategory({
+      id,
+      title: body.title,
+      description: body.description,
+      votingStyle: body.votingStyle ?? null,
+    });
+    return c.json({ id }, 201);
+  })
+  .post("/nominees", zValidator("json", nomineeCreate, rejectInvalid), async (c) => {
+    const body = c.req.valid("json");
+    const category = (await getNominees()).find((cat) => cat.id === body.categoryId);
+    if (!category) return c.body(null, 404);
+    const taken = new Set(category.options.map((o) => o.id));
+    const id = body.id ?? uniqueId(slugify(body.title), taken);
+    if (taken.has(id)) return c.text(`This category already has a nominee with the id "${id}".`, 409);
+    await insertNominee({
+      id,
+      categoryId: category.id,
+      title: body.title,
+      description: "",
+      url: body.url ?? null,
+      imageId: null,
+      videoId: null,
+      renderType: "default",
+    });
+    return c.json({ id, categoryId: category.id }, 201);
   })
 
   // Clips: build from the nominee's link and clip range, in the background.

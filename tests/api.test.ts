@@ -480,6 +480,45 @@ describe("admin", () => {
     expect((await req("/api/vote/results?preview=yes", {}, admin)).status).toBe(400);
   });
 
+  test("editor creates categories and nominees from a title", async () => {
+    const post = (path: string, body: unknown, jar: Jar = admin) =>
+      req(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }, jar);
+
+    expect((await post("/api/admin/categories", { title: "Clip of the Year" }, user)).status).toBe(401);
+    const cat = await post("/api/admin/categories", { title: "Clip of the Year!", votingStyle: "ranked" });
+    expect(cat.status).toBe(201);
+    expect(await cat.json()).toEqual({ id: "clip_of_the_year" });
+    const again = await post("/api/admin/categories", { title: "Clip of the Year" });
+    expect(await again.json()).toEqual({ id: "clip_of_the_year_2" });
+    expect((await post("/api/admin/categories", { id: "ally", title: "Dup" })).status).toBe(409);
+    expect((await post("/api/admin/categories", { title: "  " })).status).toBe(400);
+
+    const nom = await post("/api/admin/nominees", {
+      categoryId: "clip_of_the_year",
+      title: "Destiny makes xQc rage quit",
+      url: "https://www.youtube.com/watch?v=abc",
+    });
+    expect(nom.status).toBe(201);
+    expect(await nom.json()).toEqual({ id: "destiny_makes_xqc_rage_quit", categoryId: "clip_of_the_year" });
+    const second = await post("/api/admin/nominees", { categoryId: "clip_of_the_year", title: "Destiny makes xQc rage quit" });
+    expect((await second.json()).id).toBe("destiny_makes_xqc_rage_quit_2");
+    expect((await post("/api/admin/nominees", { categoryId: "nope", title: "x" })).status).toBe(404);
+    expect((await post("/api/admin/nominees", { categoryId: "clip_of_the_year", title: "x", url: "not a url" })).status).toBe(400);
+
+    const created = (await (await req("/api/admin/nominees", {}, admin)).json()).find(
+      (c: any) => c.id === "clip_of_the_year",
+    );
+    expect(created).toMatchObject({ title: "Clip of the Year!", description: "", votingStyle: "ranked", usesDefaultStyle: false });
+    expect(created.options.map((o: any) => [o.id, o.description, o.url])).toEqual([
+      ["destiny_makes_xqc_rage_quit", "", "https://www.youtube.com/watch?v=abc"],
+      ["destiny_makes_xqc_rage_quit_2", "", null],
+    ]);
+
+    for (const id of ["clip_of_the_year", "clip_of_the_year_2"]) {
+      await req(`/api/admin/category?id=${id}`, { method: "DELETE" }, admin);
+    }
+  });
+
   test("make admin by uid", async () => {
     const other = await signIn("Promoted");
     const uid = (await (await req("/api/me", {}, other)).json()).uid;

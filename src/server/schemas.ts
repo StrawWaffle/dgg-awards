@@ -76,6 +76,22 @@ export const configForm = z.object({
   viewing_config: z.enum(viewingModes),
 });
 
+/** New category from the editor. The id comes from the title if not given. */
+export const categoryCreate = z.object({
+  id: z.string().regex(/^[a-z0-9_-]{1,40}$/).optional(),
+  title: z.string().trim().min(1).max(120),
+  description: z.string().trim().max(500).default(""),
+  votingStyle: z.enum(votingStyles).nullable().optional(),
+});
+
+/** New nominee from the editor: just a title (and maybe a link) to start. */
+export const nomineeCreate = z.object({
+  categoryId: required,
+  id: z.string().regex(/^[a-z0-9_-]{1,40}$/).optional(),
+  title: z.string().trim().min(1).max(200),
+  url: z.string().trim().url().nullable().optional(),
+});
+
 export const categoryPatch = z.object({
   id: required,
   title: z.string().optional(),

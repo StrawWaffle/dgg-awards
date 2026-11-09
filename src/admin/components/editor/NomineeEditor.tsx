@@ -3,10 +3,13 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import clsx from "clsx";
 import { Button, ErrorText, Field, inputClass } from "@/admin/components/editor/fields";
 import { NomineeForm, useRefreshEditor } from "@/admin/components/editor/NomineeForm";
+import { slugify, uniqueId } from "@/lib/ids";
 import type { VotingStyle } from "@/lib/voting";
 import {
   type AdminCategory,
   type Issue,
+  createCategory,
+  createNominee,
   deleteCategory,
   deleteNominee,
   fetchAdminNom,
@@ -73,6 +76,7 @@ export function NomineeEditor() {
             );
           })}
         </ul>
+        <AddCategory taken={new Set(categories.map((c) => c.id))} onAdded={setSelected} />
       </nav>
       <div className="min-w-0 flex-1 p-4">
         {category ? (
@@ -82,6 +86,98 @@ export function NomineeEditor() {
         )}
       </div>
     </div>
+  );
+}
+
+/** Title is all it takes; the rest is set in the category's form. */
+function AddCategory({ taken, onAdded }: { taken: Set<string>; onAdded: (id: string) => void }) {
+  const refresh = useRefreshEditor();
+  const [title, setTitle] = useState("");
+  const add = useMutation({
+    mutationFn: () => createCategory({ title: title.trim() }),
+    onSuccess: async ({ id }) => {
+      await refresh();
+      setTitle("");
+      onAdded(id);
+    },
+  });
+  const id = title.trim() ? uniqueId(slugify(title), taken) : null;
+
+  return (
+    <form
+      className="space-y-2 border-t border-neutral-200 p-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        add.mutate();
+      }}
+    >
+      <Field label="New category" hint={id ? `id: ${id}` : undefined}>
+        <input
+          className={inputClass}
+          value={title}
+          placeholder="e.g. Clip of the Year"
+          onChange={(e) => setTitle(e.currentTarget.value)}
+        />
+      </Field>
+      <Button type="submit" disabled={!title.trim() || add.isPending}>
+        Add category
+      </Button>
+      <ErrorText>{add.error?.message}</ErrorText>
+    </form>
+  );
+}
+
+/** Title (and optionally the link) to start; the full form opens after. */
+function AddNominee({
+  categoryId,
+  taken,
+  onAdded,
+}: {
+  categoryId: string;
+  taken: Set<string>;
+  onAdded: (id: string) => void;
+}) {
+  const refresh = useRefreshEditor();
+  const [title, setTitle] = useState("");
+  const [url, setUrl] = useState("");
+  const add = useMutation({
+    mutationFn: () => createNominee({ categoryId, title: title.trim(), url: url.trim() || null }),
+    onSuccess: async ({ id }) => {
+      await refresh();
+      setTitle("");
+      setUrl("");
+      onAdded(id);
+    },
+  });
+  const id = title.trim() ? uniqueId(slugify(title), taken) : null;
+
+  return (
+    <form
+      className="grid gap-3 rounded border border-neutral-200 p-3 md:grid-cols-[2fr_2fr_auto] md:items-end"
+      onSubmit={(e) => {
+        e.preventDefault();
+        add.mutate();
+      }}
+    >
+      <Field label="New nominee" hint={id ? `id: ${id}` : undefined}>
+        <input className={inputClass} value={title} onChange={(e) => setTitle(e.currentTarget.value)} />
+      </Field>
+      <Field label="Source link (optional)">
+        <input
+          className={inputClass}
+          type="url"
+          value={url}
+          placeholder="https://"
+          onChange={(e) => setUrl(e.currentTarget.value)}
+        />
+      </Field>
+      <Button type="submit" disabled={!title.trim() || add.isPending} className="md:mb-5">
+        Add nominee
+      </Button>
+      <div className="md:col-span-3">
+        <ErrorText>{add.error?.message}</ErrorText>
+      </div>
+    </form>
   );
 }
 
@@ -170,6 +266,11 @@ function CategoryPanel({ category, issues }: { category: AdminCategory; issues: 
         <h3 className="text-sm font-bold">
           Nominees ({category.options.length})
         </h3>
+        <AddNominee
+          categoryId={category.id}
+          taken={new Set(category.options.map((o) => o.id))}
+          onAdded={setOpen}
+        />
         <ul className="divide-y divide-neutral-200 rounded border border-neutral-200">
           {category.options.map((n) => {
             const mine = issues.filter((i) => i.nomineeId === n.id);

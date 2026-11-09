@@ -121,6 +121,24 @@ async function ok(
   throw new Error(text || `${fallback} (${res.status})`);
 }
 
+export type CategoryCreate = Parameters<typeof client.api.admin.categories.$post>[0]["json"];
+
+/** Returns the new category's id. */
+export async function createCategory(data: CategoryCreate) {
+  const res = await client.api.admin.categories.$post({ json: data });
+  await ok(res, "Couldn't add the category");
+  return (await res.json()) as { id: string };
+}
+
+export type NomineeCreate = Parameters<typeof client.api.admin.nominees.$post>[0]["json"];
+
+/** Returns the new nominee's id. */
+export async function createNominee(data: NomineeCreate) {
+  const res = await client.api.admin.nominees.$post({ json: data });
+  await ok(res, "Couldn't add the nominee");
+  return (await res.json()) as { id: string; categoryId: string };
+}
+
 export async function fetchChecks() {
   return parseResponse(client.api.admin.checks.$get());
 }
