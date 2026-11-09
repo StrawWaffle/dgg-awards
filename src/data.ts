@@ -1476,7 +1476,7 @@ export const Data: ImportableData = [
       {
         id: "eatfresh",
         title: "EatFresh",
-        imageId: "eatFresh.png",
+        imageId: "EatFresh.png",
         description: "",
         renderType: "compact",
         url: null,
@@ -1484,8 +1484,8 @@ export const Data: ImportableData = [
       },
       {
         id: "gagaga",
-        title: "gagaga",
-        imageId: "gagaga.png",
+        title: "GAGAGA",
+        imageId: "GAGAGA.png",
         description: "",
         renderType: "compact",
         url: null,
@@ -1557,7 +1557,7 @@ export const Data: ImportableData = [
       {
         id: "mhm",
         title: "mhm",
-        imageId: "Mhm.gif",
+        imageId: "mhm.gif",
         description: "",
         renderType: "compact",
         url: null,
@@ -1592,8 +1592,8 @@ export const Data: ImportableData = [
       },
       {
         id: "peepohug",
-        title: "PeepoHug",
-        imageId: "PeepoHug.png",
+        title: "peepoHug",
+        imageId: "peepoHug.png",
         description: "",
         renderType: "compact",
         url: null,

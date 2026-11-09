@@ -59,14 +59,15 @@ export async function fetchAdminNom() {
   return parseResponse(client.api.admin.nominees.$get());
 }
 
+/** One page of votes, 100 per page, page numbers from 0. */
 export async function fetchAllVotes(
-  offset: number,
+  page: number,
   filter: undefined | { uid?: number; ip?: string },
 ) {
   return parseResponse(
     client.api.admin.votes.$get({
       query: {
-        offset: offset.toString(),
+        page: page.toString(),
         filter_uid: filter?.uid?.toString(),
         filter_ip: filter?.ip || undefined,
       },

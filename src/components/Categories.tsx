@@ -112,7 +112,7 @@ export function Categories() {
 
 export function CategoriesWithResults() {
   const dggBannerSrc =
-    "/Media/dgg_chatter_of_the_year_banner_cutechristiangirl.png";
+    "/Media/dgg_chatter_of_the_year_banner_cutechristiangirl.webp";
 
   const resultsQuery = useQuery({
     queryKey: ["vote_results"],
@@ -148,7 +148,7 @@ export function CategoriesWithResults() {
             <p className="text-blue-1 line-clamp-3 text-center">
               {category.categoryDescription}
             </p>
-            {category.categoryDescription === "dgger" && (
+            {category.categoryId === "dgger" && (
               <img
                 src={dggBannerSrc}
                 alt="DGGer of the Year banner"

@@ -69,9 +69,6 @@ export const votesQuery = z.object({
   filter_ip: z.string().optional(),
   filter_uid: z.string().optional(),
   page: z.string().optional(),
-  // KNOWN BUG, kept on purpose: the admin UI pages with `offset`, which the
-  // server accepts and ignores. It reads `page`.
-  offset: z.string().optional(),
 });
 
 export const importedData = z.array(

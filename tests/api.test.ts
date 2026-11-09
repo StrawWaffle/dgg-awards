@@ -276,12 +276,13 @@ describe("admin", () => {
     expect(byUid.length).toBeGreaterThan(0);
   });
 
-  test("KNOWN BUG: the admin UI sends offset but the server reads page", async () => {
+  test("votes page by page number", async () => {
     const first = await (await req("/api/admin/votes", {}, admin)).json();
-    const offset = await (await req("/api/admin/votes?offset=100", {}, admin)).json();
-    const page = await (await req("/api/admin/votes?page=1", {}, admin)).json();
-    expect(offset).toEqual(first);
-    expect(page).not.toEqual(first);
+    const page0 = await (await req("/api/admin/votes?page=0", {}, admin)).json();
+    const page1 = await (await req("/api/admin/votes?page=1", {}, admin)).json();
+    expect(page0).toEqual(first);
+    expect(page1).toHaveLength(100);
+    expect(page1).not.toEqual(first);
   });
 
   test("category add, update, delete", async () => {
@@ -409,12 +410,17 @@ describe("admin", () => {
     expect(res.status).toBe(400);
   });
 
-  test("KNOWN BUG: data import has no admin check", async () => {
-    const res = await req("/api/admin/import", {
-      method: "POST",
-      body: form({ data: "[]" }),
-    });
-    expect(res.status).toBe(302);
+  test("data import requires admin", async () => {
+    const body = () => form({ data: "[]" });
+    expect((await req("/api/admin/import", { method: "POST", body: body() })).status).toBe(401);
+    expect(
+      (await req("/api/admin/import", { method: "POST", body: body() }, user)).status,
+    ).toBe(401);
+    const ok = await req("/api/admin/import", { method: "POST", body: body() }, admin);
+    expect(ok.status).toBe(302);
+    expect(ok.headers.get("location")).toBe("/admin");
+    const bad = await req("/api/admin/import", { method: "POST", body: form({ data: "{" }) }, admin);
+    expect(bad.status).toBe(400);
   });
 
   test("locked mode hides nominees", async () => {

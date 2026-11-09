@@ -31,9 +31,11 @@ import {
 const backToAdmin = () =>
   new Response(null, { status: 302, headers: [["Location", "/admin"]] });
 
+// Every route here requires an admin session. Register new routes after the
+// .use() line, or they won't be protected.
 export const adminRoutes = new Hono<SessionEnv>()
-  // KNOWN BUG, kept on purpose until fixed separately: import has no admin
-  // check. It is registered before the admin middleware below.
+  .use(requireAdmin)
+
   .post("/import", zValidator("form", importForm, rejectInvalid), async (c) => {
     for (const category of c.req.valid("form").data) {
       await insertCategory({
@@ -47,8 +49,6 @@ export const adminRoutes = new Hono<SessionEnv>()
     }
     return backToAdmin();
   })
-
-  .use(requireAdmin)
 
   .post("/category", zValidator("form", categoryForm, rejectInvalid), async (c) => {
     const form = c.req.valid("form");
@@ -99,7 +99,6 @@ export const adminRoutes = new Hono<SessionEnv>()
   })
 
   .get("/votes", zValidator("query", votesQuery, rejectInvalid), async (c) => {
-    // KNOWN BUG, kept on purpose: the admin UI sends `offset`, this reads `page`.
     const { filter_ip, filter_uid, page } = c.req.valid("query");
     const offset = page ? parseInt(page) * 100 : 0;
     const votes =
