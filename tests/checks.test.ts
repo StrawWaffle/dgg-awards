@@ -44,6 +44,10 @@ describe("checkNominee", () => {
     expect(codes({ url: "https://www.youtube.com/@destiny" })).toEqual(["bare-link"]);
   });
 
+  test("a destiny.gg profile is fine for a chatter", () => {
+    expect(codes({ url: "https://www.destiny.gg/u/StrawWaffle" })).toEqual([]);
+  });
+
   test("1:53:07: an entry from the previous year", () => {
     expect(codes({ date: "2024-03-01" })).toEqual(["wrong-year"]);
   });

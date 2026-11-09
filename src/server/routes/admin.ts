@@ -15,6 +15,7 @@ import {
   updateUserMakeAdmin,
 } from "@/lib/data/driver";
 import { checkAwards } from "@/lib/nominee-checks";
+import { DGG_NAME, fetchDggProfile } from "@/server/dgg-profile";
 import { type SessionEnv, rejectInvalid, requireAdmin, zValidator } from "@/server/middleware";
 import {
   categoryForm,
@@ -104,6 +105,20 @@ export const adminRoutes = new Hono<SessionEnv>()
     const config = await getConfig();
     const year = config.awardYear ? Number(config.awardYear) : undefined;
     return c.json(checkAwards(await getNominees(), year), 200);
+  })
+  // A chatter's destiny.gg membership card, for filling in a nominee.
+  .get("/dgg-profile/:name", async (c) => {
+    const name = c.req.param("name");
+    if (!DGG_NAME.test(name)) {
+      return c.body(null, 400);
+    }
+    try {
+      const profile = await fetchDggProfile(name);
+      return profile ? c.json(profile, 200) : c.body(null, 404);
+    } catch (error) {
+      console.error(error);
+      return c.body(null, 502);
+    }
   })
   .get("/users", async (c) => c.json(await getAllUsers(), 200))
   .patch("/user", zValidator("json", userIdBody, rejectInvalid), async (c) => {

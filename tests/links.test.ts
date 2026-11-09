@@ -29,6 +29,8 @@ describe("classifyLink", () => {
     ["https://files.catbox.moe/2b1sno.mp4", "video-file"],
     ["https://i.imgur.com/x.png", "image"],
     ["https://wiki.destiny.gg/view/Ukrainian_Ana", "wiki"],
+    ["https://www.destiny.gg/u/StrawWaffle", "dgg-profile"],
+    ["https://www.destiny.gg/bigscreen", "web"],
     ["https://mitchdev.net/", "web"],
     ["not a url", "web"],
   ];

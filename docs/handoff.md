@@ -18,6 +18,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 - **Remote:** private repo https://github.com/StrawWaffle/dgg-awards (created 2026-11-09). Push `main` there. Keep it private and push nowhere else until privacy questions are settled with rinlux.
 - **Test containers** `dgga-base` (original code, port 3100), `dgga-new` (port 3200) and `dgga-mock` (port 8790), on network `dgga-test`, stay running until StrawWaffle says otherwise. `dgga-base` runs the original code as the before baseline for screenshot comparisons.
 - **Privacy is deferred.** The site is shared only as a private link for now. Don't spend time on it until StrawWaffle says so.
+- **Old data doesn't need to keep working** (StrawWaffle, 2026-11-09). 2025 only needs to survive as the static archive. Keep using migrations for schema changes, since that's how the live database updates, but don't spend effort on compatibility with old data or import files. 2026 setup can start from a fresh database.
 - **Writing:** apply the `unslop` skill to prose. **UI:** apply the `uncodixify` skill (installed at `~/.claude/skills/uncodixify`, from StrawWaffle's private skills repo).
 - **Commit style:** short, sentence-case, past tense ("Added …"), per `AGENTS.md`.
 - StrawWaffle uses voice-to-text, so ask when something reads oddly.
@@ -132,6 +133,13 @@ Order StrawWaffle gave: preview to rinlux first, then discuss, then these.
 3. ~~**Regression tests, then end-to-end type safety.**~~ Done on `stack-upgrade`.
 4. **Admin editing with preview**, for an allowlist of DGG accounts. It should cover editing nominees and categories, previewing how the site looks, and previewing the results reveal. StrawWaffle wants this to make setup easy for the organizers. Build it on a reworked nominee model that adds a date, a link type and clip start and end times, plus checks that reject bad links, wrong-year dates and duplicates. This is the first hill-climbing step.
    - **Nominee model and checks: done on branch `worktree-nominee-model`** (step 1). The new columns are `date`, `linkType`, `clipStart` and `clipEnd`. `src/lib/links.ts` and `src/lib/nominee-checks.ts` hold the logic, `GET /api/admin/checks` and `bun scripts/check-nominees.ts` report problems, and the config gains `awardYear`. The 2025 data scores 0 of 174 clean, with 25 errors and 317 warnings. When deploying, also set `awardYear` to 2025 in the live database, because the seed only sets it for fresh databases.
+   - **DGG profiles for chatter nominees** (step 1, StrawWaffle's idea).
+     - `destiny.gg/u/<name>` is the "membership card". The `dgg-profile` link type is not a bare link.
+     - `src/server/dgg-profile.ts` reads name, photo, sub tier, team, member since, bio and the hand-drawn **signature**. There's no API, so it parses the `id-card__*` classes. Nationality, gender and age are deliberately not read.
+     - The signature is rebuilt from its path data only, because SVG can carry scripts.
+     - `GET /api/admin/dgg-profile/:name` returns 404 for unknown users and 502 if destiny.gg fails.
+     - Photos are one of 8 presets, so they say little about the person. The signature and bio are the personal parts. Use them in the chatter card design.
+     - Not stored yet: storing needs the media storage from step 3.
    - **4a. Voting style, decided 2026-11-09.** Single pick or ranked, set **per category**, with a **site-wide default** for new categories. Ranked votes are counted by **instant runoff**, and the results page can show the rounds. This needs a schema change: votes get a rank, and the primary key becomes (uid, categoryId, optionId). Lock a category's style once it has votes.
    - **4b. Downloaded clips, decided 2026-11-09.**
      - Use **yt-dlp**, not Cobalt. An admin enters the source URL plus start and end times, and the server downloads just that segment (`--download-sections`) and converts it to an mp4.

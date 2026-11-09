@@ -17,6 +17,7 @@ export const linkTypes = [
   "reddit-user",
   "x-post",
   "x-profile",
+  "dgg-profile",
   "image",
   "video-file",
   "wiki",
@@ -27,7 +28,9 @@ export type LinkType = (typeof linkTypes)[number];
 
 /**
  * Links to a whole channel, profile or subreddit instead of the moment
- * itself. The most common complaint on the 2025 stream.
+ * itself. The most common complaint on the 2025 stream. A destiny.gg profile
+ * is not on this list: for chatter nominees, the membership card (bio,
+ * signature, member since) is the thing being nominated.
  */
 export const bareLinkTypes: ReadonlySet<LinkType> = new Set([
   "youtube-channel",
@@ -144,6 +147,7 @@ export function classifyLink(raw: string): { type: LinkType; start?: number } {
     return parts[1] === "status" ? { type: "x-post" } : { type: "x-profile" };
   }
 
+  if (host === "destiny.gg" && parts[0] === "u" && parts[1]) return { type: "dgg-profile" };
   if (host === "wiki.destiny.gg") return { type: "wiki" };
   return { type: "web" };
 }
@@ -183,6 +187,7 @@ const platformLabels: Record<LinkType, string> = {
   "reddit-user": "Reddit profile",
   "x-post": "Post on X",
   "x-profile": "X profile",
+  "dgg-profile": "DGG profile",
   image: "Image",
   "video-file": "Video",
   wiki: "DGG wiki",

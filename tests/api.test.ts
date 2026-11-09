@@ -461,6 +461,11 @@ describe("admin", () => {
     expect(count("duplicate-title")).toBe(2);
   });
 
+  test("DGG profile lookup is admin-only and checks the name", async () => {
+    expect((await req("/api/admin/dgg-profile/StrawWaffle", {}, user)).status).toBe(401);
+    expect((await req("/api/admin/dgg-profile/bad%20name!", {}, admin)).status).toBe(400);
+  });
+
   test("make admin by uid", async () => {
     const other = await signIn("Promoted");
     const uid = (await (await req("/api/me", {}, other)).json()).uid;
