@@ -51,6 +51,11 @@ export const categoriesTable = sqliteTable("categories", {
   votingStyle: text().$type<VotingStyle>(),
   /** Display order, set by dragging in the admin editor. Lowest first. */
   position: int().notNull().default(0),
+  /**
+   * Hidden from the site and the results, with its nominees and votes kept.
+   * A category with votes can only be hidden, not deleted.
+   */
+  hidden: int({ mode: "boolean" }).notNull().default(false),
 });
 
 export const optionsTable = sqliteTable(

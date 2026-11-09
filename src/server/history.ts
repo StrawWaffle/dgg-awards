@@ -4,6 +4,7 @@
 import {
   type CategoryRow,
   type NomineeRow,
+  categoryHasVotes,
   deleteCategory,
   deleteNominee,
   getCategory,
@@ -252,7 +253,38 @@ export async function undo(id: number, actor: Actor, force = false): Promise<num
       return record(actor, { ...base, action: "update", before: { ids: current }, after: { ids } });
     }
 
-    case "import":
-      throw new UndoConflict("Imports can't be undone here.");
+    case "import": {
+      if (entry.action === "create") {
+        // Remove what the import added, unless it has been voted on since.
+        const ids = (after.categories ?? []) as string[];
+        const snapshots = [];
+        for (const categoryId of ids) {
+          if (await categoryHasVotes(categoryId)) {
+            throw new UndoConflict(`"${categoryId}" has votes now, so the import can't be undone.`);
+          }
+        }
+        for (const categoryId of ids) {
+          const snapshot = await categorySnapshot(categoryId);
+          if (!snapshot) continue;
+          snapshots.push(snapshot);
+          await deleteCategory(categoryId);
+        }
+        return record(actor, { ...base, action: "delete", before: { categories: snapshots } });
+      }
+      // Undoing that undo: put the imported categories back.
+      const snapshots = (before.categories ?? []) as (CategoryRow & { options?: NomineeRow[] })[];
+      for (const snap of snapshots) {
+        if (await getCategory(snap.id)) throw new UndoConflict(`A category "${snap.id}" exists again.`);
+      }
+      for (const { options = [], ...row } of snapshots) {
+        await insertCategory(row);
+        for (const nominee of options) await insertNominee(nominee);
+      }
+      return record(actor, {
+        ...base,
+        action: "create",
+        after: { categories: snapshots.map((s) => s.id), nominees: snapshots.reduce((n, s) => n + (s.options?.length ?? 0), 0) },
+      });
+    }
   }
 }

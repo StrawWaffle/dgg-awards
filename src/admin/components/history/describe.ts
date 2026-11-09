@@ -28,12 +28,13 @@ const fieldNames: Record<string, string> = {
   defaultVotingStyle: "default voting style",
   message: "message",
   admin: "admin",
+  hidden: "hidden",
   ids: "order",
 };
 export const fieldName = (key: string) => fieldNames[key] ?? key;
 
 /** Not worth showing: ids, the stored order and the bookkeeping around clips. */
-const hidden = new Set(["id", "categoryId", "position", "uid", "options", "clipError"]);
+const hidden = new Set(["id", "categoryId", "position", "uid", "options", "clipError", "categories"]);
 
 const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
 
@@ -45,7 +46,7 @@ export function formatValue(key: string, value: unknown): string {
   if ((key === "clipStart" || key === "clipEnd") && typeof value === "number") return formatTimestamp(value);
   if (key === "thumbnailAt" && typeof value === "number") return `${value}s into the clip`;
   if ((key === "clipKey" || key === "thumbnailKey") && typeof value === "string") return value.split("/").pop()!;
-  if (key === "admin") return value ? "yes" : "no";
+  if (key === "admin" || key === "hidden") return value ? "yes" : "no";
   if (key === "ids" && Array.isArray(value)) return value.map((id, i) => `${i + 1}. ${id}`).join("\n");
   if (key === "votingStyle" && value === null) return "site default";
   return String(value);
@@ -79,6 +80,9 @@ export function describe(entry: HistoryEntry): string {
       return `Changed ${changed(entry) || "nothing visible"} of`;
     case "category":
       if (entry.action === "create") return "Added category";
+      if (entry.action === "update" && Object.keys(after).length === 1 && "hidden" in after) {
+        return after.hidden ? "Hid category" : "Showed category";
+      }
       if (entry.action === "delete") {
         const n = ((entry.before as Snapshot | null)?.options as unknown[] | undefined)?.length ?? 0;
         return `Deleted category (with ${n} nominee${n === 1 ? "" : "s"})`;
@@ -91,9 +95,9 @@ export function describe(entry: HistoryEntry): string {
     case "order":
       return "Reordered";
     case "import":
-      return `Imported ${after.nominees ?? 0} nominees in`;
+      return entry.action === "create" ? `Imported ${after.nominees ?? 0} nominees in` : "Removed the import of";
   }
 }
 
 /** Whether Undo is offered at all (the server still checks). */
-export const undoable = (entry: HistoryEntry) => entry.kind !== "import" && entry.undoneBy === null;
+export const undoable = (entry: HistoryEntry) => entry.undoneBy === null;

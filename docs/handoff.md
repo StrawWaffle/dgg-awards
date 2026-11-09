@@ -175,11 +175,38 @@ StrawWaffle pointed out that the wiki has the confirmed 2025 results: https://wi
 - **Except Omegalul, which adds to 125.02% on the page.** Its winner shows Godstiny's 45.98%, so it's most likely a copy slip on the wiki; the real figure would be 20.96%. Ask RiN_LuX. Details are in the doc.
 - **For the archive (feature 8):** this is enough for winners and percentages, but not counts. Whether to build the archive from it is StrawWaffle's call.
 
-### StrawWaffle's follow-ups on the history round (2026-11-09, not built yet)
+### Fourth round: StrawWaffle's follow-ups on the history (2026-11-09, built)
 
-- **Hide categories instead of deleting them once voting has started.** Deleting a category deletes its votes, so a restored one comes back empty. Once voting starts, "Delete" should become "Hide": the category leaves the public site, and its nominees and votes are kept.
-- **Back up before an import, and offer an export.** Imports can't be undone. Instead, take an automatic backup before each import that can be restored, plus an export of the nominees and categories as a file.
-- **Archive: wait for the full 2025 data.** Don't build it from the wiki percentages.
+- **Hiding categories** (migration 0007, `categories.hidden`):
+  - A category with votes can't be deleted (409). Hide it instead. Hidden categories leave the public site, the results and the nominee checks, and votes for them are refused. Their nominees and votes are kept.
+  - A nominee with votes can't be deleted either. That used to fail with a database error; it now answers 409 with a message.
+  - In the editor, the button reads "Hide from the site" or "Show on the site". A hidden category is crossed out in the list, and Delete is disabled with an explanation. Hiding is in the history, so it can be undone.
+- **Export:** `GET /api/admin/export` downloads every category and nominee, hidden ones included, with finished clip and thumbnail keys. It's in Settings → Data.
+- **Import** reads the export format (Settings → Data, or `POST /api/admin/import`).
+  - Ids that already exist are refused up front, so nothing is half imported.
+  - Before each import the whole database is copied to `/data/backups/<time>-before-import.db`, keeping the newest 20. It uses `VACUUM INTO`, which gives a consistent copy while the site is in use.
+  - **Imports can be undone now:** undo removes the imported categories (unless they've been voted on), and undoing that puts them back.
+- **Archive: wait for the full 2025 data** (StrawWaffle). Don't build it from the wiki percentages.
+- Tests: 42 API tests pass, with both snapshots unchanged. New ones cover hiding, the delete guards, and an export → import → undo → redo round trip.
+
+### Next: the lab page (StrawWaffle's answers, 2026-11-09)
+
+StrawWaffle wants the front page and the presentation to feel fun, quirky and wholesome. It gets built on an experimental page first (`/lab`, admins only) until rinlux approves. Order: the follow-ups above, merge and deploy, then the lab.
+- **Music:** the dgg-karaoke menu track, "black lover (instrumental only)" by Tiny Ghost Studios. **StrawWaffle has approval to use it.**
+  - Do both approaches: host our own copy and analyse it live in the browser (Web Audio AnalyserNode), and also precompute a beat and energy map from it.
+  - Start on the first click at a low volume, with a volume bar and a mute button, remembered per browser, like dgg-karaoke.
+  - Credit the track the way dgg-karaoke's menu footer does.
+  - **Needed from StrawWaffle:** the audio file.
+- **Emotes instead of icons** where they're clear, reacting to what you do. StrawWaffle suggests:
+  - Klappa for clapping (the usual applause)
+  - PepoG (taking notes) for survey-type parts
+  - dgg-radio's music emotes for the music
+  - Render them the way dgg-radio does (`emotes.md`): CDN `emotes.css`, emotes as background elements, sized with `zoom` or `scale`.
+- **Chat characters in presentation mode:** chatters shown as emote "NPCs" walking around, clapping and doing emote combos.
+  - **Only on the stream screen.** Presentation mode is for an allowlist of users, admins included, not the public.
+  - **Names are shown.** Messages that aren't pure emotes are mostly dropped. People with a verifiable DGG connection (orbiters, friends of the stream, notable chatters, perhaps via flairs; see dgg-radio's `flairs.md`) could get their message shown briefly at the right moment, such as when they win an award.
+  - **Built for a flood:** chat gets extremely busy during the awards. The server holds one connection to `wss://chat.destiny.gg/ws` (browsers are refused, so it's a relay, as in dgg-radio's `src/server/dgg-socket.ts` and `dgg-chat.ts`) and sends the page a small summary a few times a second. The page draws a capped number of characters on a canvas. Stress test it by replaying recorded chat at many times the speed.
+- **Music-reactive animation** from the analysis: things on the page move to the track.
 
 **Ideas from StrawWaffle, not built.** Several need rinlux's say first, since they are in charge of these decisions:
 - **More roles** than admin, e.g. moderators or editors who can only edit nominees.

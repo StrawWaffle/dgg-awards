@@ -106,6 +106,7 @@ export const categoryPatch = z.object({
   description: z.string().optional(),
   /** null: follow the site default. */
   votingStyle: z.enum(votingStyles).nullable().optional(),
+  hidden: z.boolean().optional(),
 });
 
 export const nomineePatch = z.object({
@@ -165,12 +166,22 @@ export const votesQuery = z.object({
   page: z.string().optional(),
 });
 
+/** A stored clip or thumbnail, as the export writes it: never a path out. */
+const mediaKey = z
+  .string()
+  .regex(/^(clips|thumbs)\/[\w.\/-]+$/)
+  .refine((k) => !k.includes(".."))
+  .nullable()
+  .optional();
+
+/** The export format (GET /api/admin/export), which import reads back. */
 export const importedData = z.array(
   z.object({
     id: required,
     title: z.string(),
     description: z.string(),
     votingStyle: z.enum(votingStyles).nullable().optional(),
+    hidden: z.boolean().optional(),
     options: z.array(
       z.object({
         id: required,
@@ -181,6 +192,10 @@ export const importedData = z.array(
         videoId: z.string().nullable(),
         renderType: renderType.nullable(),
         ...nomineeDetails,
+        clipKey: mediaKey,
+        clipStatus: z.enum(["ready"]).nullable().optional(),
+        thumbnailKey: mediaKey,
+        thumbnailAt: z.number().int().min(0).nullable().optional(),
       }),
     ),
   }),

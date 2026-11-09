@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, ErrorText, Field, inputClass } from "@/admin/components/editor/fields";
 import type { ViewingMode } from "@/lib/types";
 import type { VotingStyle } from "@/lib/voting";
-import { type Config, fetchConfig, saveSettings } from "@/lib/queries";
+import { type Config, fetchConfig, importNominees, saveSettings } from "@/lib/queries";
 
 const modes: { value: ViewingMode; label: string; hint: string }[] = [
   { value: "locked", label: "Locked", hint: "Visitors see only the header." },
@@ -26,7 +26,75 @@ export function SettingsTab() {
   if (config.isPending) return <p className="text-sm">Loading…</p>;
   if (config.isError) return <ErrorText>Couldn't load the settings: {config.error.message}</ErrorText>;
   // Keyed on the loaded config, so the form starts over after a save.
-  return <SettingsForm key={JSON.stringify(config.data)} config={config.data} />;
+  return (
+    <div className="max-w-2xl space-y-6">
+      <SettingsForm key={JSON.stringify(config.data)} config={config.data} />
+      <DataSection />
+    </div>
+  );
+}
+
+/** Export everything as a file to keep, and add categories from one. */
+function DataSection() {
+  const queryClient = useQueryClient();
+  const fileInput = useRef<HTMLInputElement>(null);
+  const importing = useMutation({
+    mutationFn: async (file: File) => {
+      const text = await file.text();
+      let summary = "";
+      try {
+        const data = JSON.parse(text) as { title: string; options: unknown[] }[];
+        const nominees = data.reduce((n, c) => n + (c.options?.length ?? 0), 0);
+        summary = `${data.length} categories with ${nominees} nominees`;
+      } catch {
+        throw new Error("That file isn't JSON.");
+      }
+      if (!confirm(`Add ${summary}? The database is backed up first, and this can be undone from History.`)) {
+        return null;
+      }
+      await importNominees(text);
+      return summary;
+    },
+    onSuccess: () => queryClient.invalidateQueries(),
+  });
+
+  return (
+    <section className="space-y-4 rounded border border-neutral-200 bg-white p-6">
+      <h2 className="text-sm font-bold">Data</h2>
+      <div className="flex flex-wrap items-center gap-3">
+        <a
+          href="/api/admin/export"
+          download
+          className="rounded border border-neutral-300 bg-white px-3 py-1 text-sm text-neutral-800 hover:bg-neutral-100"
+        >
+          Download all nominees
+        </a>
+        <span className="text-sm text-neutral-600">
+          Every category and nominee as a JSON file, hidden ones included. Keep it as a backup.
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <input
+          ref={fileInput}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.currentTarget.files?.[0];
+            if (file) importing.mutate(file, { onSettled: () => fileInput.current && (fileInput.current.value = "") });
+          }}
+        />
+        <Button onClick={() => fileInput.current?.click()} disabled={importing.isPending}>
+          {importing.isPending ? "Importing…" : "Import from a file"}
+        </Button>
+        <span className="text-sm text-neutral-600">
+          Adds the categories in a downloaded file. Categories that already exist are refused.
+        </span>
+      </div>
+      {importing.data && <p className="text-sm text-neutral-600">Added {importing.data}.</p>}
+      <ErrorText>{importing.error?.message}</ErrorText>
+    </section>
+  );
 }
 
 function SettingsForm({ config }: { config: Config }) {
@@ -58,7 +126,7 @@ function SettingsForm({ config }: { config: Config }) {
 
   return (
     <form
-      className="max-w-2xl space-y-6 rounded border border-neutral-200 bg-white p-6"
+      className="space-y-6 rounded border border-neutral-200 bg-white p-6"
       onSubmit={(e) => {
         e.preventDefault();
         save.mutate();

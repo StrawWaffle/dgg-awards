@@ -143,7 +143,11 @@ function CategoryItem({
         type="button"
         onClick={onSelect}
         aria-current={selected || undefined}
-        className={clsx("min-w-0 flex-1 py-2 pr-3 pl-1 text-left text-sm", selected && "font-bold")}
+        className={clsx(
+          "min-w-0 flex-1 py-2 pr-3 pl-1 text-left text-sm",
+          selected && "font-bold",
+          c.hidden && "text-neutral-500 line-through decoration-neutral-400",
+        )}
       >
         <span className="block">{c.title}</span>
         <span className="block text-xs font-normal text-neutral-500">
@@ -151,6 +155,7 @@ function CategoryItem({
           {errors > 0 && issues.length > errors && " · "}
           {issues.length > errors && `${issues.length - errors} warning${issues.length - errors === 1 ? "" : "s"}`}
           {issues.length === 0 && "No problems"}
+          {c.hidden && " · hidden"}
         </span>
       </button>
     </li>
@@ -274,11 +279,16 @@ function CategoryPanel({ category, issues }: { category: AdminCategory; issues: 
     mutationFn: () => deleteCategory(category.id),
     onSuccess: refresh,
   });
+  const hide = useMutation({
+    mutationFn: (hidden: boolean) => saveCategory({ id: category.id, hidden }),
+    onSuccess: refresh,
+  });
 
   return (
     <div className="space-y-4">
       <h2 className="text-base font-bold">
         {category.title} <span className="font-normal text-neutral-500">({category.id})</span>
+        {category.hidden && <span className="ml-2 text-sm font-normal text-neutral-500">· hidden from the site</span>}
       </h2>
 
       <Section id="category-settings" title="Category settings" boxed={false}>
@@ -321,16 +331,27 @@ function CategoryPanel({ category, issues }: { category: AdminCategory; issues: 
             </Button>
             <ErrorText>{save.error?.message}</ErrorText>
             <span className="grow" />
+            <Button disabled={hide.isPending} onClick={() => hide.mutate(!category.hidden)}>
+              {category.hidden ? "Show on the site" : "Hide from the site"}
+            </Button>
             <Button
               variant="danger"
-              disabled={remove.isPending}
+              disabled={remove.isPending || category.hasVotes}
+              title={category.hasVotes ? "It has votes. Hide it instead, which keeps them." : undefined}
               onClick={() => {
-                if (confirm(`Delete "${category.title}" with all its nominees and votes?`)) remove.mutate();
+                if (confirm(`Delete "${category.title}" and its nominees?`)) remove.mutate();
               }}
             >
               Delete category
             </Button>
           </div>
+          <ErrorText>{hide.error?.message ?? remove.error?.message}</ErrorText>
+          {category.hasVotes && (
+            <p className="text-xs text-neutral-500">
+              This category has votes, so it can be hidden but not deleted. Hiding takes it off the site and out of
+              the results, and keeps its nominees and votes.
+            </p>
+          )}
         </form>
       </Section>
 

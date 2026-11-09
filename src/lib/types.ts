@@ -22,7 +22,7 @@ export type Session = InferSelectModel<typeof sessionsTable>;
 export type PublicSession = Pick<Session, "id" | "uid">;
 // As the API sends them: `position` only decides the order they come in.
 export type Option = Omit<InferSelectModel<typeof optionsTable>, "position">;
-export type Category = Omit<InferSelectModel<typeof categoriesTable>, "position">;
+export type Category = Omit<InferSelectModel<typeof categoriesTable>, "position" | "hidden">;
 /** Nominee fields added after 2025; optional in data files and imports. */
 export type NomineeDetails =
   | "date"
@@ -36,7 +36,7 @@ export type NomineeDetails =
   | "thumbnailAt";
 
 export type ImportableData = (Omit<Category, "votingStyle"> &
-  Partial<Pick<Category, "votingStyle">> & {
+  Partial<Pick<Category, "votingStyle">> & { hidden?: boolean } & {
   options: (Omit<Option, "categoryId" | NomineeDetails> &
     Partial<Pick<Option, NomineeDetails>>)[];
 })[];

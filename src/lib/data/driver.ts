@@ -180,9 +180,10 @@ export async function getUserBallots(uid: number): Promise<Record<string, string
 }
 
 /** A category with its style and nominee ids, for validating a ballot. */
+/** A category open for votes; hidden ones aren't. */
 export async function getCategoryForVoting(id: string) {
   return db.query.categoriesTable.findFirst({
-    where: (c, { eq }) => eq(c.id, id),
+    where: (c, { and, eq }) => and(eq(c.id, id), eq(c.hidden, false)),
     with: { options: { columns: { id: true } } },
   });
 }
@@ -375,6 +376,34 @@ export async function setCategoryFields(id: string, fields: Partial<CategoryRow>
   await db.update(schema.categoriesTable).set(rest).where(eq(schema.categoriesTable.id, id));
 }
 
+/** Per category: hidden or not, and whether it has any votes. */
+export async function getCategoryFlags() {
+  const rows = await db
+    .select({
+      id: schema.categoriesTable.id,
+      hidden: schema.categoriesTable.hidden,
+      hasVotes: sql<number>`exists (select 1 from votes v where v.categoryId = ${schema.categoriesTable.id})`,
+    })
+    .from(schema.categoriesTable);
+  return new Map(rows.map((r) => [r.id, { hidden: r.hidden, hasVotes: Boolean(r.hasVotes) }]));
+}
+
+/**
+ * Copy the whole database to `<db folder>/backups/<time>-<reason>.db` and
+ * keep the newest 20. A consistent copy even while the site is in use.
+ */
+export async function backupDatabase(reason: string) {
+  const { mkdir, readdir, rm } = await import("node:fs/promises");
+  const { dirname, join } = await import("node:path");
+  const dir = join(dirname(db_uri), "backups");
+  await mkdir(dir, { recursive: true });
+  const file = join(dir, `${new Date().toISOString().replace(/[:.]/g, "-")}-${reason}.db`);
+  sqlite.run("VACUUM INTO ?", [file]);
+  const old = (await readdir(dir)).filter((f) => f.endsWith(".db")).sort().slice(0, -20);
+  for (const f of old) await rm(join(dir, f), { force: true });
+  return file;
+}
+
 export async function nomineeHasVotes(categoryId: string, id: string) {
   const vote = await db.query.votesTable.findFirst({
     where: (v, { and, eq }) => and(eq(v.categoryId, categoryId), eq(v.optionId, id)),
@@ -453,9 +482,10 @@ export async function listUnfinishedClips() {
 }
 
 /** Every category with its nominees, in display order. */
-export async function getNominees() {
+export async function getNominees({ includeHidden = false } = {}) {
   return await db.query.categoriesTable.findMany({
-    columns: { position: false },
+    columns: { position: false, hidden: false },
+    where: includeHidden ? undefined : (c, { eq }) => eq(c.hidden, false),
     orderBy: (c, { asc }) => [asc(c.position)],
     with: {
       options: {
@@ -514,12 +544,13 @@ export async function updateCategory({
   description,
   title,
   votingStyle,
+  hidden,
 }: Partial<InferInsertModel<typeof schema.categoriesTable>> & {
   id: string;
 }) {
   return await db
     .update(schema.categoriesTable)
-    .set({ description, title, votingStyle })
+    .set({ description, title, votingStyle, hidden })
     .where(eq(schema.categoriesTable.id, id));
 }
 
@@ -715,8 +746,11 @@ export async function getVotingResults(): Promise<ResultsData> {
   const allResults = await db.query.optionsTable.findMany({
     with: { votes: true, category: true },
   });
-  // Display order: categories, then nominees within each.
-  allResults.sort((a, b) => a.category.position - b.category.position || a.position - b.position);
+  // Display order: categories, then nominees within each. Hidden categories
+  // aren't in the results.
+  const shown = allResults
+    .filter((o) => !o.category.hidden)
+    .sort((a, b) => a.category.position - b.category.position || a.position - b.position);
   const config = await getConfig();
-  return processVoteResults(allResults, config.defaultVotingStyle);
+  return processVoteResults(shown, config.defaultVotingStyle);
 }

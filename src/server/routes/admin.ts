@@ -2,7 +2,11 @@ import { Hono } from "hono";
 import {
   deleteCategory,
   deleteNominee,
+  backupDatabase,
   getAdmins,
+  getCategoryFlags,
+  getCategoryNominees,
+  nomineeHasVotes,
   getCategory,
   getHistory,
   getUser,
@@ -88,14 +92,26 @@ const backToAdmin = () =>
 export const adminRoutes = new Hono<SessionEnv>()
   .use(requireAdmin)
 
+  /**
+   * Add categories (with their nominees) from the export format. Ids already
+   * in use are refused up front, so nothing is half imported. The database is
+   * backed up first, and the import can be undone from the history.
+   */
   .post("/import", zValidator("form", importForm, rejectInvalid), async (c) => {
     const data = c.req.valid("form").data;
+    const taken = new Set((await getNominees({ includeHidden: true })).map((cat) => cat.id));
+    const clash = data.map((cat) => cat.id).filter((id, i, ids) => taken.has(id) || ids.indexOf(id) !== i);
+    if (clash.length > 0) {
+      return c.text(`These categories already exist: ${[...new Set(clash)].join(", ")}`, 409);
+    }
+    if (data.length > 0) await backupDatabase("before-import");
     for (const category of data) {
       await insertCategory({
         id: category.id,
         description: category.description,
         title: category.title,
         votingStyle: category.votingStyle ?? null,
+        hidden: category.hidden ?? false,
       });
       for (const option of category.options) {
         await insertNominee({ ...option, categoryId: category.id });
@@ -105,7 +121,7 @@ export const adminRoutes = new Hono<SessionEnv>()
       await record(await actor(c), {
         kind: "import",
         action: "create",
-        label: `${data.length} categories`,
+        label: `${data.length} categor${data.length === 1 ? "y" : "ies"}`,
         after: {
           categories: data.map((cat) => cat.id),
           nominees: data.reduce((n, cat) => n + cat.options.length, 0),
@@ -113,6 +129,41 @@ export const adminRoutes = new Hono<SessionEnv>()
       });
     }
     return backToAdmin();
+  })
+  /** Every category and nominee, in the format import reads: a backup to keep. */
+  .get("/export", async (c) => {
+    const flags = await getCategoryFlags();
+    const categories = await getNominees({ includeHidden: true });
+    const data = await Promise.all(
+      categories.map(async (cat) => ({
+        id: cat.id,
+        title: cat.title,
+        description: cat.description,
+        votingStyle: cat.votingStyle,
+        hidden: flags.get(cat.id)?.hidden ?? false,
+        options: (await getCategoryNominees(cat.id)).map((o) => ({
+          id: o.id,
+          title: o.title,
+          description: o.description,
+          url: o.url,
+          imageId: o.imageId,
+          videoId: o.videoId,
+          renderType: o.renderType,
+          date: o.date,
+          linkType: o.linkType,
+          clipStart: o.clipStart,
+          clipEnd: o.clipEnd,
+          // Only finished clips; a build in progress isn't worth restoring.
+          clipKey: o.clipStatus === "ready" ? o.clipKey : null,
+          clipStatus: o.clipStatus === "ready" ? ("ready" as const) : null,
+          thumbnailKey: o.thumbnailKey,
+          thumbnailAt: o.thumbnailAt,
+        })),
+      })),
+    );
+    const day = new Date().toISOString().slice(0, 10);
+    c.header("Content-Disposition", `attachment; filename="dgg-awards-nominees-${day}.json"`);
+    return c.json(data, 200);
   })
 
   .post("/category", zValidator("form", categoryForm, rejectInvalid), async (c) => {
@@ -170,6 +221,10 @@ export const adminRoutes = new Hono<SessionEnv>()
   })
   .delete("/category", zValidator("query", idQuery, rejectInvalid), async (c) => {
     const { id } = c.req.valid("query");
+    // Deleting would delete its votes too.
+    if (await categoryHasVotes(id)) {
+      return c.text("This category has votes. Hide it instead, which keeps them.", 409);
+    }
     const snapshot = await categorySnapshot(id);
     const result = await deleteCategory(id);
     if (snapshot) {
@@ -212,6 +267,9 @@ export const adminRoutes = new Hono<SessionEnv>()
   })
   .delete("/nominee", zValidator("query", nomineeQuery, rejectInvalid), async (c) => {
     const { categoryId, id } = c.req.valid("query");
+    if (await nomineeHasVotes(categoryId, id)) {
+      return c.text("This nominee has votes, so it can't be deleted. Hide its category instead if it must go.", 409);
+    }
     const nominee = await getNominee(categoryId, id);
     await deleteNominee(categoryId, id);
     // Its clip and thumbnail files stay, so undoing the delete brings them back.
@@ -232,7 +290,7 @@ export const adminRoutes = new Hono<SessionEnv>()
   // the Management tab. Ids are made from the title and kept unique.
   .post("/categories", zValidator("json", categoryCreate, rejectInvalid), async (c) => {
     const body = c.req.valid("json");
-    const taken = new Set((await getNominees()).map((cat) => cat.id));
+    const taken = new Set((await getNominees({ includeHidden: true })).map((cat) => cat.id));
     const id = body.id ?? uniqueId(slugify(body.title), taken);
     if (taken.has(id)) return c.text(`A category with the id "${id}" already exists.`, 409);
     await insertCategory({
@@ -246,7 +304,7 @@ export const adminRoutes = new Hono<SessionEnv>()
   })
   .post("/nominees", zValidator("json", nomineeCreate, rejectInvalid), async (c) => {
     const body = c.req.valid("json");
-    const category = (await getNominees()).find((cat) => cat.id === body.categoryId);
+    const category = (await getNominees({ includeHidden: true })).find((cat) => cat.id === body.categoryId);
     if (!category) return c.body(null, 404);
     const taken = new Set(category.options.map((o) => o.id));
     const id = body.id ?? uniqueId(slugify(body.title), taken);
@@ -304,7 +362,18 @@ export const adminRoutes = new Hono<SessionEnv>()
 
   .get("/nominees", async (c) => {
     const config = await getConfig();
-    return c.json(categoriesWithMediaUrls(withEffectiveStyles(await getNominees(), config.defaultVotingStyle)), 200);
+    const flags = await getCategoryFlags();
+    const categories = categoriesWithMediaUrls(
+      withEffectiveStyles(await getNominees({ includeHidden: true }), config.defaultVotingStyle),
+    );
+    return c.json(
+      categories.map((cat) => ({
+        ...cat,
+        hidden: flags.get(cat.id)?.hidden ?? false,
+        hasVotes: flags.get(cat.id)?.hasVotes ?? false,
+      })),
+      200,
+    );
   })
   // Everything wrong with the nominees, for the admin editor. Problems come
   // from src/lib/nominee-checks.ts; the year from the awardYear setting.

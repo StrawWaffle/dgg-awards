@@ -87,11 +87,19 @@ export async function fetchVoteStats() {
 }
 
 export async function deleteCategory(id: string) {
-  await client.api.admin.category.$delete({ query: { id } });
+  await ok(await client.api.admin.category.$delete({ query: { id } }), "Couldn't delete the category");
 }
 
 export async function deleteNominee(categoryId: string, id: string) {
-  await client.api.admin.nominee.$delete({ query: { categoryId, id } });
+  await ok(await client.api.admin.nominee.$delete({ query: { categoryId, id } }), "Couldn't delete the nominee");
+}
+
+/** Add categories from an export file. Returns how many. */
+export async function importNominees(text: string) {
+  const res = await client.api.admin.import.$post({ form: { data: text } }, { init: { redirect: "manual" } });
+  // Success answers with a redirect back to the admin page (it's a form post too).
+  if (res.status === 400) throw new Error("That file isn't in the export format.");
+  if (res.type !== "opaqueredirect" && res.status !== 302) await ok(res, "Couldn't import");
 }
 
 export type NomineePatch = Parameters<

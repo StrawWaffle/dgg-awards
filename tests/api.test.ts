@@ -646,6 +646,71 @@ describe("admin", () => {
     expect((await history("kind=settings")).every((e: any) => e.kind === "settings")).toBe(true);
   });
 
+  test("categories with votes are hidden, not deleted", async () => {
+    const json = (method: string, body: unknown) => ({
+      method,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const publicIds = async () => (await (await req("/api/nominees")).json()).map((c: any) => c.id);
+    const adminAlly = async () =>
+      (await (await req("/api/admin/nominees", {}, admin)).json()).find((c: any) => c.id === "ally");
+
+    expect(await adminAlly()).toMatchObject({ hidden: false, hasVotes: true });
+    const refused = await req("/api/admin/category?id=ally", { method: "DELETE" }, admin);
+    expect(refused.status).toBe(409);
+    expect(await refused.text()).toContain("Hide it instead");
+    expect((await req("/api/admin/nominee?categoryId=ally&id=zee", { method: "DELETE" }, admin)).status).toBe(409);
+
+    expect((await req("/api/admin/category", json("PATCH", { id: "ally", hidden: true }), admin)).status).toBe(200);
+    expect(await publicIds()).not.toContain("ally");
+    expect(await adminAlly()).toMatchObject({ hidden: true, hasVotes: true });
+    const preview = await (await req("/api/vote/results?preview=1", {}, admin)).json();
+    expect(preview.map((c: any) => c.categoryId)).not.toContain("ally");
+    // Votes for it are refused while it's hidden.
+    const voter = await signIn("HiddenVoter");
+    expect((await req("/api/vote", json("POST", { category_id: "ally", nominee_id: "zee" }), voter)).status).toBe(400);
+    const [hid] = await (await req("/api/admin/history?kind=category&categoryId=ally", {}, admin)).json();
+    expect(hid).toMatchObject({ action: "update", before: { hidden: false }, after: { hidden: true } });
+
+    expect((await req("/api/admin/category", json("PATCH", { id: "ally", hidden: false }), admin)).status).toBe(200);
+    expect(await publicIds()).toContain("ally");
+  });
+
+  test("export, then import a copy, undo it and redo it", async () => {
+    const res = await req("/api/admin/export", {}, admin);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-disposition")).toMatch(/attachment; filename="dgg-awards-nominees-\d{4}-\d{2}-\d{2}\.json"/);
+    const data = await res.json();
+    const ally = data.find((c: any) => c.id === "ally");
+    expect(ally.options.map((o: any) => o.id)).toContain("zee");
+    expect(Object.keys(ally).sort()).toEqual(["description", "hidden", "id", "options", "title", "votingStyle"]);
+
+    const importIt = (cats: unknown) => req("/api/admin/import", { method: "POST", body: form({ data: JSON.stringify(cats) }) }, admin);
+    // Existing ids are refused up front.
+    const clash = await importIt([ally]);
+    expect(clash.status).toBe(409);
+    expect(await clash.text()).toContain("ally");
+
+    const copy = { ...ally, id: "ally_copy", title: "Ally copy" };
+    expect((await importIt([copy])).status).toBe(302);
+    const ids = async () => (await (await req("/api/nominees")).json()).map((c: any) => c.id);
+    expect(await ids()).toContain("ally_copy");
+    const copied = (await (await req("/api/nominees")).json()).find((c: any) => c.id === "ally_copy");
+    expect(copied.options.map((o: any) => o.id)).toEqual(ally.options.map((o: any) => o.id));
+
+    const [imported] = await (await req("/api/admin/history?kind=import", {}, admin)).json();
+    expect(imported).toMatchObject({ action: "create", after: { categories: ["ally_copy"] } });
+    const undo = (id: number) =>
+      req(`/api/admin/history/${id}/undo`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }, admin);
+    expect((await undo(imported.id)).status).toBe(200);
+    expect(await ids()).not.toContain("ally_copy");
+    const [removed] = await (await req("/api/admin/history?kind=import", {}, admin)).json();
+    expect((await undo(removed.id)).status).toBe(200);
+    expect(await ids()).toContain("ally_copy");
+    await req("/api/admin/category?id=ally_copy", { method: "DELETE" }, admin);
+  });
+
   test("make admin by uid", async () => {
     const other = await signIn("Promoted");
     const uid = (await (await req("/api/me", {}, other)).json()).uid;
@@ -829,9 +894,10 @@ describe("admin", () => {
     ]);
     await setMode(admin, "voting");
 
-    for (const id of ["rankedcat", "emptycat"]) {
-      await req(`/api/admin/category?id=${id}`, { method: "DELETE" }, admin);
-    }
+    // The empty one can go; the voted one can only be hidden.
+    expect((await req("/api/admin/category?id=emptycat", { method: "DELETE" }, admin)).status).toBe(200);
+    expect((await req("/api/admin/category?id=rankedcat", { method: "DELETE" }, admin)).status).toBe(409);
+    await req("/api/admin/category", json("PATCH", { id: "rankedcat", hidden: true }), admin);
   });
 
   // Needs the dgga-files container serving tests/fixtures (see tests/run.sh).
