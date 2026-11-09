@@ -32,7 +32,7 @@ The preview runs in Docker (`compose.yaml`); Bun is not installed on the host.
 
 ## Testing Guidelines
 - `bun run typecheck` must pass.
-- Unit tests, no server needed: `bun test tests/links.test.ts tests/checks.test.ts tests/data.test.ts`. Run them on Linux (the oven/bun image), because filename case matters there.
+- Unit tests, no server needed: `bun test tests/links.test.ts tests/checks.test.ts tests/data.test.ts tests/dgg-profile.test.ts tests/voting.test.ts`. Run them on Linux (the oven/bun image), because filename case matters there.
 - `bun scripts/check-nominees.ts` scores the nominee data with `src/lib/nominee-checks.ts` and exits 1 while there are errors.
 - `tests/api.test.ts`: HTTP characterization tests (`bun test`), run against a live container with `bash tests/run.sh <container> --ci`.
 - `tests/visual/`: Playwright full-page screenshots, pixel-compared between two builds. See the "Stack upgrade branch" section of `docs/handoff.md` for the Docker setup.

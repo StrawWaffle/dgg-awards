@@ -85,6 +85,8 @@ The source zip (`dgga25.zip`) was deleted at StrawWaffle's request, so commit 1 
 
 - **R2 bucket for clips:** StrawWaffle needs to create one on his Cloudflare account. Until then, clips can be stored locally behind the same storage interface.
 - **Real 2025 results for the archive:** ask rinlux whether they have the 2025 production database, an export or the final numbers. The zip had none, and the live site shows fake votes. Fallbacks are rebuilding from the stream (incomplete, with garbled captions) or archiving the nominees and winners only.
+  - **The 2025 code double-counted** (found 2026-11-09). A nominee in several categories got the votes from all of them, because votes joined nominees on id only. On the stream that would have affected Hasan Piker, Asmongold, Legal Mindset and "Destiny Uses his Premonition Powers". With seeded data it inflated Brainlet's total by 46% and changed its winner.
+  - The zip predates the stream version, so the live 2025 site may or may not have had the bug. With rinlux's raw votes, the archive can show the **correct** results. Ask whether the announced winners match a correct count.
 - **What rinlux thinks is missing** compared with the live 2025 version.
 
 ## Stack upgrade (branch `stack-upgrade`, merged into `main` 2026-11-09)
@@ -141,6 +143,14 @@ Order StrawWaffle gave: preview to rinlux first, then discuss, then these.
      - Photos are one of 8 presets, so they say little about the person. The signature and bio are the personal parts. Use them in the chatter card design.
      - Not stored yet: storing needs the media storage from step 3.
    - **4a. Voting style, decided 2026-11-09.** Single pick or ranked, set **per category**, with a **site-wide default** for new categories. Ranked votes are counted by **instant runoff**, and the results page can show the rounds. This needs a schema change: votes get a rank, and the primary key becomes (uid, categoryId, optionId). Lock a category's style once it has votes.
+     - **Done on the branch (step 2):**
+       - `src/lib/voting.ts` does the instant-runoff counting. Ties for last place are broken by earlier rounds, nominees with no votes are dropped together, and ballots that run out of choices are counted as exhausted.
+       - Migration 0003 had to be fixed by hand. drizzle-kit copied a `rank` column that doesn't exist yet, which SQLite would have filled with the text "rank".
+       - `POST /api/vote` takes `{category_id, ranking}` for ranked categories, `GET /api/vote/ballots` returns a voter's ballots, and `PATCH /api/admin/settings` sets `defaultVotingStyle` and `awardYear`.
+       - A category's style is locked after its first vote. Before the default changes, every category that already has votes gets its current style locked in.
+       - Results for ranked categories include `runoff.rounds`, and nominees are ordered by when they were eliminated.
+       - `seed.ts --ranked <ids>` generates fake ranked ballots.
+       - **There's no ranked-voting interface yet.** That comes with the voting page redesign.
    - **4b. Downloaded clips, decided 2026-11-09.**
      - Use **yt-dlp**, not Cobalt. An admin enters the source URL plus start and end times, and the server downloads just that segment (`--download-sections`) and converts it to an mp4.
      - **Admins can choose the thumbnail**, either a frame from the clip or an uploaded image.
