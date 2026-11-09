@@ -35,7 +35,6 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 - Cloudflare dashboard route: `dgg-awards` → `http://app:3000`.
 - It currently shows the **results** page with 500 fake voters (negative uids, ip `seed`). Admins can switch to voting under Configuration in `/admin`.
 - `ADMIN_USERNAMES=StrawWaffle,RiN_LuX` in `.env`. Anyone on that list becomes admin when they sign in.
-- **Known bug on the live site:** five emote images are broken, because the image names in `data.ts` are capitalized differently from the files and Linux treats them as different names: `eatFresh.png`, `gagaga.png`, `Mhm.gif`, `PeepoHug.png` and `PepoTurtle.png`. `dgg_chatter_of_the_year_banner_cutechristiangirl.png` (results page) isn't in `src/media` at all. Not fixed yet, pending StrawWaffle's go-ahead.
 - Crawlers and AI indexing are blocked through `robots.txt` (with 25 AI bots named), a meta robots tag and an `X-Robots-Tag` header on images. Cloudflare's "Block AI bots" toggle was suggested but not confirmed as turned on.
 - The first version is being sent to rinlux for review. **Wait for their feedback before doing the backlog.**
 
@@ -84,16 +83,13 @@ The source zip (`dgga25.zip`) was deleted at StrawWaffle's request, so commit 1 
 
 - **Voting style:** one pick per category (as in 2025), or ranked voting like jadseya.com? To decide with rinlux.
 - **What rinlux thinks is missing** compared with the live 2025 version.
-- **Merging `stack-upgrade`.** StrawWaffle to review, then merge into `main` and redeploy the live site. See "Stack upgrade branch" below.
-- **Admin tab focus outline:** keep it, or style it? See "Stack upgrade branch".
-- **Two known API bugs**, kept on purpose so far: `/api/admin/import` has no admin check, and admin vote paging sends `offset` while the server reads `page`. Fix them?
 
-## Stack upgrade branch (`stack-upgrade`, ready for review, not merged)
+## Stack upgrade (branch `stack-upgrade`, merged into `main` 2026-11-09)
 
-Worktree: `.claude/worktrees/stack-upgrade`. Branched from `main` at `13eb653`. The live site still runs `main`.
+Branched from `main` at `13eb653`. The worktree `.claude/worktrees/stack-upgrade` can be removed once merged.
 
-What it contains, one commit each:
-1. **Tests.** `tests/api.test.ts` (29 HTTP characterization tests with 2 snapshots) and `tests/visual/` (12 full-page Playwright screenshots, pixel-compared). Both were written against the original code first, and they record its current behavior, including 2 known bugs.
+What it contains, one commit per step:
+1. **Tests.** `tests/api.test.ts` (29 HTTP characterization tests with 2 snapshots) and `tests/visual/` (12 full-page Playwright screenshots, pixel-compared). Both were written against the original code first, and they recorded its behavior, including 2 bugs that were then fixed in step 5.
 2. **Dependencies to latest, and Bun 1.3 → 1.4.** React 19.3, Tailwind 4.3, radix-ui 1.8, TanStack Query 5.107. Tailwind 4.3 changed its default font list, so the 4.1 list is pinned in `src/index.css`.
 3. **TypeScript 7 type checking** (`bun run typecheck`). Also fixed the `build` script, which pointed to `build.tsx`.
 4. **Hono, Zod and a typed client.**
@@ -102,17 +98,21 @@ What it contains, one commit each:
    - The frontend calls the API through `hc<AppType>` (`src/lib/client.ts`, `src/lib/queries.ts`), so request and response types are inferred from the server, not written by hand.
    - The compiler then caught wrong types: config times are strings, and session dates arrive as strings.
    - `submitVote` now waits for its request to finish.
+5. **Fixes StrawWaffle approved:**
+   - `/api/admin/import` now requires admin.
+   - Admin vote paging works.
+   - Five emote filenames now match DGG's current emote names: EatFresh, GAGAGA, mhm, peepoHug, PepoTurtle. They only matched before on case-insensitive Windows.
+   - The results page shows the DGGer banner. It used to check the wrong field and point at a missing `.png`.
+   - The admin tabs have no focus outline. Tabs activate on focus, so the focused tab is always the selected one.
+   - New `tests/data.test.ts` checks that every referenced image exists with exact case.
 
 Results:
-- All 29 API tests pass unchanged on every step.
-- Public pages are pixel-identical to the original.
+- Through steps 1–4, all 29 API tests passed unchanged, and pages were pixel-identical to the original, except a focus outline on the admin tabs.
+- After step 5, the only visual changes are the fixed emotes and the banner.
 - `tsc` is clean.
 - Dev mode (`bun --hot`) works.
 
-**One visible difference:** radix-ui 1.8 (react-tabs 1.2) treats a mouse-clicked admin tab as keyboard-focused, so the browser draws its focus outline around the selected tab. This is admin-only. Options:
-- Keep it.
-- Replace it with a subtle styled ring that only appears for keyboard use.
-- Hide it, which is bad for keyboard users.
+Run `bun test tests/data.test.ts` on Linux, for example through the oven/bun image.
 
 How to test (Docker only, network `dgga-test`):
 - Run `dgga-mock` (the stand-in) and the app containers with `ADMIN_USERNAMES=Tester` and the `dev-client`/`dev-secret` credentials. See `tests/run.sh` for the expected setup.
