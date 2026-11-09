@@ -27,7 +27,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 
 ### At a glance (end of session 2, 2026-11-09)
 
-**Live** (`main` at `6ce6277` plus docs, deployed and pushed):
+**Live** (`main` at `1ca752d` plus docs, deployed and pushed):
 - **Infrastructure:** the Docker preview behind a Cloudflare tunnel, real destiny.gg sign-in, the stack upgrade (Bun 1.4, Hono, Zod, TS 7), and clips into Cloudflare R2 at 1080p.
 - **Admin page:**
   - a left sidebar, dark theme, drag to reorder, and collapsible sections
@@ -552,7 +552,7 @@ StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, an
   - typecheck and 92 unit tests; 49 API tests, with the preview addresses added
   - in the browser: both preview menus (hover, jump, close, current page marked, the admin one on a phone), every stage and page, a preview vote not saved, the old addresses rewritten, `/lab#sound` kept, non-admin and signed-out refusals, the big screen switched to simulated votes with the reveal running, and the music's first play starting at 6.02 s
 
-### The year in DGG chat (branch `worktree-chat-review`, 2026-11-09)
+### The year in DGG chat (2026-11-09, deployed)
 
 StrawWaffle asked for a page from dgg-scs's report (`C:\Users\<user>\Desktop\dgg\dgg-scs\data\report-cache\year-in-review-2026.html`, data in `yir-2026.json` beside it), with a funny spin per entry, shown once the results are out, in the site's look.
 - **`/chat` (`src/site/ChatReviewPage.tsx`)**, tab "Year in chat": a cover with the year in numbers, then emotes, combos, saying the streamers' names, who tagged whom, greentext, links, and law and order. Each section has highlight cards (an emote, a big handwritten number, a caption), bars that grow in, and lists or tables. Clicking any big emote fires a burst of it. The fine print lists the nicks not counted as tags (everyday words), as StrawWaffle asked; the rest of the report's method is left out.
@@ -562,6 +562,7 @@ StrawWaffle asked for a page from dgg-scs's report (`C:\Users\<user>\Desktop\dgg
   - Discord links (they expire: shown as "[self-destructed Discord image]"), NSFW links, and a link about an assault
   - artefacts: "@moderation" tagging "muted", and "Emote" as a tagged nick
 - **Also on this branch (StrawWaffle):** the Lab tab is gone from the header, even in a preview; the lab is in the logo's preview menu and keeps its own row of tabs. The "Admin" chip in the user menu is now a link to the admin page.
+- **Deployed** after a backup (`/data/backups/2026-11-09T22-58-23-696Z-before-deploy.db`). Live: `/chat` and `/preview/results/chat` 200; `/api/chat-review` 401 signed out, also with `?preview=1`.
 - **For rinlux to look at:** the "Law and order" section names people mods punished (only light ones: RiN_LuX and JaydrVernanda muted by Bing, the most throttled, the most duels lost), and the page lists real nicks throughout.
 - Tested: typecheck, 92 unit tests, 50 API tests (a new one: the year in chat is refused while voting and to non-admins in preview, and has no Discord links), and in the browser in light, dark and at phone width (no sideways scroll, every emote drawn, the bursts, and the locked notice for visitors).
 
