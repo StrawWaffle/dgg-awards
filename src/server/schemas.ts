@@ -179,6 +179,12 @@ export const clipFromLibrary = z.object({
 
 export const libraryFileQuery = z.object({ path: required });
 
+/** A full backup to restore: a .db file, or an encrypted .db.enc (password optional: the site's own is tried). */
+export const restoreForm = z.object({
+  file: z.instanceof(File),
+  password: z.string().optional(),
+});
+
 export const votesQuery = z.object({
   filter_ip: z.string().optional(),
   filter_uid: z.string().regex(/^-?\d+$/).optional(),

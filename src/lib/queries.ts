@@ -210,6 +210,22 @@ export async function buildClip(categoryId: string, id: string) {
   await ok(await client.api.admin.clip.$post({ json: { categoryId, id } }), "Couldn't start the clip");
 }
 
+/** When the database and media last went to Google Drive. */
+export async function fetchBackupStatus() {
+  return parseResponse(client.api.admin.backup.status.$get());
+}
+
+export async function backupNow() {
+  await ok(await client.api.admin.backup.now.$post(), "The backup failed");
+}
+
+/** Replace the whole database with a backup. Returns rows restored per table. */
+export async function restoreBackup(file: File, password: string) {
+  const res = await client.api.admin.backup.restore.$post({ form: { file, ...(password ? { password } : {}) } });
+  if (!res.ok) throw new Error((await res.text()) || "Couldn't restore that backup");
+  return ((await res.json()) as { counts: Record<string, number> }).counts;
+}
+
 /** The video library on the server. */
 export async function fetchLibrary() {
   return parseResponse(client.api.admin.library.$get());

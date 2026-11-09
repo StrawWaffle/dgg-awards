@@ -4,11 +4,15 @@ import index from "@/index.html";
 import lab from "@/lab.html";
 import { createApp } from "@/server/app";
 import { resumeClipJobs } from "@/server/clips";
+import { startOffsiteBackups } from "@/server/backups";
 import { websocket } from "@/server/routes/lab";
 
 const app = createApp();
 
 const server = serve({
+  // Seconds a request may go quiet. Bun's default (10) cut off "Back up now",
+  // which encrypts and uploads, and restores of large backups.
+  idleTimeout: 120,
   // Bun bundles and serves the HTML pages; everything else is Hono.
   routes: {
     "/": index,
@@ -31,3 +35,4 @@ console.log(`> ${server.url}`);
 
 // Clip jobs interrupted by a restart start again.
 resumeClipJobs().catch((error) => console.error("Resuming clip jobs failed:", error));
+startOffsiteBackups();

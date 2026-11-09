@@ -404,6 +404,108 @@ export async function backupDatabase(reason: string) {
   return file;
 }
 
+/** Tables that aren't data: sign-ins in progress and sessions stay out of backups. */
+const NOT_BACKED_UP = ["sessions", "states"];
+const MIGRATIONS_TABLE = "__drizzle_migrations";
+
+/**
+ * The whole database as one SQLite file: a consistent copy (VACUUM INTO),
+ * without sessions or sign-ins in progress. For downloads and off-site backups.
+ */
+export async function snapshotDatabase(): Promise<Uint8Array> {
+  const { mkdtemp, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = await mkdtemp(join(tmpdir(), "snapshot-"));
+  try {
+    const file = join(dir, "snapshot.db");
+    sqlite.run("VACUUM INTO ?", [file]);
+    const copy = new Database(file);
+    for (const table of NOT_BACKED_UP) copy.run(`DELETE FROM "${table}"`);
+    copy.run("VACUUM");
+    copy.close();
+    return new Uint8Array(await Bun.file(file).arrayBuffer());
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+/** How far a database's schema has got: its applied migrations, in order. */
+function migrationsOf(conn: Database): string[] {
+  try {
+    return conn.query<{ hash: string }, []>(`SELECT hash FROM "${MIGRATIONS_TABLE}" ORDER BY created_at`).all().map((r) => r.hash);
+  } catch {
+    return [];
+  }
+}
+
+export class RestoreError extends Error {}
+
+/**
+ * Replace everything in the live database with a backup's contents, in one
+ * transaction. The backup must be from the same schema (the same migrations
+ * applied). The current database is copied to backups/ first. Sessions stay,
+ * so whoever restores stays signed in (if their account is in the backup).
+ * Returns the number of rows restored per table.
+ */
+export async function restoreDatabase(data: Uint8Array): Promise<Record<string, number>> {
+  const { mkdtemp, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = await mkdtemp(join(tmpdir(), "restore-"));
+  try {
+    const file = join(dir, "restore.db");
+    await Bun.write(file, data);
+    let source: Database;
+    try {
+      source = new Database(file, { readonly: true });
+      source.query("SELECT count(*) FROM sqlite_master").get();
+    } catch {
+      throw new RestoreError("That file isn't a readable database.");
+    }
+    const theirs = migrationsOf(source);
+    source.close();
+    const ours = migrationsOf(sqlite);
+    if (theirs.length === 0) throw new RestoreError("That database isn't a DGG Awards backup.");
+    if (theirs.join() !== ours.join()) {
+      throw new RestoreError(
+        theirs.length < ours.length && ours.slice(0, theirs.length).join() === theirs.join()
+          ? `That backup is from an older version of the site (${theirs.length} of ${ours.length} database updates). Restore it on that version, or run its updates first (see docs/migration.md).`
+          : "That backup is from a different version of the site; its database updates don't match this one's.",
+      );
+    }
+
+    await backupDatabase("before-restore");
+    const tables = sqlite
+      .query<{ name: string }, []>(
+        `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name != '${MIGRATIONS_TABLE}'`,
+      )
+      .all()
+      .map((t) => t.name)
+      .filter((t) => !NOT_BACKED_UP.includes(t));
+    const counts: Record<string, number> = {};
+    sqlite.run("PRAGMA foreign_keys = OFF");
+    sqlite.run("ATTACH DATABASE ? AS restore", [file]);
+    try {
+      sqlite.transaction(() => {
+        for (const t of tables) {
+          sqlite.run(`DELETE FROM main."${t}"`);
+          sqlite.run(`INSERT INTO main."${t}" SELECT * FROM restore."${t}"`);
+          counts[t] = sqlite.query<{ n: number }, []>(`SELECT count(*) AS n FROM main."${t}"`).get()!.n;
+        }
+        // Sessions whose account isn't in the backup can't stay.
+        sqlite.run(`DELETE FROM main.sessions WHERE uid NOT IN (SELECT uid FROM main.users)`);
+      })();
+    } finally {
+      sqlite.run("DETACH DATABASE restore");
+      sqlite.run("PRAGMA foreign_keys = ON");
+    }
+    return counts;
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
 export async function nomineeHasVotes(categoryId: string, id: string) {
   const vote = await db.query.votesTable.findFirst({
     where: (v, { and, eq }) => and(eq(v.categoryId, categoryId), eq(v.optionId, id)),

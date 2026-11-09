@@ -21,7 +21,7 @@ Voting and results site for the yearly destiny.gg community awards (DGG Awards).
   ```bash
   MSYS_NO_PATHCONV=1 docker run --rm -v "C:\\Users\\<user>\\.t3\\projects\\dgg-awards:/w" \
     -v dgga-nm:/w/node_modules -w /w oven/bun:1.4 \
-    sh -c "bun install --frozen-lockfile >/dev/null && bun run typecheck && bun test tests/links.test.ts tests/checks.test.ts tests/data.test.ts tests/dgg-profile.test.ts tests/voting.test.ts tests/storage.test.ts tests/ids.test.ts"
+    sh -c "bun install --frozen-lockfile >/dev/null && bun run typecheck && bun test tests/links.test.ts tests/checks.test.ts tests/data.test.ts tests/dgg-profile.test.ts tests/voting.test.ts tests/storage.test.ts tests/ids.test.ts tests/backup.test.ts"
   ```
   For a worktree, mount its folder instead (`.claude\\worktrees\\<name>`).
 - **Worktree sessions refuse complex one-liners** they can't prove stay inside the worktree. Write the commands to a script file (e.g. in the scratchpad) and run `bash <file>`.
@@ -61,7 +61,7 @@ The live `.env` holds the real DGG OAuth app, `AUTH_SECRET`, the tunnel token, `
 ## Testing
 
 - `bun run typecheck` must pass.
-- **Unit tests** (no server): `tests/{links,checks,data,dgg-profile,voting,storage,ids,lab-chat}.test.ts`. Run on Linux, since `data.test.ts` checks filename case.
+- **Unit tests** (no server): `tests/{links,checks,data,dgg-profile,voting,storage,ids,lab-chat,backup}.test.ts`. Run on Linux, since `data.test.ts` checks filename case.
 - **API tests:** `bash tests/run.sh <app-container> --ci`. 36 characterization tests with snapshots, run over HTTP against a running app on the Docker network `dgga-test`. `tests/reset.sh` reseeds first.
 - **Screenshots:** `bash tests/visual/run.sh capture <container> <name>`, then `… compare <a> <b>`. These are full-page Playwright screenshots, pinned so two runs of the same code are pixel-identical.
 - **Data score:** `bun scripts/check-nominees.ts` (exits 1 while there are errors).
@@ -81,6 +81,7 @@ The live `.env` holds the real DGG OAuth app, `AUTH_SECRET`, the tunnel token, `
 - Snapshots change only on purpose. When one changes, check the diff is exactly what you expected before `--update-snapshots`.
 - In the browser (T3 preview tools), sign in as an admin at `http://localhost:<port>/signin` with username `Tester`. If the preview hangs, use Playwright in Docker on `dgga-test` (see the handoff's "At a glance"). Its Chromium has no H.264, so check clip playback in its Firefox.
 - **Before every deploy**, back up the live database (`VACUUM INTO` under `/data/backups/`, see the handoff).
+- **Backups and moving the site:** `docs/migration.md`. Full backups download and restore in Settings → Backups. The live site also backs up hourly to Google Drive, encrypted with `BACKUP_PASSWORD` (`src/server/backups.ts`, `src/lib/backup-crypto.ts`). A new admin write needs no backup work, but a new table is included automatically: restores copy every table except `sessions` and `states`.
 
 ## Pitfalls already hit
 

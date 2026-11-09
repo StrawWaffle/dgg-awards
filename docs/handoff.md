@@ -411,6 +411,26 @@ The Picture section has "From the library…" too: the library's pictures by fol
 - The cropper now hides "Upload as it is" when the server wouldn't take the file unchanged: AVIF (3 in the library), or over 5 MB (one 7.8 MB JPEG). Instead it converts: AVIF and JPEG come out as JPEG, others as PNG. If the result is still over 5 MB, it says to pick a smaller size.
 - Tested in the browser on the live library's files: an AVIF converted and set as the picture, the 7.8 MB JPEG converted at full size under 5 MB, and the GIF went straight up.
 
+### Full backups, restore and Google Drive (branch `worktree-backups`, 2026-11-09)
+
+StrawWaffle wanted the live database safe, a proper full export and import, and off-site backups to Google Drive (easier to share than R2, and a next maintainer won't have his R2). The guide is `docs/migration.md`.
+- **Settings → Backups** in the admin page:
+  - "Download a full backup": the whole database as a `.db` file (`GET /api/admin/backup`, from `snapshotDatabase()`: a `VACUUM INTO` copy without `sessions` and `states`).
+  - "Restore from a backup": a `.db`, or an encrypted `.db.enc` with an optional password (`POST /api/admin/backup/restore`, `restoreDatabase()`). The backup's migrations must match the site's; an older one is refused with a pointer to the guide. The current database is copied to `/data/backups/` first. Every table but `sessions`/`states` is replaced in one transaction. Sessions stay, minus any whose account isn't in the backup.
+  - The off-site status (last database and media runs) and "Back up now".
+- **Off-site, hourly** (`src/server/backups.ts`, started in `src/index.tsx`): it encrypts (`src/lib/backup-crypto.ts`: gzip, then AES-256-GCM with a PBKDF2-SHA256 key from `BACKUP_PASSWORD`, 600k rounds) and uploads with rclone to `gdrive:DGG Awards backups/database/`.
+  - Kept: every copy for 2 days, then one a day for 60 days (`src/lib/backup-names.ts`).
+  - Once a day it copies media (R2, or the local media folder) to `…/media/`, unencrypted, since it's public anyway.
+  - Status is in `/data/backups/offsite.json`.
+- rclone 1.68.2 is in the image (pinned, checksum-checked). Its Drive remote comes from `RCLONE_CONFIG_GDRIVE_*` in `.env`, with scope `drive.file`, so it only sees its own files.
+- **Set up 2026-11-09** with StrawWaffle's Google account (15 GB). The token and `BACKUP_PASSWORD` are in the live `.env` only. StrawWaffle keeps the password in his password manager. Backups can't be restored without it.
+- `scripts/backup-decrypt.ts` decrypts a Drive backup without the site.
+- `idleTimeout: 120` on the server: Bun's 10 s default cut off "Back up now".
+- Tested:
+  - unit tests (`tests/backup.test.ts`: encryption round trip, wrong password, damage, the keeping rule)
+  - an API test (download, restore plain and encrypted, refusals)
+  - end to end against Drive in a test folder, since deleted: the backup uploaded, then was fetched back, decrypted with the script and opened (22 awards, 174 nominees, 9,328 votes, 501 users, 0 sessions)
+
 ### Next: the lab page (StrawWaffle's answers, 2026-11-09)
 
 StrawWaffle wants the front page and the presentation to feel fun, quirky and wholesome. It gets built on an experimental page first (`/lab`, admins only) until rinlux approves. Order: the follow-ups above, merge and deploy, then the lab.

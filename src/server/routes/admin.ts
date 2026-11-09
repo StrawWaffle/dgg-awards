@@ -59,6 +59,9 @@ import { DGG_NAME, fetchDggProfile } from "@/server/dgg-profile";
 import { categoriesWithMediaUrls } from "@/server/present";
 import { serveFile, storage } from "@/server/storage";
 import { libraryFile, listLibrary } from "@/server/library";
+import { RestoreError, restoreDatabase, snapshotDatabase } from "@/lib/data/driver";
+import { decryptBackup, isEncryptedBackup, isSqlite } from "@/lib/backup-crypto";
+import { backupDatabaseOffsite, backupMediaOffsite, offsiteEnabled, offsiteStatus } from "@/server/backups";
 import { type SessionEnv, rejectInvalid, requireAdmin, zValidator } from "@/server/middleware";
 import {
   categoryCreate,
@@ -78,6 +81,7 @@ import {
   thumbnailAt,
   thumbnailUpload,
   clipUpload,
+  restoreForm,
   clipFromLibrary,
   libraryFileQuery,
   historyQuery,
@@ -138,6 +142,51 @@ export const adminRoutes = new Hono<SessionEnv>()
     return backToAdmin();
   })
   /** Every category and nominee, in the format import reads: a backup to keep. */
+  // Full backups: the whole database as one file (without sessions), and
+  // putting one back. Off-site copies go to Google Drive (src/server/backups.ts).
+  .get("/backup", async (c) => {
+    const data = await snapshotDatabase();
+    const name = `dgg-awards-${new Date().toISOString().slice(0, 16).replace(":", "-")}Z.db`;
+    return new Response(new Blob([new Uint8Array(data)]), {
+      headers: {
+        "Content-Type": "application/vnd.sqlite3",
+        "Content-Disposition": `attachment; filename="${name}"`,
+        "Cache-Control": "no-store",
+      },
+    });
+  })
+  .post("/backup/restore", zValidator("form", restoreForm, rejectInvalid), async (c) => {
+    const { file, password } = c.req.valid("form");
+    let data: Uint8Array = new Uint8Array(await file.arrayBuffer());
+    try {
+      if (isEncryptedBackup(data)) {
+        const key = password || process.env.BACKUP_PASSWORD;
+        if (!key) return c.text("That backup is encrypted: enter its password.", 400);
+        data = await decryptBackup(data, key);
+      } else if (!isSqlite(data)) {
+        return c.text("That isn't a backup: choose a .db or .db.enc file.", 400);
+      }
+      const counts = await restoreDatabase(data);
+      console.log(`Database restored from ${file.name} by uid ${c.get("session").uid}:`, counts);
+      return c.json({ counts }, 200);
+    } catch (error) {
+      if (error instanceof RestoreError) return c.text(error.message, 400);
+      if (error instanceof Error && error.message.startsWith("Couldn't decrypt")) return c.text(error.message, 400);
+      throw error;
+    }
+  })
+  .get("/backup/status", async (c) => c.json(await offsiteStatus(), 200))
+  .post("/backup/now", async (c) => {
+    if (!offsiteEnabled()) return c.text("Off-site backups aren't set up (see docs/migration.md).", 400);
+    try {
+      await backupDatabaseOffsite();
+    } catch (error) {
+      return c.text(`The backup failed: ${(error as Error).message}`, 502);
+    }
+    // Media can take a while; it carries on in the background.
+    void backupMediaOffsite().catch((error) => console.error("Media backup failed:", error.message));
+    return c.json(await offsiteStatus(), 200);
+  })
   .get("/export", async (c) => {
     const flags = await getCategoryFlags();
     const categories = await getNominees({ includeHidden: true });

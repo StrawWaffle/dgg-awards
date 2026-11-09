@@ -8,6 +8,7 @@
 // The server must have ADMIN_USERNAMES=Tester and be seeded with
 // `bun scripts/seed.ts --mode voting --fake-votes 500`. See tests/run.sh.
 import { describe, expect, test } from "bun:test";
+import { encryptBackup } from "@/lib/backup-crypto";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:3100";
 const MOCK = process.env.MOCK_URL ?? "http://localhost:8790";
@@ -1167,6 +1168,59 @@ describe("admin", () => {
     },
     60_000,
   );
+
+  test("full backups: download, restore (plain and encrypted), refusals", async () => {
+    const restore = (file: Blob, name: string, password?: string, as: Jar = admin) => {
+      const f = new FormData();
+      f.set("file", file, name);
+      if (password) f.set("password", password);
+      return req("/api/admin/backup/restore", { method: "POST", body: f }, as);
+    };
+    const allyTitle = async () =>
+      (await (await req("/api/admin/nominees", {}, admin)).json()).find((c: any) => c.id === "ally").title;
+    const rename = (title: string) =>
+      req("/api/admin/category", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: "ally", title }) }, admin);
+
+    // Download: the whole database, without sessions. Admins only.
+    expect((await req("/api/admin/backup", {}, user)).status).toBe(401);
+    const res = await req("/api/admin/backup", {}, admin);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-disposition")).toMatch(/^attachment; filename="dgg-awards-.*\.db"$/);
+    const backup = new Uint8Array(await res.arrayBuffer());
+    expect(new TextDecoder().decode(backup.subarray(0, 15))).toBe("SQLite format 3");
+    const original = await allyTitle();
+
+    // Change something, restore, and it's back; the admin is still signed in.
+    await rename("Changed for the restore test");
+    const restored = await restore(new Blob([backup]), "backup.db");
+    expect(restored.status).toBe(200);
+    const { counts } = await restored.json();
+    expect(counts.categories).toBeGreaterThan(0);
+    expect(counts.votes).toBeGreaterThan(0);
+    expect(counts.sessions).toBeUndefined();
+    expect(await allyTitle()).toBe(original);
+
+    // Encrypted, as on Google Drive: needs the right password.
+    await rename("Changed again");
+    const sealed = new Uint8Array(await encryptBackup(backup, "test password"));
+    const wrong = await restore(new Blob([sealed]), "backup.db.enc", "nope");
+    expect(wrong.status).toBe(400);
+    expect(await wrong.text()).toContain("wrong password");
+    expect(await allyTitle()).toBe("Changed again");
+    expect((await restore(new Blob([sealed]), "backup.db.enc", "test password")).status).toBe(200);
+    expect(await allyTitle()).toBe(original);
+
+    // Not a backup, or not an admin.
+    const junk = await restore(new Blob(["hello"]), "notes.txt");
+    expect(junk.status).toBe(400);
+    expect(await junk.text()).toBe("That isn't a backup: choose a .db or .db.enc file.");
+    expect((await restore(new Blob([backup]), "backup.db", undefined, user)).status).toBe(401);
+
+    // Off-site backups aren't set up on the test server.
+    const status = await (await req("/api/admin/backup/status", {}, admin)).json();
+    expect(status.enabled).toBe(false);
+    expect((await req("/api/admin/backup/now", { method: "POST" }, admin)).status).toBe(400);
+  });
 
   test("locked mode hides nominees", async () => {
     await setMode(admin, "locked");
