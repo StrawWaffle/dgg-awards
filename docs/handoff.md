@@ -27,7 +27,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 
 ### At a glance (end of session 2, 2026-11-09)
 
-**Live** (`main` at `12c0b96`, deployed and pushed):
+**Live** (`main` at `6ce6277` plus docs, deployed and pushed):
 - **Infrastructure:** the Docker preview behind a Cloudflare tunnel, real destiny.gg sign-in, the stack upgrade (Bun 1.4, Hono, Zod, TS 7), and clips into Cloudflare R2 at 1080p.
 - **Admin page:**
   - a left sidebar, dark theme, drag to reorder, and collapsible sections
@@ -97,7 +97,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 - Fast-forward `main`, run `docker compose --profile tunnel up -d --build app`, then check `/`, `/api/config`, `/lab`, `/admin` (200), `/api/admin/checks` and `/api/lab/emotes` (401), and `/signin` (to destiny.gg).
 - Push `main`.
 
-**Worktrees:** the merged ones were removed on 2026-11-09. Only `preview-stages` is left (see "Previews by stage").
+**Worktrees:** none; all merged ones were removed on 2026-11-09.
 
 **Test containers**, on network `dgga-test`, all kept running:
 
@@ -525,7 +525,7 @@ StrawWaffle, after the one-site deploy:
   - Destiny's menu (picture, member since, team, profile link).
   - Hover open and close, signing out, and the Sign in button returning to the page. 49 API tests pass.
 
-### Previews by stage, simulated votes on the big screen, and the music start (branch `worktree-preview-stages`, 2026-11-09)
+### Previews by stage, simulated votes on the big screen, and the music start (2026-11-09, deployed)
 
 StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, and the previews should all live under `/preview/<stage>/<page>`, with a stage per part of the year, and the front page previewable too.
 - **Addresses:** `/preview/<stage>` is the front page, then `/vote`, `/results` and `/2025` under it. The stages are `before` (Before voting), `voting` (Voting open), `closed` (Voting closed) and `results` (Results out).
@@ -546,6 +546,7 @@ StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, an
   - The first start jumps to 6.02 s (a bar line on the beat map's grid), where the music is in fully, with a 0.4 s fade-in of our own.
   - Looping is by hand: at the end it goes back to 2 s, skipping the silence, and keeps the song's own fade-out and fade-in as the way round. The loop doesn't count as a pause, so the music button stays as it is (not tested in a browser: a full loop takes two minutes).
 - **The drawn look is always on** (StrawWaffle): the pencil button is gone from the header, and so are the plain-look versions (`useDrawnLook`, `setDrawnLook` and the `lab.drawn` setting). Frames, hatched bars, the circled winner and the box round a pick always show.
+- **Deployed** 2026-11-09 after a backup (`/data/backups/2026-11-09T22-19-17-280Z-before-deploy.db`). Live checks: every page and preview address 200, `/api/admin/checks`, `/api/me/profile` and `/api/lab/emotes` 401 signed out, `/signin` to destiny.gg.
 - **Housekeeping:** the 23 merged worktrees were removed. The screenshot script now also captures the four stage previews. Its pictures aren't in git: two runs of this build match pixel for pixel, except the admin Votes tab (vote times).
 - Tested:
   - typecheck and 92 unit tests; 49 API tests, with the preview addresses added
