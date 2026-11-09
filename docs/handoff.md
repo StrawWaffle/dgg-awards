@@ -464,6 +464,17 @@ StrawWaffle: "remove the ip tracking, and we don't need the encryption thing any
 - **Backups:** off-site backups are plain `.db` files now (they show who voted for what, so share the Drive folder only with organisers). They need only the rclone token. The older encrypted `.db.enc` files still restore with `BACKUP_PASSWORD` (kept in `.env` for that) and are deleted by the keeping rule within 60 days.
 - **Still holding IPs, until they age out:** the local backups in `/data/backups/` from before this (they keep the newest 20) and the encrypted Drive backups (60 days). They hold the test voters' fake "seed" addresses and the admins' sign-in addresses.
 
+### IP and browser recording as switches (branch `worktree-privacy-flags`, 2026-11-09)
+
+StrawWaffle wasn't happy with removing them outright: the collaborator who'll host it later might want them. So both are now switches in **Settings → Privacy**, off for now:
+- `recordIp` keeps the visitor's address (Cloudflare's `CF-Connecting-IP`) with each new sign-in, and through it with each vote.
+- `recordAgent` keeps the user agent.
+- When off, `sessions.ip` is null and `agent` is "". Switching off doesn't delete what was kept while it was on. Changes go in the history as settings.
+- Migration `0009_optional_ip` adds `sessions.ip` back, nullable. It was tested on a copy of the live database (0008 had already dropped it there).
+- The Votes tab shows the IP column, filter and shared-address table when `recordIp` is on, or when there are addresses to show. The shared-address table now ignores votes without one.
+- **The original 2025 code did record both** (`src/routes/oauth.ts` in the recovered source): the IP and user agent at sign-in, copied into every vote. The real 2025 database would have held voters' IPs. Ours only ever held fake test addresses and the admins' own.
+- API test: off by default, on keeps both, off again. 47 pass.
+
 ### Next: the lab page (StrawWaffle's answers, 2026-11-09)
 
 StrawWaffle wants the front page and the presentation to feel fun, quirky and wholesome. It gets built on an experimental page first (`/lab`, admins only) until rinlux approves. Order: the follow-ups above, merge and deploy, then the lab.

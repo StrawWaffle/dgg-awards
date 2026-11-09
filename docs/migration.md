@@ -18,7 +18,7 @@ What isn't in the folder, and where it is instead:
 
 - **Off-site, every hour**: `src/server/backups.ts`, when the `RCLONE_CONFIG_GDRIVE_*` settings are in `.env`. The admin page's Settings → Backups shows the last run and has "Back up now".
 - **On the server**: a copy in `/data/backups/` before every import, restore and deploy (the newest 20 are kept).
-- **By hand**: Settings → Backups → "Download a full backup" gives the database as a plain `.db` file. It shows who voted for what, so keep it private. (No IP addresses are kept, since 2026-11-09.)
+- **By hand**: Settings → Backups → "Download a full backup" gives the database as a plain `.db` file. It shows who voted for what, so keep it private. (IP addresses and browsers are kept only when switched on in Settings → Privacy.)
 
 ### Setting up the off-site backups (once per maintainer)
 

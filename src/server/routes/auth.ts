@@ -9,6 +9,7 @@ import {
   insertState,
   insertUser,
   setUserAdmin,
+  getConfig,
 } from "@/lib/data/driver";
 import { buildUrl, env } from "@/lib/util";
 import type {
@@ -161,9 +162,13 @@ export const authRoutes = new Hono()
       await setUserAdmin(userInfo.userId, true);
     }
 
-    const agent = c.req.header("User-Agent") ?? "Unknown device";
+    // Kept only when switched on in Settings (both off since 2026-11-09).
+    // The address is Cloudflare's header; "Unknown" when not behind the tunnel.
+    const { recordIp, recordAgent } = await getConfig();
+    const ip = recordIp === "on" ? (c.req.header("CF-Connecting-IP") ?? "Unknown") : null;
+    const agent = recordAgent === "on" ? (c.req.header("User-Agent") ?? "Unknown device") : "";
 
-    const session = await createSession(userInfo.userId, agent);
+    const session = await createSession(userInfo.userId, ip, agent);
     setCookie(c, SESSION_COOKIE, session, { ...sessionCookie, maxAge: 604800 });
     const next = safeNext(getCookie(c, NEXT_COOKIE));
     deleteCookie(c, NEXT_COOKIE, { path: "/" });

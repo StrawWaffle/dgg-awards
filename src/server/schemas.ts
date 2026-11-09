@@ -31,6 +31,9 @@ export const settingsPatch = z
     startTime: z.number().int().positive().optional(),
     endTime: z.number().int().positive().optional(),
     viewingMode: z.enum(viewingModes).optional(),
+    /** Keep voters' IP addresses / browsers with new sign-ins and votes. */
+    recordIp: z.boolean().optional(),
+    recordAgent: z.boolean().optional(),
   })
   .refine((s) => s.startTime === undefined || s.endTime === undefined || s.startTime < s.endTime, {
     message: "Voting has to end after it starts",
@@ -186,6 +189,7 @@ export const restoreForm = z.object({
 });
 
 export const votesQuery = z.object({
+  filter_ip: z.string().optional(),
   filter_uid: z.string().regex(/^-?\d+$/).optional(),
   filter_name: z.string().trim().min(1).optional(),
   page: z.string().optional(),

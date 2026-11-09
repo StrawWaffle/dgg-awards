@@ -66,7 +66,7 @@ export async function fetchAdminNom() {
   return parseResponse(client.api.admin.nominees.$get());
 }
 
-export type VoteFilter = { uid?: number; name?: string };
+export type VoteFilter = { uid?: number; ip?: string; name?: string };
 
 /** One page of votes, 100 per page, page numbers from 0. */
 export async function fetchAllVotes(page: number, filter: VoteFilter = {}) {
@@ -75,6 +75,7 @@ export async function fetchAllVotes(page: number, filter: VoteFilter = {}) {
       query: {
         page: page.toString(),
         filter_uid: filter.uid?.toString(),
+        filter_ip: filter.ip || undefined,
         filter_name: filter.name || undefined,
       },
     }),

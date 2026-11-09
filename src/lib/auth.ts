@@ -13,6 +13,7 @@ export function sha256hex(s: string) {
 
 export async function createSession(
   uid: User["uid"],
+  ip: string | null,
   agent: string,
 ) {
   const now = new Date();
@@ -24,6 +25,7 @@ export async function createSession(
     createdAt: now,
     expiresAt,
     uid,
+    ip,
     agent,
   };
   const message = btoa(

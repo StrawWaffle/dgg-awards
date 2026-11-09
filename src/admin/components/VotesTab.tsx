@@ -2,22 +2,26 @@ import { type ReactNode, useState } from "react";
 import { Section } from "@/admin/components/Section";
 import { Button, ErrorText, inputClass } from "@/admin/components/editor/fields";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { type VoteFilter, fetchAllVotes, fetchVoteStats } from "@/lib/queries";
+import { type VoteFilter, fetchAllVotes, fetchConfig, fetchVoteStats } from "@/lib/queries";
 
 const number = new Intl.NumberFormat();
 const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: "short", timeStyle: "short" });
 
 export function VotesTab() {
   const [filter, setFilter] = useState<VoteFilter>({});
+  // IP addresses show when they're being kept (Settings → Privacy), or when
+  // some were kept earlier.
+  const config = useQuery({ queryKey: ["config"], queryFn: fetchConfig });
+  const ipOn = config.data?.recordIp === "on";
   return (
     <div className="space-y-6">
-      <Stats />
-      <VoteList filter={filter} setFilter={setFilter} />
+      <Stats onFilterIp={(ip) => setFilter({ ip })} ipOn={ipOn} />
+      <VoteList filter={filter} setFilter={setFilter} ipOn={ipOn} />
     </div>
   );
 }
 
-function Stats() {
+function Stats({ onFilterIp, ipOn }: { onFilterIp: (ip: string) => void; ipOn: boolean }) {
   const stats = useQuery({ queryKey: ["vote-stats"], queryFn: fetchVoteStats, refetchInterval: 30000 });
   if (stats.isPending) return <p className="text-sm">Loading…</p>;
   if (stats.isError) return <ErrorText>Couldn't load the totals: {stats.error.message}</ErrorText>;
@@ -54,6 +58,25 @@ function Stats() {
               </tr>
             ))}
           </Table>
+          {(ipOn || s.sharedIps.length > 0) && (
+          <Table
+            id="shared-ips"
+            title="Addresses shared by several voters"
+            head={["IP", "Voters"]}
+            empty="No address has more than one voter."
+          >
+            {s.sharedIps.map((r) => (
+              <tr key={r.ip}>
+                <td className="px-3 py-1.5">
+                  <button type="button" className="underline" onClick={() => onFilterIp(r.ip)}>
+                    {r.ip}
+                  </button>
+                </td>
+                <td className="px-3 py-1.5 text-right tabular-nums">{number.format(r.voters)}</td>
+              </tr>
+            ))}
+          </Table>
+          )}
         </div>
       </div>
     </>
@@ -95,14 +118,16 @@ function Table({
   );
 }
 
-function VoteList({ filter, setFilter }: { filter: VoteFilter; setFilter: (f: VoteFilter) => void }) {
+function VoteList({ filter, setFilter, ipOn }: { filter: VoteFilter; setFilter: (f: VoteFilter) => void; ipOn: boolean }) {
   const [page, setPage] = useState(0);
   const [user, setUser] = useState("");
+  const [ip, setIp] = useState("");
   const [shown, setShown] = useState(filter);
-  // A click on a voter replaces the filter; keep the input in step.
+  // A click in the totals (an IP) replaces the filter; keep the inputs in step.
   if (shown !== filter) {
     setShown(filter);
     setUser(filter.name ?? filter.uid?.toString() ?? "");
+    setIp(filter.ip ?? "");
     setPage(0);
   }
 
@@ -113,6 +138,7 @@ function VoteList({ filter, setFilter }: { filter: VoteFilter; setFilter: (f: Vo
     refetchInterval: 30000,
   });
   const hasNext = votes.data?.length === 100;
+  const showIp = ipOn || !!filter.ip || !!votes.data?.some((v) => v.ip);
   const filtered = Object.values(filter).some((v) => v !== undefined);
 
   const apply = (f: VoteFilter) => setFilter(f);
@@ -120,6 +146,7 @@ function VoteList({ filter, setFilter }: { filter: VoteFilter; setFilter: (f: Vo
     const u = user.trim();
     apply({
       ...(u ? (/^-?\d+$/.test(u) ? { uid: Number(u) } : { name: u }) : {}),
+      ...(ip.trim() ? { ip: ip.trim() } : {}),
     });
   };
 
@@ -141,6 +168,15 @@ function VoteList({ filter, setFilter }: { filter: VoteFilter; setFilter: (f: Vo
             value={user}
             onChange={(e) => setUser(e.currentTarget.value)}
           />
+          {showIp && (
+            <input
+              className={`${inputClass} w-48!`}
+              placeholder="IP address"
+              aria-label="IP address"
+              value={ip}
+              onChange={(e) => setIp(e.currentTarget.value)}
+            />
+          )}
           <Button type="submit">Filter</Button>
           {filtered && <Button onClick={() => apply({})}>Clear</Button>}
         </form>
@@ -153,6 +189,7 @@ function VoteList({ filter, setFilter }: { filter: VoteFilter; setFilter: (f: Vo
               <tr className="border-b border-neutral-200 text-left text-xs text-neutral-600">
                 <th className="px-3 py-2 font-medium">When</th>
                 <th className="px-3 py-2 font-medium">Voter</th>
+                {showIp && <th className="px-3 py-2 font-medium">IP</th>}
                 <th className="px-3 py-2 font-medium">Category</th>
                 <th className="px-3 py-2 font-medium">Nominee</th>
               </tr>
@@ -166,6 +203,15 @@ function VoteList({ filter, setFilter }: { filter: VoteFilter; setFilter: (f: Vo
                       {v.name}
                     </button>
                   </td>
+                  {showIp && (
+                    <td className="px-3 py-1.5">
+                      {v.ip && (
+                        <button type="button" className="hover:underline" onClick={() => apply({ ip: v.ip! })}>
+                          {v.ip}
+                        </button>
+                      )}
+                    </td>
+                  )}
                   <td className="px-3 py-1.5">{v.categoryTitle}</td>
                   <td className="px-3 py-1.5">
                     {v.optionTitle ?? v.optionId}

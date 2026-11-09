@@ -179,8 +179,7 @@ describe("sign-in", () => {
     expect(body.name).toBe("Alice");
     expect(body.admin).toBe(false);
     expect(Object.keys(body).sort()).toEqual(
-      // No IP address is kept.
-      ["admin", "agent", "createdAt", "expiresAt", "id", "name", "uid"].sort(),
+      ["admin", "agent", "createdAt", "expiresAt", "id", "ip", "name", "uid"].sort(),
     );
   });
 
@@ -284,9 +283,12 @@ describe("admin", () => {
     const all = await (await req("/api/admin/votes", {}, admin)).json();
     expect(all).toHaveLength(100);
     expect(Object.keys(all[0]).sort()).toEqual(
-      ["at", "categoryId", "categoryTitle", "name", "optionId", "optionTitle", "rank", "uid"].sort(),
+      ["at", "categoryId", "categoryTitle", "ip", "name", "optionId", "optionTitle", "rank", "uid"].sort(),
     );
     expect(all.every((v: any) => v.name && v.categoryTitle && v.optionTitle)).toBe(true);
+    // The seeded voters have a made-up address.
+    const byIp = await (await req("/api/admin/votes?filter_ip=seed", {}, admin)).json();
+    expect(byIp).toHaveLength(100);
     const byUid = await (await req("/api/admin/votes?filter_uid=-1", {}, admin)).json();
     expect(byUid.every((v: any) => v.uid === -1)).toBe(true);
     expect(byUid.length).toBeGreaterThan(0);
@@ -304,7 +306,7 @@ describe("admin", () => {
     expect(stats.voters).toBe(501);
     expect(stats.categories.reduce((n: number, c: any) => n + c.ballots, 0)).toBe(stats.ballots);
     expect(stats.days.reduce((n: number, d: any) => n + d.ballots, 0)).toBe(stats.ballots);
-    expect(stats.sharedIps).toBeUndefined();
+    expect(stats.sharedIps).toEqual([{ ip: "seed", voters: 500 }]);
     expect((await req("/api/admin/stats", {}, user)).status).toBe(401);
   });
 
@@ -726,6 +728,25 @@ describe("admin", () => {
     for (const evil of ["//evil.example", "https://evil.example", "/\\evil.example", "evil"]) {
       expect((await signIn("Tester", evil)).landed).toBe("/");
     }
+  });
+
+  test("IP addresses and browsers are kept only when switched on in Settings", async () => {
+    const settings = (body: object) =>
+      req("/api/admin/settings", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }, admin);
+    const me = async (j: Jar) => (await req("/api/me", {}, j)).json();
+    // Off by default.
+    const off = await me(await signIn("PrivacyOff"));
+    expect(off.ip).toBeNull();
+    expect(off.agent).toBe("");
+    // On: the address (here "Unknown": no Cloudflare in front) and the browser.
+    expect((await settings({ recordIp: true, recordAgent: true })).status).toBe(200);
+    expect((await (await req("/api/config")).json()).recordIp).toBe("on");
+    const on = await me(await signIn("PrivacyOn"));
+    expect(on.ip).toBe("Unknown");
+    expect(on.agent).not.toBe("");
+    // And off again.
+    expect((await settings({ recordIp: false, recordAgent: false })).status).toBe(200);
+    expect((await me(await signIn("PrivacyOff2"))).ip).toBeNull();
   });
 
   test("make admin by uid", async () => {

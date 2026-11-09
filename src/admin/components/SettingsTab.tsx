@@ -257,6 +257,8 @@ function SettingsForm({ config }: { config: Config }) {
   const [closes, setCloses] = useState(toLocalInput(config.endTime));
   const [year, setYear] = useState(config.awardYear ?? "");
   const [style, setStyle] = useState<VotingStyle>(config.defaultVotingStyle ?? "single");
+  const [recordIp, setRecordIp] = useState(config.recordIp === "on");
+  const [recordAgent, setRecordAgent] = useState(config.recordAgent === "on");
 
   const save = useMutation({
     mutationFn: () =>
@@ -266,6 +268,8 @@ function SettingsForm({ config }: { config: Config }) {
         endTime: fromLocalInput(closes),
         ...(year ? { awardYear: Number(year) } : {}),
         defaultVotingStyle: style,
+        recordIp,
+        recordAgent,
       }),
     onSuccess: () =>
       Promise.all([
@@ -346,6 +350,30 @@ function SettingsForm({ config }: { config: Config }) {
             </select>
           </Field>
         </div>
+      </section>
+
+      <section className="space-y-3 border-t border-neutral-200 pt-6">
+        <h2 className="text-sm font-bold">Privacy</h2>
+        <p className="text-sm text-neutral-600">
+          What's kept about voters besides their destiny.gg account and votes. Applies to new sign-ins and votes; switching
+          off doesn't delete what was kept while it was on.
+        </p>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-1" checked={recordIp} onChange={(e) => setRecordIp(e.currentTarget.checked)} />
+          <span>
+            <span className="font-medium">Keep voters' IP addresses</span>
+            <span className="block text-neutral-600">
+              Shows in Votes, with a table of addresses shared by several voters (a sign of bot accounts).
+            </span>
+          </span>
+        </label>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-1" checked={recordAgent} onChange={(e) => setRecordAgent(e.currentTarget.checked)} />
+          <span>
+            <span className="font-medium">Keep voters' browsers (user agent)</span>
+            <span className="block text-neutral-600">Which browser and system each sign-in came from.</span>
+          </span>
+        </label>
       </section>
 
       <div className="flex items-center gap-3 border-t border-neutral-200 pt-6">

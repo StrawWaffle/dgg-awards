@@ -29,6 +29,9 @@ export const sessionsTable = sqliteTable(
     uid: int()
       .references(() => usersTable.uid, { onDelete: "cascade" })
       .notNull(),
+    /** Only when the "recordIp" setting is on; otherwise null. */
+    ip: text(),
+    /** Only when the "recordAgent" setting is on; otherwise "". */
     agent: text().notNull(),
   },
   (table) => [
