@@ -552,6 +552,18 @@ StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, an
   - typecheck and 92 unit tests; 49 API tests, with the preview addresses added
   - in the browser: both preview menus (hover, jump, close, current page marked, the admin one on a phone), every stage and page, a preview vote not saved, the old addresses rewritten, `/lab#sound` kept, non-admin and signed-out refusals, the big screen switched to simulated votes with the reveal running, and the music's first play starting at 6.02 s
 
+### The year in DGG chat (branch `worktree-chat-review`, 2026-11-09)
+
+StrawWaffle asked for a page from dgg-scs's report (`C:\Users\<user>\Desktop\dgg\dgg-scs\data\report-cache\year-in-review-2026.html`, data in `yir-2026.json` beside it), with a funny spin per entry, shown once the results are out, in the site's look.
+- **`/chat` (`src/site/ChatReviewPage.tsx`)**, tab "Year in chat": a cover with the year in numbers, then emotes, combos, saying the streamers' names, who tagged whom, greentext, links, and law and order. Each section has highlight cards (an emote, a big handwritten number, a caption), bars that grow in, and lists or tables. Clicking any big emote fires a burst of it. The fine print lists the nicks not counted as tags (everyday words), as StrawWaffle asked; the rest of the report's method is left out.
+- **Shown with the results:** `GET /api/chat-review` answers only in reviewing mode, or to admins with `?preview=1`, like the tally. The data isn't in the page's bundle, so it can't be read early. Visitors before then see "The year in chat comes out with the results". Admins see it in the "Results out" preview (`/preview/results/chat`, also in the preview menus). The front page's results panel has a "The year in DGG chat" button.
+- **The data** is `src/archive/chat-2026.json`, made by `python scripts/build-chat-review.py <yir-2026.json> src/archive/chat-2026.json`. The numbers come straight from the report; what's shown and the captions are picked by hand in the script. **Left out on purpose:**
+  - raw messages that are NSFW, NSFL, about real-world harm, or slurs: several "longest greentexts" (an explicit fanfic, a suicide joke, one naming RiN_LuX in a made-up abuse story), combo-breaking messages and ban reasons with slurs
+  - Discord links (they expire: shown as "[self-destructed Discord image]"), NSFW links, and a link about an assault
+  - artefacts: "@moderation" tagging "muted", and "Emote" as a tagged nick
+- **For rinlux to look at:** the "Law and order" section names people mods punished (only light ones: RiN_LuX and JaydrVernanda muted by Bing, the most throttled, the most duels lost), and the page lists real nicks throughout.
+- Tested: typecheck, 92 unit tests, 50 API tests (a new one: the year in chat is refused while voting and to non-admins in preview, and has no Discord links), and in the browser in light, dark and at phone width (no sideways scroll, every emote drawn, the bursts, and the locked notice for visitors).
+
 ### Next: the lab page (StrawWaffle's answers, 2026-11-09)
 
 StrawWaffle wants the front page and the presentation to feel fun, quirky and wholesome. It gets built on an experimental page first (`/lab`, admins only) until rinlux approves. Order: the follow-ups above, merge and deploy, then the lab.

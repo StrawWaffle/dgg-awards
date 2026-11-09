@@ -86,7 +86,7 @@ function ChatReview({ data, preview }: { data: Review; preview: boolean }) {
       {/* The cover. */}
       <Sketch pad={5} radius={26} strokeWidth={3} boil roughness={1.5}>
         <header className="relative overflow-hidden rounded-[24px] px-6 py-10 text-center sm:px-10" style={{ background: "var(--panel)" }}>
-          <div className="mb-4 flex justify-center gap-3">
+          <div className="mb-4 flex flex-wrap justify-center gap-3">
             {["OMEGALUL", "MMMM", "DANKMEMES", "GIGACHAD", "CINEMA"].map((e) => (
               <button key={e} type="button" className="cozy-row rounded-xl p-1" onClick={burst(e)} aria-label={`A burst of ${e}`}>
                 <Emote name={e} size={1.1} title="" />
@@ -113,7 +113,7 @@ function ChatReview({ data, preview }: { data: Review; preview: boolean }) {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {data.numbers.map((n) => (
           <div key={n.label} className="cozy-panel p-4">
-            <div className="hand text-4xl font-bold tabular-nums sm:text-5xl">{fmt(n.value)}</div>
+            <div className="hand text-[1.6rem] font-bold tabular-nums sm:text-5xl">{fmt(n.value)}</div>
             <div className="font-black">{n.label}</div>
             <p className="mt-1 text-sm font-semibold" style={{ color: "var(--muted)" }}>
               {n.note}

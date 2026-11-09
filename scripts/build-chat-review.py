@@ -277,5 +277,5 @@ data = {
     "law": {"cards": law_cards, "mods": mod_bars, "banReasons": ban_reasons, "nuked": nuked, "linkRules": link_rules, "flyers": flyers},
     "notTags": [n for n in d["meta"]["nicks_not_counted_as_tags"] if not n.startswith("@")],
 }
-json.dump(data, open(out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+json.dump(data, open(out, "w", encoding="utf-8", newline="\n"), ensure_ascii=False, indent=1)
 print("wrote", out)
