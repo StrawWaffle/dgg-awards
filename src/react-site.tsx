@@ -2,12 +2,12 @@ import "@/index.css";
 import "@/lab/lab.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { Home } from "@/home/Home";
+import { Site } from "@/site/Site";
 
 function start() {
   createRoot(document.querySelector("body")!).render(
     <StrictMode>
-      <Home />
+      <Site />
     </StrictMode>,
   );
 }

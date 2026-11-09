@@ -339,6 +339,29 @@ export async function getVoteStats() {
   return { ...totals!, categories, days, sharedIps };
 }
 
+/**
+ * The public tally, with the results: how many people voted, ballots (one
+ * voter's vote in one award), and both per day (UTC). Counts only; nothing
+ * about anyone (rinlux, 2026-11-09).
+ */
+export async function getVoteTally() {
+  const v = schema.votesTable;
+  const [totals] = await db
+    .select({
+      voters: sql<number>`count(distinct ${v.uid})`,
+      ballots: sql<number>`count(*) filter (where ${v.rank} = 1)`,
+    })
+    .from(v);
+  const day = sql<string>`date(${v.at}, 'unixepoch')`;
+  const days = await db
+    .select({ day, voters: sql<number>`count(distinct ${v.uid})`, ballots: sql<number>`count(*)` })
+    .from(v)
+    .where(eq(v.rank, 1))
+    .groupBy(day)
+    .orderBy(asc(day));
+  return { ...totals!, days };
+}
+
 export async function getNominee(categoryId: string, id: string) {
   return db.query.optionsTable.findFirst({
     where: (o, { and, eq }) => and(eq(o.categoryId, categoryId), eq(o.id, id)),

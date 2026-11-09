@@ -62,7 +62,40 @@ export async function loadArchive2025(): Promise<AwardResult[]> {
   }));
 }
 
-async function loadSummary(): Promise<AwardResult[]> {
+/**
+ * Made-up results for this year's nominees, for admins to preview the page
+ * before there are votes: per award, a few hundred voters shared out at
+ * random (the same each time for an award). Never saved, never public.
+ */
+export async function loadSimulated(): Promise<AwardResult[]> {
+  const data: any[] = await fetch("/api/admin/nominees").then((r) => (r.ok ? r.json() : []));
+  return data
+    .filter((c) => !c.hidden && c.options.length > 0)
+    .map((c) => {
+      let seed = [...String(c.id)].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 11) || 1;
+      const random = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      const total = 250 + Math.floor(random() * 400);
+      const weights = c.options.map(() => random() ** 2.2 + 0.02);
+      const sum = weights.reduce((a: number, b: number) => a + b, 0);
+      const counts: number[] = weights.map((w: number) => Math.round((w / sum) * total));
+      const most = Math.max(...counts);
+      const counted = counts.reduce((a, b) => a + b, 0) || 1;
+      const standings = c.options
+        .map((o: any, i: number) => ({
+          id: o.id,
+          title: o.title,
+          count: counts[i]!,
+          percentage: Number(((counts[i]! / counted) * 100).toFixed(1)),
+          isWinner: counts[i] === most,
+          image: o.thumbnailUrl ?? (o.imageId ? `/Media/${o.imageId}` : null),
+          clip: nomineeClip(o, `${o.title} · ${c.title}`),
+        }))
+        .sort((a: Standing, b: Standing) => b.count! - a.count!);
+      return { id: c.id, title: c.title, description: c.description ?? "", ranked: c.votingStyle === "ranked", total: counted, standings, rounds: null };
+    });
+}
+
+export async function loadSummary(): Promise<AwardResult[]> {
   const data: any[] = await fetch("/api/vote/results?preview=1").then((r) => (r.ok ? r.json() : []));
   return data.map((c) => ({
     id: c.categoryId,
@@ -127,10 +160,13 @@ export function Summary({
   load = loadSummary,
   title = "The results",
   footer,
+  extra,
 }: {
   load?: () => Promise<AwardResult[]>;
   title?: string;
   footer?: ReactNode;
+  /** More for the overview, under the highlights (the tally). */
+  extra?: ReactNode;
 } = {}) {
   const [awards, setAwards] = useState<AwardResult[] | null>(null);
   const [watching, setWatching] = useState<Clip | null>(null);
@@ -277,6 +313,7 @@ export function Summary({
               <Highlights title="Most nominees" items={busiest.map((a) => ({ a, text: `${a.standings.length} nominees` }))} onJump={jump} />
             )}
           </div>
+          {extra}
         </section>
 
         {awards.map((a) => (

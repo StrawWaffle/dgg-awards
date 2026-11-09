@@ -7,6 +7,7 @@ import {
   getUserBallots,
   getUserVotes,
   getVotingResults,
+  getVoteTally,
   insertBallot,
   userVoteExists,
 } from "@/lib/data/driver";
@@ -96,6 +97,17 @@ export const publicRoutes = new Hono<SessionEnv>()
       return c.body(null, 200);
     },
   )
+
+  // The tally (voters, ballots, per day): public with the results, and for
+  // admins with ?preview=1.
+  .get("/api/vote/tally", zValidator("query", resultsQuery, rejectInvalid), async (c) => {
+    const config = await getConfig();
+    const preview =
+      c.req.valid("query").preview === "1" &&
+      (await verifyAdminSession(getCookie(c, SESSION_COOKIE))) !== null;
+    if (config.viewingMode !== "reviewing" && !preview) return c.body(null, 401);
+    return c.json(await getVoteTally(), 200);
+  })
 
   // Results are public once the site is in reviewing mode. Admins can see
   // them any time with ?preview=1, to check the reveal before the stream.

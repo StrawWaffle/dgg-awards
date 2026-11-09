@@ -2,7 +2,7 @@ import { type CSSProperties, useEffect, useRef } from "react";
 
 /**
  * A destiny.gg emote, drawn by destiny.gg's own emotes.css (linked in
- * lab.html), so it looks and animates exactly as in chat. `size` scales it.
+ * site.html), so it looks and animates exactly as in chat. `size` scales it.
  * Some emotes animate a set number of times; those are made to loop.
  * `rate` sets the animation speed (1 is normal, 0 holds still).
  */

@@ -129,23 +129,18 @@ async function shot(name, { path = "/vote", token, viewport = { width: 1440, hei
 
 const mobile = { width: 390, height: 844 };
 
+// The public site (one page since 2026-11-09): the front page, voting, results.
+await shot("home", { path: "/" });
 await shot("voting-signed-out");
 await shot("voting-signed-in", { token: voter });
 await shot("voting-mobile", { viewport: mobile, token: voter });
-await shot("sidebar-open", {
-  token: voter,
-  before: async (p) => {
-    await p.getByRole("button", { name: "Navigation" }).click();
-    await p.waitForTimeout(1500); // let the slide-in finish
-  },
-});
 
 await setMode(admin, "reviewing");
-await shot("results");
-await shot("results-mobile", { viewport: mobile });
+await shot("results", { path: "/results" });
+await shot("results-mobile", { path: "/results", viewport: mobile });
 
 await setMode(admin, "locked");
-await shot("locked");
+await shot("locked", { path: "/" });
 await setMode(admin, "voting");
 
 for (const tab of ["Nominees", "Settings", "Admins", "Votes"]) {

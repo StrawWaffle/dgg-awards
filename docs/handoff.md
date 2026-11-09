@@ -490,6 +490,30 @@ StrawWaffle noticed missing hover effects and a side list that didn't follow the
   - Checked in the browser: all 10 sampled elements change on hover.
 - **Results / 2025 side list:** the highlighted award is now worked out on scroll: the last one whose heading has passed the upper third, the last one at the very bottom (the short final awards never reached the old observer's band), and none above the first. The list scrolls itself to keep it in view: a third of the way down when it nears an edge, back to the top at the overview.
 
+### One site: the real voting and results pages (branch `worktree-one-site`, 2026-11-09)
+
+StrawWaffle: `/vote?preview=voting` and `?preview=results` should show the new look, and "lab and non-lab should not be two different web pages; the lab is a slightly more experimental place, without touching what's agreed upon".
+- **One page, `site.html` → `src/site/Site.tsx`**, at `/`, `/vote`, `/results`, `/2025` and `/lab`, with one header.
+  - Tabs: Home, Vote (in voting mode, and for admins), Results (in reviewing mode, and for admins), 2025 results, and Lab (admins).
+  - Pages slide like the lab's tabs did, and the music keeps playing.
+  - `/vote?preview=results` opens the results, matching the admin page's link.
+- **Removed:** the old 2025-style page (`App.tsx`, `index.html`, `src/components/`), `lab.html` and the lab's own shell, and the lab's voting demo and results tab, which the real pages replace.
+- **`/vote` (`VotePage.tsx`)**, the lab's voting flow made real:
+  - One award at a time, with the ballot on the side (it keeps the current award in view).
+  - Pick one, or for ranked awards click in order (numbers on the cards; click again to take one out; Clear).
+  - "Cast my vote" posts to `/api/vote`. **Votes are final**, as the server allows one ballot per award, and the page says so (the demo's "you can change your votes" was wrong). Voted awards show "Your vote", with their cards locked. It starts at the first award not voted on, and has a finish screen.
+  - Signed out: a banner and "Sign in to vote", returning to `/vote`.
+  - Outside voting: "Voting opens …", "Voting has closed" or "the results are out". The check matches the server's: voting mode, between both dates.
+  - **Admins always get a preview** when voting isn't open, or with `?preview=voting`. It loads nominees from `/api/admin/nominees`, so it works while locked, and nothing is saved.
+- **`/results` (`ResultsPage.tsx`)**, this year's results with the results summary: public in reviewing mode, an admin preview otherwise.
+  - **"Simulated votes"** (admins, in preview) uses `loadSimulated()` in `Summary.tsx`: a few hundred made-up voters per award, the same each time, built in the browser and never saved. It starts on when there are no votes yet.
+  - **The tally** rinlux approved: `GET /api/vote/tally` (voters, ballots and per day), public with the results and for admins with `?preview=1`. It shows in the overview.
+- **`/lab` (`LabPage.tsx`):** the Big screen and the Sound check, in the site's header (a second row with the lab's tabs, and the chat toggle).
+- Tests:
+  - API: the five addresses and the tally's access (48 pass).
+  - Browser: the admin preview while locked (22 awards, a vote not saved), the results preview (real with tally, then simulated), the lab, locked and signed-out visitors, a real vote kept after reload, and a ranked ballot saved in order.
+  - The screenshot script now captures the front page, voting and results of the new site; its old baselines are out of date.
+
 ### Next: the lab page (StrawWaffle's answers, 2026-11-09)
 
 StrawWaffle wants the front page and the presentation to feel fun, quirky and wholesome. It gets built on an experimental page first (`/lab`, admins only) until rinlux approves. Order: the follow-ups above, merge and deploy, then the lab.

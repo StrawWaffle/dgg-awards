@@ -87,11 +87,13 @@ async function setMode(admin: Jar, mode: string) {
 }
 
 describe("static and public routes", () => {
-  test("pages are served with robots meta: the front page, 2025's results and the voting page", async () => {
+  test("the site's pages are one page, served with robots meta", async () => {
     for (const [path, title] of [
       ["/", "DGG Awards"],
+      ["/vote", "DGG Awards"],
+      ["/results", "DGG Awards"],
       ["/2025", "DGG Awards"],
-      ["/vote", "Destiny Awards 2025"],
+      ["/lab", "DGG Awards"],
     ] as const) {
       const res = await req(path);
       expect(res.status).toBe(200);
@@ -747,6 +749,18 @@ describe("admin", () => {
     // And off again.
     expect((await settings({ recordIp: false, recordAgent: false })).status).toBe(200);
     expect((await me(await signIn("PrivacyOff2"))).ip).toBeNull();
+  });
+
+  test("the tally is public with the results, and for admins in preview", async () => {
+    // The tests run in voting mode: not public yet.
+    expect((await req("/api/vote/tally")).status).toBe(401);
+    expect((await req("/api/vote/tally?preview=1", {}, user)).status).toBe(401);
+    const res = await req("/api/vote/tally?preview=1", {}, admin);
+    expect(res.status).toBe(200);
+    const tally = await res.json();
+    expect(Object.keys(tally).sort()).toEqual(["ballots", "days", "voters"]);
+    expect(tally.voters).toBeGreaterThan(500);
+    expect(tally.days.reduce((n: number, d: any) => n + d.ballots, 0)).toBe(tally.ballots);
   });
 
   test("make admin by uid", async () => {
