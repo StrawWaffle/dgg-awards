@@ -209,14 +209,13 @@ export function Site() {
   const mode = shown?.viewingMode;
   // Tabs as visitors see them (at the previewed stage, in a preview): Vote
   // while voting, Results once they're out, and the page being looked at.
-  // The lab only in a preview.
+  // The lab isn't a tab: it's in the logo's preview menu, and has its own row.
   const tabs: { page: Page; label: string }[] = [
     { page: "home", label: "Home" },
     ...(mode === "voting" || page === "vote" ? [{ page: "vote" as Page, label: "Vote" }] : []),
     ...(mode === "reviewing" || page === "results" ? [{ page: "results" as Page, label: "Results" }] : []),
     ...(mode === "reviewing" || page === "chat" ? [{ page: "chat" as Page, label: "Year in chat" }] : []),
     { page: "2025", label: "2025 results" },
-    ...(previewing ? [{ page: "lab" as Page, label: "Lab" }] : []),
   ];
 
   const render = (p: Page): ReactNode => {

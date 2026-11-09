@@ -67,7 +67,11 @@ export function UserMenu({ me }: { me: Me | undefined }) {
             </div>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {me.admin && <span className="cozy-chip coral">Admin</span>}
+            {me.admin && (
+              <a className="cozy-chip coral" href="/admin" title="Open the admin page">
+                Admin
+              </a>
+            )}
             {profile?.tier && <span className="cozy-chip green">{profile.tier}</span>}
             {profile?.team && <span className="cozy-chip">{/^team /i.test(profile.team) ? profile.team : `Team ${profile.team}`}</span>}
           </div>

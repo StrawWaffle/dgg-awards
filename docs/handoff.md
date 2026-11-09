@@ -561,6 +561,7 @@ StrawWaffle asked for a page from dgg-scs's report (`C:\Users\<user>\Desktop\dgg
   - raw messages that are NSFW, NSFL, about real-world harm, or slurs: several "longest greentexts" (an explicit fanfic, a suicide joke, one naming RiN_LuX in a made-up abuse story), combo-breaking messages and ban reasons with slurs
   - Discord links (they expire: shown as "[self-destructed Discord image]"), NSFW links, and a link about an assault
   - artefacts: "@moderation" tagging "muted", and "Emote" as a tagged nick
+- **Also on this branch (StrawWaffle):** the Lab tab is gone from the header, even in a preview; the lab is in the logo's preview menu and keeps its own row of tabs. The "Admin" chip in the user menu is now a link to the admin page.
 - **For rinlux to look at:** the "Law and order" section names people mods punished (only light ones: RiN_LuX and JaydrVernanda muted by Bing, the most throttled, the most duels lost), and the page lists real nicks throughout.
 - Tested: typecheck, 92 unit tests, 50 API tests (a new one: the year in chat is refused while voting and to non-admins in preview, and has no Discord links), and in the browser in light, dark and at phone width (no sideways scroll, every emote drawn, the bursts, and the locked notice for visitors).
 
