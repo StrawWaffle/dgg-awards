@@ -27,7 +27,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 
 ### At a glance (end of session 2, 2026-11-09)
 
-**Live** (`main` at `2986962` plus docs, deployed and pushed):
+**Live** (`main` at `25570b2` plus docs, deployed and pushed):
 - **Infrastructure:** the Docker preview behind a Cloudflare tunnel, real destiny.gg sign-in, the stack upgrade (Bun 1.4, Hono, Zod, TS 7), and clips into Cloudflare R2 at 1080p.
 - **Admin page:**
   - a left sidebar, dark theme, drag to reorder, and collapsible sections
@@ -68,8 +68,8 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 - **The code is never to be public.**
 
 **Still open:**
-- bing's destiny.gg name.
-- The voting end date.
+- bing: added to `ADMIN_USERNAMES` as `bing` (an admin from their next sign-in).
+- Voting end: 26 December 2026 23:59:59 UTC ("for now", StrawWaffle).
 - How DGGer's groups and wildcards should vote.
 - **Simulated results for admins** (StrawWaffle asked): a switch in the admin results previews (summary and big screen) that makes up ballots in memory, never saved. Not built yet.
 - **The new voting page** (next, see the front page section). Until then "Vote now" goes to the old page at `/vote`.
@@ -99,7 +99,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 - Fast-forward `main`, run `docker compose --profile tunnel up -d --build app`, then check `/`, `/api/config`, `/lab`, `/admin` (200), `/api/admin/checks` and `/api/lab/emotes` (401), and `/signin` (to destiny.gg).
 - Push `main`.
 
-**Worktrees:** everything under `.claude/worktrees/` is merged (`admin-pass`, `editor-scroll`, `lab`, `lab-polish`, `lab-polish-2`, `lab-polish-3`, `lab-polish-4`, `lab-summary`, `admin-lab-link`, `duel-reveal`, `plain-admin`, `clip-preview`, `library-pictures`, `backups`, `frontpage`, `nominee-images`, `sketchy`) and can be removed.
+**Worktrees:** everything under `.claude/worktrees/` is merged (`admin-pass`, `editor-scroll`, `lab`, `lab-polish`, `lab-polish-2`, `lab-polish-3`, `lab-polish-4`, `lab-summary`, `admin-lab-link`, `duel-reveal`, `plain-admin`, `clip-preview`, `library-pictures`, `backups`, `frontpage`, `no-ip`, `nominee-images`, `sketchy`) and can be removed.
 
 **Test containers**, on network `dgga-test`, all kept running:
 
@@ -457,7 +457,7 @@ StrawWaffle got approval for the lab's look ("the lab is the official version no
 
 **Next (StrawWaffle's order): the lab's voting page as the real one.** `VoteDemo` saves nothing and shows 3 awards. It needs real ballots (`/api/vote`), sign-in, the voter's existing picks, every award, ranked awards, and the voting window. Then `VOTE_PATH` in `Home.tsx` points at it and the old page can go.
 
-### No IP addresses, and plain backups (branch `worktree-no-ip`, 2026-11-09)
+### No IP addresses, and plain backups (2026-11-09, deployed)
 
 StrawWaffle: "remove the ip tracking, and we don't need the encryption thing anymore".
 - **IPs:** sign-ins no longer store the visitor's address (it came from Cloudflare's `CF-Connecting-IP`). Migration `0008_no_ip` drops `sessions.ip` and strips `ip` from every vote's `sessionSnapshot`. Tested on a copy of live's pre-2026 backup: 9,328 votes, all stripped, all kept. The admin Votes tab lost its IP column, IP filter and "addresses shared by several voters" table. That table was the only bot signal; there's none now. `/api/me` and the votes list no longer return `ip`. The user agent is still kept with each session and vote.
