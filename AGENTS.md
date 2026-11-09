@@ -53,7 +53,7 @@ Voting and results site for the yearly destiny.gg community awards (DGG Awards).
 
 From the repo root on `main`: `docker compose --profile tunnel up -d --build app`. Migrations run on start. Then check:
 - `https://dgg-awards.strawwaffle.dev` and `/api/config` answer 200
-- `/api/admin/checks` answers 401 when signed out
+- `/admin` answers 200 (the page checks for an admin itself) and `/api/admin/checks` answers 401 when signed out
 - `/signin` redirects to www.destiny.gg
 
 The live `.env` holds the real DGG OAuth app, `AUTH_SECRET`, the tunnel token, `ADMIN_USERNAMES` and the five `R2_*` settings (see `.env.example` for names). Its database is the `dgg-awards_awards_data` volume.

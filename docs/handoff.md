@@ -27,7 +27,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 
 ### At a glance (end of session 2, 2026-11-09)
 
-**Live** (`main` at `7568e2a` plus docs, deployed and pushed):
+**Live** (`main` at `1913956` plus docs, deployed and pushed):
 - **Infrastructure:** the Docker preview behind a Cloudflare tunnel, real destiny.gg sign-in, the stack upgrade (Bun 1.4, Hono, Zod, TS 7), and clips into Cloudflare R2 at 1080p.
 - **Admin page:**
   - a left sidebar, dark theme, drag to reorder, and collapsible sections
@@ -36,6 +36,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
   - edit history with undo
   - hiding categories that have votes; export, and import with an automatic database backup
   - links at the bottom left to preview voting and results, open the site, and open the lab
+  - at plain `/admin` (the page checks for an admin; the API refuses everyone else), and signing in returns you to the page you came from
 - **Voting model:** single pick or ranked per category, ranked counted by instant runoff, and the 2025 double-count bug fixed.
 - **The lab** (`/lab`, admins only), where the 2026 voting page and presentation are being tried out:
   - a cozy look after a community destiny.gg skin, light and dark, a hand-drawn "drawn look" switch, and drifting emote silhouettes in the background
@@ -83,10 +84,10 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 
 **Deploying (what was done each time):**
 - Back up the live database first: `VACUUM INTO /data/backups/<time>-before-deploy.db` inside `dgg-awards-app-1`. Imports also make their own backups there, and the newest 20 are kept.
-- Fast-forward `main`, run `docker compose --profile tunnel up -d --build app`, then check `/`, `/api/config`, `/lab` (200), `/api/admin/checks` and `/api/lab/emotes` (401), and `/signin` (to destiny.gg).
+- Fast-forward `main`, run `docker compose --profile tunnel up -d --build app`, then check `/`, `/api/config`, `/lab`, `/admin` (200), `/api/admin/checks` and `/api/lab/emotes` (401), and `/signin` (to destiny.gg).
 - Push `main`.
 
-**Worktrees:** everything under `.claude/worktrees/` is merged (`admin-pass`, `editor-scroll`, `lab`, `lab-polish`, `lab-polish-2`, `lab-polish-3`, `lab-polish-4`, `lab-summary`, `admin-lab-link`, `duel-reveal`, `nominee-images`, `sketchy`) and can be removed.
+**Worktrees:** everything under `.claude/worktrees/` is merged (`admin-pass`, `editor-scroll`, `lab`, `lab-polish`, `lab-polish-2`, `lab-polish-3`, `lab-polish-4`, `lab-summary`, `admin-lab-link`, `duel-reveal`, `plain-admin`, `nominee-images`, `sketchy`) and can be removed.
 
 **Test containers**, on network `dgga-test`, all kept running:
 
@@ -367,7 +368,7 @@ In the lab (voting, big screen, results summary), a nominee without a built clip
 - With the sample data, 68 nominees now have something to play on the summary.
 - **For rinlux, before this reaches the real site:** an embed loads YouTube or Twitch in visitors' browsers (the no-cookie YouTube domain is used), which is a privacy point.
 
-### The admin page at plain /admin (branch `worktree-plain-admin`, 2026-11-09, not deployed)
+### The admin page at plain /admin (2026-11-09, deployed)
 
 StrawWaffle saw what looked like being signed out after every deploy. Sessions were never the problem: they live in the database and are signed with the fixed `AUTH_SECRET`, and a session from 06:33 was still valid after about ten deploys. The admin page lived at a random `/admin/<code>` address made fresh at each start (from the 2025 code, security through obscurity), so open tabs and bookmarks got a 404 after a deploy. StrawWaffle chose plain `/admin`:
 - Bun serves the admin page at `/admin` to anyone, like the lab. The page asks `/api/me` and shows the admin UI only to admins. Others get a short sign-in or "not an admin" note. That's a courtesy: the protection is the server, which refuses every `/api/admin` request from non-admins, as it always did.
