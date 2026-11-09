@@ -236,10 +236,15 @@ export async function insertNominee(
   return await db.insert(schema.optionsTable).values(nominee);
 }
 
+/**
+ * Site settings from the key/value table. Values are stored as text, so the
+ * times are unix seconds as strings, and any key can be missing.
+ */
 export async function getConfig(): Promise<{
-  startTime: number;
-  endTime: number;
-  viewingMode: ViewingMode;
+  startTime?: string;
+  endTime?: string;
+  viewingMode?: ViewingMode;
+  message?: string;
 }> {
   const arrayOfObjects = await db.query.configurationTable.findMany();
 

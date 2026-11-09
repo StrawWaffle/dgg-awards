@@ -1,7 +1,7 @@
 import { CategorySelect } from "@/admin/components/CategorySelect";
 import { PlusCircledIcon } from "@radix-ui/react-icons";
 import * as Label from "@radix-ui/react-label";
-import * as Tabs from "@radix-ui/react-tabs";
+import { Tabs } from "radix-ui";
 import { useQuery } from "@tanstack/react-query";
 import { fetchNominees } from "@/lib/queries";
 

@@ -1,4 +1,4 @@
 import { createContext } from "react";
-import type { MeApiResponse } from "@/lib/types";
+import type { Me } from "@/lib/queries";
 
-export const AuthContext = createContext<MeApiResponse | undefined>(undefined);
+export const AuthContext = createContext<Me | undefined>(undefined);

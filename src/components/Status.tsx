@@ -32,7 +32,8 @@ export function Status() {
     }
 
     const calculateTimeLeft = () => {
-      const target = new Date(configQuery.data.startTime * 1000).getTime();
+      // Number(undefined) is NaN: no countdown when the time isn't set, as before.
+      const target = new Date(Number(configQuery.data.startTime) * 1000).getTime();
       const now = Date.now();
       const difference = Math.max(0, Math.floor((target - now) / 1000));
 
@@ -54,7 +55,7 @@ export function Status() {
     }
 
     const calculateTimeLeft = () => {
-      const target = new Date(configQuery.data.endTime * 1000).getTime();
+      const target = new Date(Number(configQuery.data.endTime) * 1000).getTime();
       const now = Date.now();
       const difference = Math.max(0, Math.floor((target - now) / 1000));
 

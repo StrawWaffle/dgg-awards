@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { fetchAuthSession, fetchConfig, submitVote } from "@/lib/queries";
 import { nowS } from "@/lib/util";
-import type { MeApiResponse } from "@/lib/types";
 
 type Props = {
   disabled: boolean;
@@ -20,7 +19,7 @@ export function VoteButton(props: Props) {
     queryFn: fetchConfig,
   });
 
-  const authQuery = useQuery<MeApiResponse>({
+  const authQuery = useQuery({
     queryKey: ["me"],
     queryFn: fetchAuthSession,
   });

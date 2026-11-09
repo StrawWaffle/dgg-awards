@@ -1,5 +1,5 @@
 import * as Label from "@radix-ui/react-label";
-import * as Tabs from "@radix-ui/react-tabs";
+import { Tabs } from "radix-ui";
 import { useQuery } from "@tanstack/react-query";
 import { fetchConfig } from "@/lib/queries";
 

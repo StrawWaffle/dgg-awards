@@ -1,5 +1,5 @@
 import * as React from "react";
-import * as Tabs from "@radix-ui/react-tabs";
+import { Tabs } from "radix-ui";
 import { clsx } from "clsx";
 
 interface TabTriggerProps {

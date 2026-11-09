@@ -7,7 +7,7 @@ import {
   ReloadIcon,
   UpdateIcon,
 } from "@radix-ui/react-icons";
-import * as Tabs from "@radix-ui/react-tabs";
+import { Tabs } from "radix-ui";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { fetchAllVotes } from "@/lib/queries";
 

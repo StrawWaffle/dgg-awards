@@ -87,23 +87,8 @@ export async function verifySession(token: string) {
   }
 }
 
-export async function verifyRequest(
-  req: Bun.BunRequest,
-  tokenCookieName = "session",
-) {
-  const session = req.cookies.get(tokenCookieName);
-  if (!session) {
-    return null;
-  }
-
-  return await verifySession(session);
-}
-
-export async function verifyAdminRequest(
-  req: Bun.BunRequest,
-  tokenCookieName = "session",
-) {
-  const token = req.cookies.get(tokenCookieName);
+/** The session for a token, but only if its user is an admin. */
+export async function verifyAdminSession(token: string | undefined) {
   if (!token) {
     return null;
   }
@@ -114,11 +99,7 @@ export async function verifyAdminRequest(
   }
 
   const user = await getUser(session.uid);
-  if (!user) {
-    return null;
-  }
-
-  if (!user.admin) {
+  if (!user?.admin) {
     return null;
   }
 

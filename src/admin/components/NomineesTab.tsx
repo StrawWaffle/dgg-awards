@@ -3,7 +3,7 @@ import * as Accordion from "@radix-ui/react-accordion";
 import { ArrowDownIcon, CaretSortIcon, TrashIcon } from "@radix-ui/react-icons";
 import * as ScrollArea from "@radix-ui/react-scroll-area";
 import * as Separator from "@radix-ui/react-separator";
-import * as Tabs from "@radix-ui/react-tabs";
+import { Tabs } from "radix-ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { Label, Tooltip } from "radix-ui";

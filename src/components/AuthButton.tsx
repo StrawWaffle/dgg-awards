@@ -1,10 +1,9 @@
 import { fetchAuthSession } from "@/lib/queries";
 import { ExternalLinkIcon } from "@radix-ui/react-icons";
 import { useQuery } from "@tanstack/react-query";
-import type { MeApiResponse } from "@/lib/types";
 
 export function AuthButton() {
-  const query = useQuery<MeApiResponse>({
+  const query = useQuery({
     queryKey: ["me"],
     queryFn: fetchAuthSession,
     staleTime: Infinity,

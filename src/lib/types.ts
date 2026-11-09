@@ -1,11 +1,5 @@
-import type { InferInsertModel, InferSelectModel } from "drizzle-orm";
-import type {
-  getAllUsers,
-  getAllVotes,
-  getConfig,
-  getNominees,
-  getUserVotes,
-} from "@/lib/data/driver";
+import type { InferSelectModel } from "drizzle-orm";
+import type { z } from "zod";
 import type {
   categoriesTable,
   optionsTable,
@@ -13,21 +7,13 @@ import type {
   usersTable,
   votesTable,
 } from "@/lib/data/schema";
+import type { nomineePatch } from "@/server/schemas";
 
+// Request and response types for the HTTP API are not written here: requests
+// come from the Zod schemas in src/server/schemas.ts, responses are inferred
+// from the routes by the typed client (src/lib/client.ts, src/lib/queries.ts).
 export namespace API {
-  export type GET_Config = Awaited<ReturnType<typeof getConfig>>;
-  export type GET_Me = Session & { name: string };
-  export type GET_Nominees = Awaited<ReturnType<typeof getNominees>>;
-  export type Get_UserVotes = Awaited<ReturnType<typeof getUserVotes>>;
-  export type GET_AllVotes = Awaited<ReturnType<typeof getAllVotes>>;
-  export type GET_AllUsers = Awaited<ReturnType<typeof getAllUsers>>;
-  export type PATCH_CategoryRequest = Partial<
-    InferSelectModel<typeof categoriesTable>
-  > & { id: string };
-  export type PATCH_NomineeRequest = Partial<
-    InferInsertModel<typeof optionsTable>
-  > & { id: string; categoryId: string };
-  export type PATCH_AdminUserRequest = User["uid"];
+  export type PATCH_NomineeRequest = z.infer<typeof nomineePatch>;
 }
 
 export type User = InferSelectModel<typeof usersTable>;
@@ -35,7 +21,6 @@ export type Session = InferSelectModel<typeof sessionsTable>;
 export type PublicSession = Pick<Session, "id" | "uid">;
 export type Option = InferSelectModel<typeof optionsTable>;
 export type Category = InferSelectModel<typeof categoriesTable>;
-export type Awards = Category[];
 export type ImportableData = (Category & {
   options: Omit<Option, "categoryId">[];
 })[];
@@ -71,8 +56,6 @@ export type DggApiUserinfoResponse = {
   allowChatting: boolean;
   wikiUserId: number;
 };
-
-export type MeApiResponse = Session & { name: User["name"] };
 
 export interface StreamableFileMetadata {
   framerate: number;
@@ -132,10 +115,6 @@ export type Recognitions = Contribution[];
 
 export type Vote = InferSelectModel<typeof votesTable>;
 
-export type ApiVoteSubmit = {
-  category_id: string;
-  nominee_id: string;
-};
 
 export type VoteEntry = {
   id: string;

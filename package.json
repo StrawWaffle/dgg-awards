@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
+    "@hono/zod-validator": "^0.9.1",
     "@radix-ui/react-icons": "^1.3.2",
     "@react-spring/web": "^10.1.2",
     "@tanstack/react-query": "^5.107.1",
@@ -17,10 +18,12 @@
     "bun-plugin-tailwind": "^0.1.2",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.4",
+    "hono": "^4.13.17",
     "radix-ui": "^1.8.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "tailwindcss": "^4.3.5"
+    "tailwindcss": "^4.3.5",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@libsql/client": "^0.18.0",

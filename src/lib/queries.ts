@@ -1,78 +1,85 @@
-import type {
-  API,
-  ResultsData,
-  StreamableVideo,
-  YouTubeVideo,
-} from "@/lib/types";
+import { parseResponse } from "hono/client";
+import { client } from "@/lib/client";
+import type { StreamableVideo, YouTubeVideo } from "@/lib/types";
 
-function partialParamsConstructor(params: Record<string, string | undefined>) {
-  const _ = new URLSearchParams();
-  Object.entries(params).forEach(([key, val]) => {
-    if (val) {
-      _.set(key, val);
-    }
-  });
-  return _;
-}
+// Reads throw on any non-2xx answer, so TanStack Query sees an error, as it
+// did before (the old code failed while parsing the empty body).
 
-async function fjson<T>(k: string): Promise<T> {
-  return await (await fetch(k)).json();
-}
+export type Me = Awaited<ReturnType<typeof fetchAuthSession>>;
+export type Config = Awaited<ReturnType<typeof fetchConfig>>;
+export type Nominees = Awaited<ReturnType<typeof fetchNominees>>;
+export type VoteResults = Awaited<ReturnType<typeof getVoteResults>>;
 
 export async function fetchAuthSession() {
-  return fjson<API.GET_Me>("/api/me");
+  return parseResponse(client.api.me.$get());
 }
 
+/** Config with the stored unix-second strings turned into numbers. */
 export async function fetchConfig() {
-  return fjson<API.GET_Config>("/api/config");
+  const config = await parseResponse(client.api.config.$get());
+  const seconds = (s?: string) => (s === undefined ? undefined : Number(s));
+  return {
+    ...config,
+    startTime: seconds(config.startTime),
+    endTime: seconds(config.endTime),
+  };
 }
 
 export async function fetchNominees() {
-  return fjson<API.GET_Nominees>("/api/nominees");
+  const data = await parseResponse(client.api.nominees.$get());
+  // In locked mode the server answers with the text "locked".
+  if (typeof data === "string") {
+    throw new Error("Nominees are locked");
+  }
+  return data;
 }
 
 export async function fetchUserVotes() {
-  return fjson<API.Get_UserVotes>("/api/vote");
+  return parseResponse(client.api.vote.$get());
 }
 
-export async function fetchStreamableData(shortcode?: string) {
-  if (shortcode === undefined) {
-    return null;
-  }
-
-  return fjson<StreamableVideo>(
-    `https://api.streamable.com/videos/${shortcode}`,
-  );
+export async function getVoteResults() {
+  return parseResponse(client.api.vote.results.$get());
 }
+
+/** Fire the vote. A refused vote (already voted, voting closed) is ignored, as before. */
+export async function submitVote(categoryId: string, nomineeId: string) {
+  await client.api.vote.$post({
+    json: { category_id: categoryId, nominee_id: nomineeId },
+  });
+}
+
+// Admin
 
 export async function fetchAllUsers() {
-  return fjson<API.GET_AllUsers>("/api/admin/users");
+  return parseResponse(client.api.admin.users.$get());
 }
 
 export async function fetchAdminNom() {
-  return fjson<API.GET_Nominees>("/api/admin/nominees");
+  return parseResponse(client.api.admin.nominees.$get());
 }
 
 export async function fetchAllVotes(
   offset: number,
   filter: undefined | { uid?: number; ip?: string },
 ) {
-  return fjson<API.GET_AllVotes>(
-    `/api/admin/votes?${partialParamsConstructor({ offset: offset.toString(), filter_uid: filter?.uid?.toString(), filter_ip: filter?.ip }).toString()}`,
+  return parseResponse(
+    client.api.admin.votes.$get({
+      query: {
+        offset: offset.toString(),
+        filter_uid: filter?.uid?.toString(),
+        filter_ip: filter?.ip || undefined,
+      },
+    }),
   );
 }
 
 export async function deleteCategory(id: string) {
-  await fetch(`/api/admin/category?id=${encodeURIComponent(id)}`, {
-    method: "delete",
-  });
+  await client.api.admin.category.$delete({ query: { id } });
 }
 
 export async function deleteNominee(categoryId: string, id: string) {
-  await fetch(
-    `/api/admin/nominee?${new URLSearchParams({ categoryId, id }).toString()}`,
-    { method: "delete" },
-  );
+  await client.api.admin.nominee.$delete({ query: { categoryId, id } });
 }
 
 export async function updateCategory(
@@ -80,31 +87,31 @@ export async function updateCategory(
   description?: string,
   title?: string,
 ) {
-  await fetch(`/api/admin/category`, {
-    method: "PATCH",
-    headers: [["Content-Type", "application/json"]],
-    body: JSON.stringify({
-      id: categoryId,
-      description,
-      title,
-    } satisfies API.PATCH_CategoryRequest),
+  await client.api.admin.category.$patch({
+    json: { id: categoryId, description, title },
   });
 }
 
-export async function updateNominee(data: API.PATCH_NomineeRequest) {
-  await fetch("/api/admin/nominee", {
-    method: "PATCH",
-    headers: [["Content-Type", "application/json"]],
-    body: JSON.stringify(data),
-  });
+export type NomineePatch = Parameters<
+  typeof client.api.admin.nominee.$patch
+>[0]["json"];
+
+export async function updateNominee(data: NomineePatch) {
+  await client.api.admin.nominee.$patch({ json: data });
 }
 
-export async function makeAdmin(data: API.PATCH_AdminUserRequest) {
-  await fetch("/api/admin/user", {
-    method: "PATCH",
-    headers: [["Content-Type", "application/json"]],
-    body: JSON.stringify(data),
-  });
+export async function makeAdmin(uid: number) {
+  await client.api.admin.user.$patch({ json: uid });
+}
+
+// Third-party lookups, not our API.
+
+export async function fetchStreamableData(shortcode?: string) {
+  if (shortcode === undefined) {
+    return null;
+  }
+  const response = await fetch(`https://api.streamable.com/videos/${shortcode}`);
+  return (await response.json()) as StreamableVideo;
 }
 
 export async function fetchYouTubeEmbedData(videoId?: string) {
@@ -122,19 +129,4 @@ export async function fetchYouTubeEmbedData(videoId?: string) {
   } catch (error) {
     return null;
   }
-}
-
-export async function submitVote(categoryId: string, nomineeId: string) {
-  fetch("/api/vote", {
-    body: JSON.stringify({
-      category_id: categoryId,
-      nominee_id: nomineeId,
-    }),
-    method: "POST",
-    headers: [["Content-Type", "application/json"]],
-  });
-}
-
-export async function getVoteResults() {
-  return fjson<ResultsData>("/api/vote/results");
 }

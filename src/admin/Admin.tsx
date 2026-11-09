@@ -12,7 +12,7 @@ import {
   PlusCircledIcon,
   StackIcon,
 } from "@radix-ui/react-icons";
-import * as Tabs from "@radix-ui/react-tabs";
+import { Tabs } from "radix-ui";
 import {
   QueryClient,
   QueryClientProvider,
