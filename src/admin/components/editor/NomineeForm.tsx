@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Section } from "@/admin/components/Section";
 import { PictureCropper } from "@/admin/components/editor/PictureCropper";
 import { ClipPreview } from "@/admin/components/editor/ClipPreview";
+import { ClipUpload } from "@/admin/components/editor/ClipUpload";
 import { HistoryList } from "@/admin/components/history/HistoryList";
 import { Button, ErrorText, Field, TimeInput, inputClass } from "@/admin/components/editor/fields";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -387,14 +388,22 @@ function ClipSection({ nominee, unsaved }: { nominee: AdminNominee; unsaved: boo
             </Button>
             <span className="text-neutral-700">
               {nominee.clipStatus === "pending" && "Waiting to download…"}
-              {nominee.clipStatus === "processing" && "Downloading and converting…"}
-              {nominee.clipStatus === "ready" && "Ready."}
+              {nominee.clipStatus === "processing" && "Making the clip…"}
+              {nominee.clipStatus === "ready" &&
+                (nominee.clipError ? (
+                  <span className="text-red-700">
+                    The new clip failed: {nominee.clipError} The previous clip is still in use.
+                  </span>
+                ) : (
+                  "Ready."
+                ))}
               {nominee.clipStatus === "failed" && <span className="text-red-700">Failed: {nominee.clipError}</span>}
-              {!nominee.clipStatus && "No clip yet. Set the start and end, save, then build."}
+              {!nominee.clipStatus && "No clip yet. Set the start and end above, save, then build; or upload a video below."}
             </span>
             {unsaved && <span className="text-neutral-500">Save first.</span>}
           </div>
           <ErrorText>{build.error?.message}</ErrorText>
+          <ClipUpload categoryId={nominee.categoryId} id={nominee.id} busy={working} onStarted={refresh} />
 
           {nominee.clipUrl && (
             <div className="grid gap-4 md:grid-cols-2">

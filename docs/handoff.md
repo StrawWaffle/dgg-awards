@@ -387,7 +387,13 @@ rinlux asked to preview the window they pick before building, to check the timec
 - If the times change while it's open, it says so, and "Play the clip again" plays the new window.
 - Tested in the browser: YouTube 30–45 s and its ending 40–45 s, a Twitch VOD's ending at 45 s, the Kick note, and a video file in Firefox.
 
-**Next, waiting on rinlux's answers:** uploading clips they've already downloaded. The plan: pick a file, preview and trim it locally with the same fields, then send it to the server in chunks (the tunnel rejects single requests over 100 MB). The server converts it to the usual MP4, cuts it and stores it in R2. Asked: are their files already cut, and how big are they and in what format?
+**Uploading a video you already have** (same branch). rinlux keeps clips in a Google Drive folder, one subfolder per award: MP4s of about 7–39 MB, most needing some trimming. In the clip section, "Or upload a video you have" (`ClipUpload.tsx`):
+- Pick a file and it plays right there, from the computer (nothing is sent yet). Pause and press "Start here" and "End here" (0.1 s steps). "Preview the clip" plays the marked part and stops at the end, and "Check the ending" plays its last 5 s.
+- "Upload and make the clip" sends it in one request with a progress bar. The limit is 95 MB, since the tunnel refuses requests over 100 MB, so chunking wasn't needed for these files. MP4, MOV, MKV and WebM are accepted.
+- `POST /api/admin/clip/upload`, then `enqueueUpload()` in `clips.ts`. The file waits in `uploads/` next to the database (on its volume) with a small job file, so a restart picks it up again. The usual queue builds it: cut with an encode when trimmed (frame-exact), repackaged when whole and already fitting, then stored, thumbnailed and recorded in the history like a built clip. The upload is deleted afterwards. At most 180 s.
+- **Also changed for all clips:** a failed new clip no longer hides a working one. Status goes back to ready with the error beside it ("The new clip failed: … The previous clip is still in use."). It used to switch to failed and the old clip vanished from the site.
+- Tested: an API test (whole file, cut 1–3 s is smaller, refusals, a mark past the end keeps the working clip; 44 pass) and in Firefox (marks 0:01–0:03.5, the preview stopped at 3.5, the upload built a 2.52 s H.264 clip, and `uploads/` was empty after).
+- Not done: picking straight from Google Drive (download first, then upload). The site still loses its clip briefly while a rebuild is pending, as before.
 
 ### Next: the lab page (StrawWaffle's answers, 2026-11-09)
 

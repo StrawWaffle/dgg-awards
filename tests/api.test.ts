@@ -1062,6 +1062,68 @@ describe("admin", () => {
     120_000,
   );
 
+  test(
+    "clips: upload a video, cut to the marked part",
+    async () => {
+      const upload = (id: string, fields: Record<string, string>, file: Blob, name: string, as: Jar = admin) => {
+        const f = new FormData();
+        f.set("categoryId", "ally");
+        f.set("id", id);
+        for (const [k, v] of Object.entries(fields)) f.set(k, v);
+        f.set("file", file, name);
+        return req("/api/admin/clip/upload", { method: "POST", body: f }, as);
+      };
+      const nominee = async (id: string) =>
+        (await (await req("/api/admin/nominees", {}, admin)).json())
+          .find((c: any) => c.id === "ally")
+          .options.find((o: any) => o.id === id);
+      const waitForClip = async (id: string) => {
+        for (let i = 0; i < 120; i++) {
+          const n = await nominee(id);
+          if (n.clipStatus === "ready" || n.clipStatus === "failed") return n;
+          await Bun.sleep(500);
+        }
+        throw new Error(`clip ${id} never finished`);
+      };
+      const sample = Bun.file("tests/fixtures/sample.mp4");
+      const id = "zee"; // any nominee; uploads don't need a source link
+
+      // Refused: not a video, end before start, unknown nominee, not an admin.
+      const text = await upload(id, {}, new Blob(["hello"], { type: "text/plain" }), "notes.txt");
+      expect(text.status).toBe(400);
+      expect(await text.text()).toBe("That isn't a video file (MP4, MOV, MKV or WebM).");
+      const backwards = await upload(id, { start: "3", end: "1" }, sample, "sample.mp4");
+      expect(backwards.status).toBe(400);
+      expect((await upload("nope", {}, sample, "sample.mp4")).status).toBe(404);
+      expect((await upload(id, {}, sample, "sample.mp4", user)).status).toBe(401);
+
+      // The whole 6 s video, then just 1–3 s of it.
+      expect((await upload(id, {}, sample, "sample.mp4")).status).toBe(202);
+      const whole = await waitForClip(id);
+      expect(whole.clipError).toBeNull();
+      expect(whole.clipStatus).toBe("ready");
+      expect(whole.thumbnailAt).toBe(2); // a third of 6 s
+      const wholeSize = (await (await req(whole.clipUrl)).arrayBuffer()).byteLength;
+
+      expect((await upload(id, { start: "1", end: "3" }, sample, "sample.mp4")).status).toBe(202);
+      const cut = await waitForClip(id);
+      expect(cut.clipError).toBeNull();
+      expect(cut.clipUrl).not.toBe(whole.clipUrl);
+      expect(cut.thumbnailAt).toBe(0); // a third of 2 s
+      const cutSize = (await (await req(cut.clipUrl)).arrayBuffer()).byteLength;
+      expect(cutSize).toBeLessThan(wholeSize);
+
+      // Marking past the end of the video fails, with a reason, and the
+      // working clip stays in use.
+      expect((await upload(id, { start: "10", end: "12" }, sample, "sample.mp4")).status).toBe(202);
+      const late = await waitForClip(id);
+      expect(late.clipStatus).toBe("ready");
+      expect(late.clipError).toBe("The start is past the end of the video.");
+      expect(late.clipUrl).toBe(cut.clipUrl);
+    },
+    60_000,
+  );
+
   test("locked mode hides nominees", async () => {
     await setMode(admin, "locked");
     const res = await req("/api/nominees");

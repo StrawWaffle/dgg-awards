@@ -49,6 +49,7 @@ import {
   UserError,
   clipProblem,
   enqueueClip,
+  enqueueUpload,
   thumbnailFromClip,
   thumbnailFromUpload,
   clearThumbnail,
@@ -74,6 +75,7 @@ import {
   settingsPatch,
   thumbnailAt,
   thumbnailUpload,
+  clipUpload,
   historyQuery,
   undoBody,
   userAdminBody,
@@ -333,6 +335,19 @@ export const adminRoutes = new Hono<SessionEnv>()
     const problem = clipProblem(nominee);
     if (problem) return c.text(problem, 400);
     await enqueueClip(categoryId, id);
+    return c.json({ clipStatus: "pending" as const }, 202);
+  })
+  // A video the admin already has (downloaded or made), cut to the part they
+  // marked. Built in the background like any clip.
+  .post("/clip/upload", zValidator("form", clipUpload, rejectInvalid), async (c) => {
+    const { categoryId, id, file, start, end } = c.req.valid("form");
+    if (!(await getNominee(categoryId, id))) return c.body(null, 404);
+    try {
+      await enqueueUpload(categoryId, id, file, start ?? null, end ?? null);
+    } catch (error) {
+      if (error instanceof UserError) return c.text(error.message, 400);
+      throw error;
+    }
     return c.json({ clipStatus: "pending" as const }, 202);
   })
   // Thumbnails: a frame from the clip, or an uploaded image.

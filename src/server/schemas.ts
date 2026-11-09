@@ -159,6 +159,15 @@ export const thumbnailUpload = z.object({
   file: z.instanceof(File),
 });
 
+/** A video to make the clip from; start and end in seconds, either optional. */
+export const clipUpload = z.object({
+  categoryId: required,
+  id: required,
+  file: z.instanceof(File),
+  start: z.coerce.number().nonnegative().optional(),
+  end: z.coerce.number().positive().optional(),
+});
+
 export const votesQuery = z.object({
   filter_ip: z.string().optional(),
   filter_uid: z.string().regex(/^-?\d+$/).optional(),

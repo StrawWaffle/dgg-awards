@@ -1,13 +1,14 @@
 // Turns a nominee's source link + clip range into a short mp4 we host
 // ourselves, plus a thumbnail. yt-dlp fetches only the section, ffmpeg
-// converts it to one web-friendly format (≤720p H.264/AAC, fast start).
+// converts it to one web-friendly format (≤1080p H.264/AAC, fast start).
+// Or, from a video file an admin uploaded, cut to the part they marked.
 //
 // Jobs run one at a time, in the background. Their state lives on the nominee
 // (clipStatus/clipError), so the admin page can show it and a restart picks
 // up unfinished jobs (resumeClipJobs).
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { getNominee, listUnfinishedClips, setNomineeMedia } from "@/lib/data/driver";
 import { classifyLink, videoLinkTypes } from "@/lib/links";
 import { nomineeLabel, record, serverActor } from "@/server/history";
@@ -30,6 +31,22 @@ const FORMAT =
  */
 const MAX_HEIGHT = 1080;
 const MAX_VIDEO_KBPS = 4000;
+
+/**
+ * Largest video upload. The Cloudflare tunnel refuses requests over 100 MB;
+ * clips that need trimming are usually 10–40 MB.
+ */
+export const MAX_VIDEO_UPLOAD_BYTES = 95 * 1024 * 1024;
+const VIDEO_EXTENSIONS = ["mp4", "m4v", "mov", "mkv", "webm"];
+
+/**
+ * Uploaded videos wait here, next to the database (so on its volume), until
+ * their clip is built; a restart picks them up again. `<category>__<id>.json`
+ * says which file and which part of it.
+ */
+const UPLOAD_DIR = join(dirname(process.env.DB_FILE_NAME ?? "./sqlite.db"), "uploads");
+type UploadJob = { file: string; start: number | null; end: number | null };
+const jobPath = (categoryId: string, id: string) => join(UPLOAD_DIR, `${categoryId}__${id}.json`);
 
 type Nominee = NonNullable<Awaited<ReturnType<typeof getNominee>>>;
 
@@ -63,12 +80,43 @@ export async function enqueueClip(categoryId: string, id: string) {
       await buildClip(categoryId, id);
     } catch (error) {
       console.error(`Clip ${key} failed:`, error);
+      // A clip that was working stays in use; the error shows beside it.
+      const n = await getNominee(categoryId, id);
       await setNomineeMedia(categoryId, id, {
-        clipStatus: "failed",
+        clipStatus: n?.clipKey ? "ready" : "failed",
         clipError: errorText(error),
       });
     }
   });
+}
+
+/**
+ * Keep an uploaded video and build the nominee's clip from it, cut from
+ * `start` to `end` seconds (either may be left out: from the beginning, to
+ * the end). Replaces any earlier clip, as a rebuild does.
+ */
+export async function enqueueUpload(categoryId: string, id: string, file: File, start: number | null, end: number | null) {
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+  if (!VIDEO_EXTENSIONS.includes(ext) && !file.type.startsWith("video/")) {
+    throw new UserError("That isn't a video file (MP4, MOV, MKV or WebM).");
+  }
+  if (file.size > MAX_VIDEO_UPLOAD_BYTES) {
+    throw new UserError(`Videos can be at most ${Math.floor(MAX_VIDEO_UPLOAD_BYTES / 1024 / 1024)} MB. Trim it first, or export it smaller.`);
+  }
+  if (start != null && end != null && end <= start) throw new UserError("The end must come after the start.");
+  await mkdir(UPLOAD_DIR, { recursive: true });
+  const path = join(UPLOAD_DIR, `${categoryId}__${id}-${Date.now()}.${VIDEO_EXTENSIONS.includes(ext) ? ext : "mp4"}`);
+  await Bun.write(path, file);
+  // A job still waiting for a previous upload gives way to this one.
+  const old = await readJob(categoryId, id);
+  if (old && old.file !== path) await rm(old.file, { force: true });
+  await Bun.write(jobPath(categoryId, id), JSON.stringify({ file: path, start, end } satisfies UploadJob));
+  await enqueueClip(categoryId, id);
+}
+
+async function readJob(categoryId: string, id: string): Promise<UploadJob | null> {
+  const f = Bun.file(jobPath(categoryId, id));
+  return (await f.exists()) ? ((await f.json()) as UploadJob) : null;
 }
 
 /** Re-queue jobs a restart interrupted. Call once at startup. */
@@ -87,7 +135,13 @@ export function clipQueueIdle() {
 
 async function buildClip(categoryId: string, id: string) {
   const n = await getNominee(categoryId, id);
-  if (!n) return; // deleted while queued
+  const job = await readJob(categoryId, id);
+  if (!n) {
+    // Deleted while queued.
+    if (job) await dropJob(categoryId, id, job);
+    return;
+  }
+  if (job) return buildFromUpload(n, job);
   const problem = clipProblem(n);
   if (problem) throw new Error(problem);
   await setNomineeMedia(categoryId, id, { clipStatus: "processing" });
@@ -143,41 +197,102 @@ async function buildClip(categoryId: string, id: string) {
       ENCODE_TIMEOUT_MS,
     );
 
-    const duration = await probeDuration(out);
-    const at = Math.floor(duration / 3);
-    const version = (await sha256(`${n.url}|${start}|${end}`)).slice(0, 10);
-    const clipKey = `clips/${categoryId}/${id}-${version}.mp4`;
-    await storage.put(clipKey, Bun.file(out), "video/mp4");
-    const thumbnailKey = await thumbnailFromVideo(out, categoryId, id, at, dir);
-
-    await setNomineeMedia(categoryId, id, {
-      clipKey,
-      clipStatus: "ready",
-      clipError: null,
-      thumbnailKey,
-      thumbnailAt: at,
-    });
-    await removeReplaced([n.clipKey, n.thumbnailKey], [clipKey, thumbnailKey]);
-    // In the history as the server's change, so the old clip can be put back.
-    // "Before" is the clip as it was, not the in-progress status.
-    await record(serverActor, {
-      kind: "nominee",
-      action: "update",
-      label: await nomineeLabel(categoryId, n.title),
-      categoryId,
-      nomineeId: id,
-      before: {
-        clipKey: n.clipKey,
-        clipStatus: n.clipKey ? "ready" : null,
-        clipError: null,
-        thumbnailKey: n.thumbnailKey,
-        thumbnailAt: n.thumbnailAt,
-      },
-      after: { clipKey, clipStatus: "ready", clipError: null, thumbnailKey, thumbnailAt: at },
-    });
+    await finishClip(n, out, dir, (await sha256(`${n.url}|${start}|${end}`)).slice(0, 10));
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+}
+
+/** Cuts an uploaded video to the marked part and converts it, like a build. */
+async function buildFromUpload(n: Nominee, job: UploadJob) {
+  const { categoryId, id } = n;
+  await setNomineeMedia(categoryId, id, { clipStatus: "processing" });
+  const dir = await mkdtemp(join(tmpdir(), "clip-"));
+  try {
+    const length = await probeDuration(job.file);
+    if (!Number.isFinite(length) || length <= 0) throw new UserError("Couldn't read that video.");
+    const start = Math.max(0, job.start ?? 0);
+    const end = Math.min(length, job.end ?? length);
+    if (end <= start) throw new UserError("The start is past the end of the video.");
+    if (end - start > MAX_CLIP_SECONDS) {
+      throw new UserError(`Clips can be at most ${MAX_CLIP_SECONDS} seconds; this part is ${Math.round(end - start)}. Mark a shorter part.`);
+    }
+    const trimmed = start > 0 || end < length - 0.05;
+    const info = await probeStreams(job.file);
+    const fits =
+      info.video?.codec === "h264" &&
+      (info.video.height ?? Infinity) <= MAX_HEIGHT &&
+      (info.video.kbps ?? Infinity) <= MAX_VIDEO_KBPS * 1.1 &&
+      (info.audio === null || info.audio.codec === "aac");
+    const out = join(dir, "clip.mp4");
+    // A cut is encoded, so it lands on the exact frame; a whole file that
+    // already fits is only repackaged.
+    await run(
+      "ffmpeg",
+      !trimmed && fits
+        ? ["-y", "-i", job.file, "-c", "copy", "-movflags", "+faststart", out]
+        : [
+            "-y",
+            ...(trimmed ? ["-ss", String(start), "-i", job.file, "-t", String(end - start)] : ["-i", job.file]),
+            "-vf", `scale=-2:'min(${MAX_HEIGHT},ih)'`,
+            "-c:v", "libx264", "-preset", "medium", "-crf", "21",
+            "-maxrate", `${MAX_VIDEO_KBPS}k`, "-bufsize", `${MAX_VIDEO_KBPS * 2}k`,
+            "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "160k",
+            "-movflags", "+faststart",
+            out,
+          ],
+      ENCODE_TIMEOUT_MS,
+    );
+    const name = job.file.split(/[\\/]/).pop()!;
+    await finishClip(n, out, dir, (await sha256(`upload|${name}|${start}|${end}`)).slice(0, 10));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+    await dropJob(categoryId, id, job);
+  }
+}
+
+async function dropJob(categoryId: string, id: string, job: UploadJob) {
+  // Only if no newer upload has replaced this job meanwhile.
+  const current = await readJob(categoryId, id);
+  if (current?.file === job.file) await rm(jobPath(categoryId, id), { force: true });
+  await rm(job.file, { force: true });
+}
+
+/** Store a finished clip and its thumbnail, mark it ready, and record it. */
+async function finishClip(n: Nominee, out: string, dir: string, version: string) {
+  const { categoryId, id } = n;
+  const duration = await probeDuration(out);
+  const at = Math.floor(duration / 3);
+  const clipKey = `clips/${categoryId}/${id}-${version}.mp4`;
+  await storage.put(clipKey, Bun.file(out), "video/mp4");
+  const thumbnailKey = await thumbnailFromVideo(out, categoryId, id, at, dir);
+
+  await setNomineeMedia(categoryId, id, {
+    clipKey,
+    clipStatus: "ready",
+    clipError: null,
+    thumbnailKey,
+    thumbnailAt: at,
+  });
+  await removeReplaced([n.clipKey, n.thumbnailKey], [clipKey, thumbnailKey]);
+  // In the history as the server's change, so the old clip can be put back.
+  // "Before" is the clip as it was, not the in-progress status.
+  await record(serverActor, {
+    kind: "nominee",
+    action: "update",
+    label: await nomineeLabel(categoryId, n.title),
+    categoryId,
+    nomineeId: id,
+    before: {
+      clipKey: n.clipKey,
+      clipStatus: n.clipKey ? "ready" : null,
+      clipError: null,
+      thumbnailKey: n.thumbnailKey,
+      thumbnailAt: n.thumbnailAt,
+    },
+    after: { clipKey, clipStatus: "ready", clipError: null, thumbnailKey, thumbnailAt: at },
+  });
 }
 
 /** A thumbnail from the clip at `at` seconds. The clip must be ready. */
