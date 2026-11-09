@@ -18,6 +18,8 @@ type Props = Option & {
 
 export function Option(props: Props) {
   const [isExpanded, setIsExpanded] = useState(false);
+  // An uploaded picture (or a clip frame) first, then the old built-in file.
+  const picture = props.thumbnailUrl ?? (props.imageId ? `/Media/${props.imageId}` : null);
 
   const hoverHighlightClass =
     "rounded transition hover:shadow-[0_0_0_1px_rgba(0,144,255,0.7),0_0_20px_rgba(0,144,255,0.3)] hover:-translate-y-0.1";
@@ -53,14 +55,14 @@ export function Option(props: Props) {
       {!props.clipUrl && props.videoId && (
         <VideoEmbed code={props.videoId} externalUrl={props.url} />
       )}
-      {!props.clipUrl && props.imageId && (
+      {!props.clipUrl && picture && (
         <PossibleLink
           activeClassName="peer hover:brightness-115 transition-all cursor-pointer"
           href={props.url}
         >
           <img
             loading="lazy"
-            src={`/Media/${props.imageId}`}
+            src={picture}
             className={clsx("rounded-md", {
               "h-20 w-20": props.compact,
               "h-32 w-32": !props.compact,
@@ -69,7 +71,7 @@ export function Option(props: Props) {
           />
         </PossibleLink>
       )}
-      {!props.clipUrl && !props.videoId && !props.imageId && (
+      {!props.clipUrl && !props.videoId && !picture && (
         <img
           loading="lazy"
           src="/Media/waiting.png"

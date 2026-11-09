@@ -994,7 +994,7 @@ describe("admin", () => {
       const tooLate = await req("/api/admin/thumbnail", json("POST", { categoryId: "ally", id: "clipok", at: 99 }), admin);
       expect(tooLate.status).toBe(400);
 
-      // Upload a thumbnail: re-encoded to JPEG; junk is refused.
+      // Upload a picture: stills re-saved without metadata; junk is refused.
       const png = Uint8Array.from(
         atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="),
         (ch) => ch.charCodeAt(0),
@@ -1006,11 +1006,31 @@ describe("admin", () => {
       };
       const uploaded = await upload(new File([png], "t.png", { type: "image/png" }));
       expect(uploaded.status).toBe(200);
-      expect((await uploaded.json()).thumbnailUrl).toMatch(/clipok-upload-[0-9a-f]{10}\.jpg$/);
+      // A still PNG is re-saved as PNG (lossless, metadata dropped).
+      expect((await uploaded.json()).thumbnailUrl).toMatch(/clipok-upload-[0-9a-f]{10}\.png$/);
       expect((await nominee("clipok")).thumbnailAt).toBeNull();
       const junk = await upload(new File(["not an image"], "x.png", { type: "image/png" }));
       expect(junk.status).toBe(400);
       expect((await upload(new File(["<svg/>"], "x.svg", { type: "image/svg+xml" }))).status).toBe(400);
+      // A PNG header with junk behind it is refused too: ffprobe has to read it.
+      const fakePng = new Uint8Array([...png.subarray(0, 16), ...new TextEncoder().encode("junk junk junk")]);
+      expect((await upload(new File([fakePng], "f.png", { type: "image/png" }))).status).toBe(400);
+      // GIFs are kept byte for byte, whatever the browser called them.
+      const gif = Uint8Array.from(atob("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"), (ch) => ch.charCodeAt(0));
+      const gifUp = await upload(new File([gif], "e.gif", { type: "application/octet-stream" }));
+      expect(gifUp.status).toBe(200);
+      const gifUrl = (await gifUp.json()).thumbnailUrl;
+      expect(gifUrl).toMatch(/clipok-upload-[0-9a-f]{10}\.gif$/);
+      const served = await req(gifUrl);
+      expect(served.headers.get("content-type")).toContain("image/gif");
+      expect(new Uint8Array(await served.arrayBuffer())).toEqual(gif);
+      // Removing the picture is recorded, and can be undone.
+      expect((await req("/api/admin/thumbnail?categoryId=ally&id=clipok", { method: "DELETE" }, admin)).status).toBe(200);
+      expect((await nominee("clipok")).thumbnailUrl).toBeNull();
+      const [removed] = await (await req("/api/admin/history?categoryId=ally&nomineeId=clipok", {}, admin)).json();
+      expect(removed).toMatchObject({ action: "update", after: { thumbnailKey: null } });
+      expect((await req(`/api/admin/history/${removed.id}/undo`, json("POST", {}), admin)).status).toBe(200);
+      expect((await nominee("clipok")).thumbnailUrl).toBe(gifUrl);
 
       // A source that can't be downloaded ends as "failed" with a reason.
       await addNominee("clipbad", { url: `${FILES}/missing.mp4`, link_type: "video-file", clip_start: "0", clip_end: "2" });

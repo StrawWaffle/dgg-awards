@@ -51,6 +51,7 @@ import {
   enqueueClip,
   thumbnailFromClip,
   thumbnailFromUpload,
+  clearThumbnail,
 } from "@/server/clips";
 import { DGG_NAME, fetchDggProfile } from "@/server/dgg-profile";
 import { categoriesWithMediaUrls } from "@/server/present";
@@ -358,6 +359,15 @@ export const adminRoutes = new Hono<SessionEnv>()
       if (error instanceof UserError) return c.text(error.message, 400);
       throw error;
     }
+  })
+  /** Take the picture off; the old image file (if any) shows again. */
+  .delete("/thumbnail", zValidator("query", nomineeQuery, rejectInvalid), async (c) => {
+    const { categoryId, id } = c.req.valid("query");
+    const before = await getNominee(categoryId, id);
+    if (!before) return c.body(null, 404);
+    await clearThumbnail(categoryId, id);
+    await recordNomineeUpdate(await actor(c), before);
+    return c.body(null, 200);
   })
 
   .get("/nominees", async (c) => {

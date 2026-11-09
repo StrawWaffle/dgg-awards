@@ -189,6 +189,28 @@ StrawWaffle pointed out that the wiki has the confirmed 2025 results: https://wi
 - **Archive: wait for the full 2025 data** (StrawWaffle). Don't build it from the wiki percentages.
 - Tests: 42 API tests pass, with both snapshots unchanged. New ones cover hiding, the delete guards, and an export → import → undo → redo round trip.
 
+### Nominee pictures (branch `worktree-nominee-images`, 2026-11-09, not deployed)
+
+StrawWaffle asked for image uploads where relevant, kept at full size, with optional cropping and resizing in the browser.
+- **One picture per nominee:** `thumbnailKey`, shown on the card and as the clip's thumbnail.
+  - The public card (`Option.tsx`) now shows it even without a clip, falling back to the old `imageId` file. Until now an uploaded picture only showed with a clip.
+  - The old "Image file" box moved under the picture, as "Image file from the code (older nominees)".
+- **Editor:** a Picture section with a preview, where it came from (an upload or a clip frame), "Upload a (new) picture" and "Remove picture". The Clip section keeps "Use this frame as the picture" and lost its own upload button.
+- **Cropping** (`PictureCropper.tsx`, browser only) is offered for stills:
+  - shape: square (as on the site's cards), 4:3, 16:9 or no crop
+  - drag to position, zoom 1–4×
+  - size: full, 1200, 800 or 400 px on the longest side
+  - "Upload as it is" skips it. JPEG stays JPEG (quality 0.92); anything else becomes PNG to keep transparency. Animated GIF, PNG and WebP skip the dialog.
+- **Server** (`thumbnailFromUpload` in `src/server/clips.ts`):
+  - The type is sniffed from the bytes (the browser's label can lie). Files must be at most 5 MB and 8000 px a side, and ffprobe must be able to read them.
+  - JPEG is re-saved at full quality without metadata, which drops phone photos' location. Still PNG and WebP become lossless PNG. Animated files are kept byte for byte.
+  - It used to turn everything into a 640 px JPEG.
+  - `DELETE /api/admin/thumbnail` removes the picture. That's in the history and can be undone, and the file is kept.
+- **Tests:**
+  - New API checks: a fake PNG is refused, a GIF is stored byte for byte with the right type, and remove plus undo work.
+  - In Chromium and Firefox, a dragged and zoomed square crop was stored at exactly the size the dialog showed, and a GIF went up without the dialog.
+  - 42 API tests pass, with both snapshots unchanged.
+
 ### Next: the lab page (StrawWaffle's answers, 2026-11-09)
 
 StrawWaffle wants the front page and the presentation to feel fun, quirky and wholesome. It gets built on an experimental page first (`/lab`, admins only) until rinlux approves. Order: the follow-ups above, merge and deploy, then the lab.

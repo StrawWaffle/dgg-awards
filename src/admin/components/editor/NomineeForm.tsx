@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { Section } from "@/admin/components/Section";
+import { PictureCropper } from "@/admin/components/editor/PictureCropper";
 import { HistoryList } from "@/admin/components/history/HistoryList";
 import { Button, ErrorText, Field, TimeInput, inputClass } from "@/admin/components/editor/fields";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -12,6 +13,7 @@ import {
   deleteNominee,
   fetchDggProfile,
   pickThumbnail,
+  removeThumbnail,
   saveNominee,
   uploadThumbnail,
 } from "@/lib/queries";
@@ -198,14 +200,6 @@ export function NomineeForm({ nominee, issues }: { nominee: AdminNominee; issues
             </Field>
           </div>
 
-          <Field label="Image file" hint="A file in src/media, e.g. zee.jpg. A clip's thumbnail takes its place.">
-            <input
-              className={inputClass}
-              value={draft.imageId}
-              onChange={(e) => set("imageId", e.currentTarget.value)}
-            />
-          </Field>
-
           {draft.url && type && draft.clipStart != null && (
             <p className="text-sm text-neutral-600">
               Viewers get:{" "}
@@ -249,6 +243,7 @@ export function NomineeForm({ nominee, issues }: { nominee: AdminNominee; issues
         </div>
       </Section>
 
+      <PictureSection nominee={nominee} imageId={draft.imageId} setImageId={(v) => set("imageId", v)} />
       <ClipSection nominee={nominee} unsaved={dirty} />
       {type === "dgg-profile" && draft.url && (
         <ProfileSection url={draft.url} onUseBio={(bio) => set("description", bio)} />
@@ -262,18 +257,116 @@ export function NomineeForm({ nominee, issues }: { nominee: AdminNominee; issues
   );
 }
 
+/** Whether an image file is animated, from its first bytes. */
+async function isAnimated(file: File) {
+  if (file.type === "image/gif") return true;
+  const head = new TextDecoder("latin1").decode(await file.slice(0, 64 * 1024).arrayBuffer());
+  return (file.type === "image/png" && head.includes("acTL")) || (file.type === "image/webp" && head.includes("ANIM"));
+}
+
+/**
+ * The nominee's picture: shown on its card, and as its clip's thumbnail.
+ * Upload one (stills can be cropped and sized first; animated images go up as
+ * they are), take a frame from the clip (in the Clip section), or remove it.
+ * Older nominees can name an image file from the code instead, which shows
+ * when there's no picture.
+ */
+function PictureSection({
+  nominee,
+  imageId,
+  setImageId,
+}: {
+  nominee: AdminNominee;
+  imageId: string;
+  setImageId: (value: string) => void;
+}) {
+  const refresh = useRefreshEditor();
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [cropping, setCropping] = useState<File | null>(null);
+  const upload = useMutation({
+    mutationFn: (file: File) => uploadThumbnail(nominee.categoryId, nominee.id, file).then(refresh),
+  });
+  const remove = useMutation({
+    mutationFn: () => removeThumbnail(nominee.categoryId, nominee.id).then(refresh),
+  });
+  const shown = nominee.thumbnailUrl ?? (imageId ? `/Media/${imageId}` : null);
+  const from = nominee.thumbnailUrl
+    ? nominee.thumbnailAt != null
+      ? `A frame from the clip, ${nominee.thumbnailAt}s in.`
+      : "An uploaded picture."
+    : imageId
+      ? "The image file from the code."
+      : "No picture yet.";
+
+  return (
+    <div>
+      <Section id="nominee-picture" title="Picture" aside={nominee.thumbnailUrl || imageId ? "set" : "none"} boxed={false}>
+        <div className="flex flex-wrap items-start gap-4">
+          <div className="flex h-32 w-32 shrink-0 items-center justify-center overflow-hidden rounded border border-neutral-200 bg-[repeating-conic-gradient(#eee_0_25%,#fff_0_50%)] bg-[length:16px_16px]">
+            {shown ? (
+              <img src={shown} alt="" className="max-h-full max-w-full object-contain" />
+            ) : (
+              <span className="text-xs text-neutral-500">none</span>
+            )}
+          </div>
+          <div className="min-w-0 flex-1 space-y-3 text-sm">
+            <p className="text-neutral-700">{from}</p>
+            <div className="flex flex-wrap gap-2">
+              <input
+                ref={fileInput}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.currentTarget.files?.[0];
+                  e.currentTarget.value = "";
+                  if (!file) return;
+                  if (await isAnimated(file)) upload.mutate(file);
+                  else setCropping(file);
+                }}
+              />
+              <Button onClick={() => fileInput.current?.click()} disabled={upload.isPending}>
+                {upload.isPending ? "Uploading…" : nominee.thumbnailUrl ? "Upload a new picture" : "Upload a picture"}
+              </Button>
+              {nominee.thumbnailUrl && (
+                <Button variant="danger" onClick={() => remove.mutate()} disabled={remove.isPending}>
+                  Remove picture
+                </Button>
+              )}
+            </div>
+            <p className="text-xs text-neutral-500">
+              PNG, JPEG, WebP or GIF, up to 5 MB, kept at full size unless you shrink it. Stills can be cropped
+              first; animated GIFs and WebPs go up as they are, so emotes keep moving.
+            </p>
+            <ErrorText>{upload.error?.message ?? remove.error?.message}</ErrorText>
+            <Field label="Image file from the code (older nominees)" hint="A file in src/media, e.g. zee.jpg. Shows when there's no picture. Saved with Save above.">
+              <input className={inputClass} value={imageId} onChange={(e) => setImageId(e.currentTarget.value)} />
+            </Field>
+          </div>
+        </div>
+      </Section>
+      {cropping && (
+        <PictureCropper
+          file={cropping}
+          onCancel={() => setCropping(null)}
+          onDone={(file) => {
+            setCropping(null);
+            upload.mutate(file);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
 function ClipSection({ nominee, unsaved }: { nominee: AdminNominee; unsaved: boolean }) {
   const refresh = useRefreshEditor();
   const video = useRef<HTMLVideoElement>(null);
-  const fileInput = useRef<HTMLInputElement>(null);
   const run = (fn: () => Promise<void>) => fn().then(refresh);
 
   const build = useMutation({ mutationFn: () => run(() => buildClip(nominee.categoryId, nominee.id)) });
   const frame = useMutation({
     mutationFn: (at: number) => run(() => pickThumbnail(nominee.categoryId, nominee.id, at)),
-  });
-  const upload = useMutation({
-    mutationFn: (file: File) => run(() => uploadThumbnail(nominee.categoryId, nominee.id, file)),
   });
   const working = nominee.clipStatus === "pending" || nominee.clipStatus === "processing";
 
@@ -314,7 +407,7 @@ function ClipSection({ nominee, unsaved }: { nominee: AdminNominee; unsaved: boo
                   onClick={() => frame.mutate(Math.floor(video.current?.currentTime ?? 0))}
                   disabled={frame.isPending}
                 >
-                  Use this frame as the thumbnail
+                  Use this frame as the picture
                 </Button>
                 <ErrorText>{frame.error?.message}</ErrorText>
               </div>
@@ -323,35 +416,19 @@ function ClipSection({ nominee, unsaved }: { nominee: AdminNominee; unsaved: boo
                   <img
                     className="aspect-video w-full rounded object-cover"
                     src={nominee.thumbnailUrl}
-                    alt="Current thumbnail"
+                    alt="Current picture"
                   />
                 )}
                 <p className="text-sm text-neutral-600">
                   {nominee.thumbnailAt != null
-                    ? `Thumbnail from ${nominee.thumbnailAt}s into the clip.`
-                    : "Uploaded thumbnail."}
+                    ? `The picture is the frame ${nominee.thumbnailAt}s into the clip.`
+                    : nominee.thumbnailUrl
+                      ? "The picture is an uploaded one."
+                      : "No picture yet."}
                 </p>
               </div>
             </div>
           )}
-
-          <div className="flex flex-wrap items-center gap-3 text-sm">
-            <input
-              ref={fileInput}
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.currentTarget.files?.[0];
-                if (file) upload.mutate(file, { onSettled: () => fileInput.current && (fileInput.current.value = "") });
-              }}
-            />
-            <Button onClick={() => fileInput.current?.click()} disabled={upload.isPending}>
-              {upload.isPending ? "Uploading…" : "Upload a thumbnail"}
-            </Button>
-            <span className="text-neutral-600">PNG, JPEG, WebP or GIF. Replaces the current thumbnail.</span>
-            <ErrorText>{upload.error?.message}</ErrorText>
-          </div>
         </div>
       </Section>
     </div>

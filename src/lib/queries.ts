@@ -224,6 +224,10 @@ export async function uploadThumbnail(categoryId: string, id: string, file: File
   );
 }
 
+export async function removeThumbnail(categoryId: string, id: string) {
+  await ok(await client.api.admin.thumbnail.$delete({ query: { categoryId, id } }), "Couldn't remove the picture");
+}
+
 /** A destiny.gg membership card; null if there's no such user. */
 export async function fetchDggProfile(name: string) {
   const res = await client.api.admin["dgg-profile"][":name"].$get({ param: { name } });

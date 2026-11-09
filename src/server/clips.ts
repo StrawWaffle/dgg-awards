@@ -200,40 +200,86 @@ export async function thumbnailFromClip(categoryId: string, id: string, at: numb
   }
 }
 
+/** What an upload really is, from its first bytes (the browser's type can lie). */
+function sniffImage(bytes: Uint8Array): { type: "png" | "jpeg" | "gif" | "webp"; animated: boolean } | null {
+  const ascii = (from: number, to: number) => String.fromCharCode(...bytes.subarray(from, to));
+  const head = new TextDecoder("latin1").decode(bytes.subarray(0, Math.min(bytes.length, 64 * 1024)));
+  if (bytes[0] === 0x89 && ascii(1, 4) === "PNG") return { type: "png", animated: head.includes("acTL") };
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return { type: "jpeg", animated: false };
+  if (ascii(0, 6) === "GIF87a" || ascii(0, 6) === "GIF89a") return { type: "gif", animated: true };
+  if (ascii(0, 4) === "RIFF" && ascii(8, 12) === "WEBP") return { type: "webp", animated: head.includes("ANIM") };
+  return null;
+}
+
+const PICTURE_TYPES = { png: "image/png", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp" } as const;
+
 /**
- * Use an uploaded image as the thumbnail. It's re-encoded through ffmpeg, so
- * only a plain JPEG we made ourselves is stored and served.
+ * Use an uploaded image as the nominee's picture, at its full size (the
+ * editor offers to crop and shrink stills first). What's stored:
+ * - JPEG: re-saved through ffmpeg at full quality, which drops its metadata
+ *   (phone photos carry their location in it).
+ * - PNG and still WebP: re-saved as PNG, lossless, transparency kept.
+ * - GIF and animated PNG or WebP: kept byte for byte, so emotes keep moving,
+ *   once ffmpeg has confirmed they decode as an image.
  */
 export async function thumbnailFromUpload(categoryId: string, id: string, file: File) {
   const n = await getNominee(categoryId, id);
   if (!n) throw new UserError("No such nominee.");
-  if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type)) {
-    throw new UserError("Upload a PNG, JPEG, WebP or GIF image.");
-  }
   if (file.size > MAX_UPLOAD_BYTES) throw new UserError("Images can be at most 5 MB.");
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const kind = sniffImage(bytes);
+  if (!kind) throw new UserError("Upload a PNG, JPEG, WebP or GIF image.");
   const dir = await mkdtemp(join(tmpdir(), "upload-"));
   try {
-    const input = join(dir, "upload");
-    await Bun.write(input, file);
-    const out = join(dir, "thumb.jpg");
-    try {
-      await run(
-        "ffmpeg",
-        ["-y", "-i", input, "-frames:v", "1", "-vf", `scale='min(${THUMB_WIDTH},iw)':-2`, "-q:v", "3", out],
-        60_000,
-      );
-    } catch {
-      throw new UserError("That file couldn't be read as an image.");
+    const input = join(dir, `upload.${kind.type}`);
+    await Bun.write(input, bytes);
+    const [w, h] = await probeSize(input).catch(() => [0, 0]);
+    if (!w || !h) throw new UserError("That file couldn't be read as an image.");
+    if (w > 8000 || h > 8000) throw new UserError("That image is too large (at most 8000 pixels a side).");
+
+    let out = input;
+    let ext: string = kind.type === "jpeg" ? "jpg" : kind.type;
+    let type: string = PICTURE_TYPES[kind.type];
+    if (!kind.animated) {
+      const still = kind.type === "jpeg" ? "jpg" : "png";
+      out = join(dir, `picture.${still}`);
+      try {
+        await run(
+          "ffmpeg",
+          ["-y", "-i", input, "-frames:v", "1", "-map_metadata", "-1", ...(still === "jpg" ? ["-q:v", "2"] : []), out],
+          60_000,
+        );
+      } catch {
+        throw new UserError("That file couldn't be read as an image.");
+      }
+      ext = still;
+      type = still === "jpg" ? "image/jpeg" : "image/png";
     }
     const digest = (await sha256(await Bun.file(out).bytes())).slice(0, 10);
-    const thumbnailKey = `thumbs/${categoryId}/${id}-upload-${digest}.jpg`;
-    await storage.put(thumbnailKey, Bun.file(out), "image/jpeg");
+    const thumbnailKey = `thumbs/${categoryId}/${id}-upload-${digest}.${ext}`;
+    await storage.put(thumbnailKey, Bun.file(out), type);
     await setNomineeMedia(categoryId, id, { thumbnailKey, thumbnailAt: null });
     await removeReplaced([n.thumbnailKey], [thumbnailKey]);
     return thumbnailKey;
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+}
+
+/** Take the picture off a nominee (the file stays, for the history). */
+export async function clearThumbnail(categoryId: string, id: string) {
+  await setNomineeMedia(categoryId, id, { thumbnailKey: null, thumbnailAt: null });
+}
+
+/** Width and height of an image or video's first stream. */
+async function probeSize(path: string): Promise<[number, number]> {
+  const { stdout } = await run(
+    "ffprobe",
+    ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0:s=x", path],
+    30_000,
+  );
+  const [w, h] = stdout.trim().split("x").map(Number);
+  return [w ?? 0, h ?? 0];
 }
 
 // ---- Helpers --------------------------------------------------------------
