@@ -84,17 +84,50 @@ The source zip (`dgga25.zip`) was deleted at StrawWaffle's request, so commit 1 
 
 - **Voting style:** one pick per category (as in 2025), or ranked voting like jadseya.com? To decide with rinlux.
 - **What rinlux thinks is missing** compared with the live 2025 version.
+- **Merging `stack-upgrade`.** StrawWaffle to review, then merge into `main` and redeploy the live site. See "Stack upgrade branch" below.
+- **Admin tab focus outline:** keep it, or style it? See "Stack upgrade branch".
+- **Two known API bugs**, kept on purpose so far: `/api/admin/import` has no admin check, and admin vote paging sends `offset` while the server reads `page`. Fix them?
+
+## Stack upgrade branch (`stack-upgrade`, ready for review, not merged)
+
+Worktree: `.claude/worktrees/stack-upgrade`. Branched from `main` at `13eb653`. The live site still runs `main`.
+
+What it contains, one commit each:
+1. **Tests.** `tests/api.test.ts` (29 HTTP characterization tests with 2 snapshots) and `tests/visual/` (12 full-page Playwright screenshots, pixel-compared). Both were written against the original code first, and they record its current behavior, including 2 known bugs.
+2. **Dependencies to latest, and Bun 1.3 → 1.4.** React 19.3, Tailwind 4.3, radix-ui 1.8, TanStack Query 5.107. Tailwind 4.3 changed its default font list, so the 4.1 list is pinned in `src/index.css`.
+3. **TypeScript 7 type checking** (`bun run typecheck`). Also fixed the `build` script, which pointed to `build.tsx`.
+4. **Hono, Zod and a typed client.**
+   - The API lives in `src/server/`: `app.tsx`, `routes/{auth,public,admin}.ts`, `schemas.ts` and `middleware.ts`.
+   - Bun still serves the two HTML pages, and everything else goes to `app.fetch`.
+   - The frontend calls the API through `hc<AppType>` (`src/lib/client.ts`, `src/lib/queries.ts`), so request and response types are inferred from the server, not written by hand.
+   - The compiler then caught wrong types: config times are strings, and session dates arrive as strings.
+   - `submitVote` now waits for its request to finish.
+
+Results:
+- All 29 API tests pass unchanged on every step.
+- Public pages are pixel-identical to the original.
+- `tsc` is clean.
+- Dev mode (`bun --hot`) works.
+
+**One visible difference:** radix-ui 1.8 (react-tabs 1.2) treats a mouse-clicked admin tab as keyboard-focused, so the browser draws its focus outline around the selected tab. This is admin-only. Options:
+- Keep it.
+- Replace it with a subtle styled ring that only appears for keyboard use.
+- Hide it, which is bad for keyboard users.
+
+How to test (Docker only, network `dgga-test`):
+- Run `dgga-mock` (the stand-in) and the app containers with `ADMIN_USERNAMES=Tester` and the `dev-client`/`dev-secret` credentials. See `tests/run.sh` for the expected setup.
+- `bash tests/run.sh <app-container> --ci` runs the API tests.
+- `bash tests/visual/run.sh capture <app-container> <name>`, then `bash tests/visual/run.sh compare <a> <b>`, compares screenshots.
+- `tests/reset.sh` wipes users, sessions and votes and reseeds, so every run starts from the same state.
+- The screenshot script pins everything else that would vary: external requests are stubbed, animated images are swapped for a still, the clock is frozen, and the app is always reached as `app.test`.
 
 ## Planned features (agreed, not started)
 
 Order StrawWaffle gave: preview to rinlux first, then discuss, then these.
 
 1. ~~**Switch to real DGG login.**~~ Done 2026-11-09 (see Current state).
-2. **Dependency upgrades** to current versions, as one commit of their own. `bun outdated` showed minor bumps, the largest being radix-ui 1.4 → 1.8 and Tailwind 4.1 → 4.3.
-3. **Regression tests first, then end-to-end type safety.**
-   - Write characterization tests with `bun test` against a seeded database. Cover status codes, response shapes, sign-in, voting twice in a category, and that results totals add up.
-   - Then move the routes to **Hono**, with **Zod** validation on every input and Hono's typed client (`hc`) in the frontend. The tests must pass unchanged.
-   - What's weak today: `await req.json()` is cast without checks, the client trusts responses through `fjson<T>`, and routes and fetch calls are linked only by URL strings. Drizzle and the shared `API` types are already fine.
+2. ~~**Dependency upgrades.**~~ Done on `stack-upgrade`.
+3. ~~**Regression tests, then end-to-end type safety.**~~ Done on `stack-upgrade`.
 4. **Admin editing with preview**, for an allowlist of DGG accounts. It should cover editing nominees and categories, previewing how the site looks, and previewing the results reveal.
 5. **Re-pull emotes from the DGG CDN:** `https://cdn.destiny.gg/emotes/emotes.json` and `emotes.css`. Some emotes are sprite sheets or animated by CSS transforms, so a plain `<img>` won't show them correctly. DGG-Radio's `emotes.md` explains this and has a working approach to reuse.
 6. **Privacy page** saying exactly what's collected (DGG id and name, IP and user agent per vote) and why, with a retention plan. Do this when StrawWaffle lifts the privacy deferral.

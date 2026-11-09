@@ -6,7 +6,9 @@ The preview runs in Docker (`compose.yaml`); Bun is not installed on the host.
 
 ## Project Structure & Module Organization
 - `src/` holds the Bun + React app; entry point is `src/index.tsx`.
-- `src/routes/` contains route components; `src/admin/` contains admin UI pages.
+- `src/server/` is the Hono API: `app.tsx` assembles it, `routes/` holds the handlers, `schemas.ts` the Zod input schemas. `src/index.tsx` serves the two HTML pages and hands everything else to the Hono app.
+- `src/lib/client.ts` and `src/lib/queries.ts` are the typed client (`hc<AppType>`); don't hand-write API response types.
+- `src/admin/` contains admin UI pages.
 - `src/components/` is shared UI; `src/lib/` is utilities and types; `src/context/` is providers.
 - `src/media/` stores bundled static assets; `src/index.css` is Tailwind styling.
 - `drizzle/` stores SQL migrations; see `drizzle.config.ts` and `drizzle-prod.config.ts`.
@@ -29,8 +31,11 @@ The preview runs in Docker (`compose.yaml`); Bun is not installed on the host.
 - Component filenames are PascalCase (e.g., `src/components/AuthButton.tsx`).
 
 ## Testing Guidelines
-- No automated test runner is configured yet.
-- If you add tests, document the runner and command here and keep test names descriptive.
+- `bun run typecheck` must pass.
+- `tests/api.test.ts`: HTTP characterization tests (`bun test`), run against a live container with `bash tests/run.sh <container> --ci`.
+- `tests/visual/`: Playwright full-page screenshots, pixel-compared between two builds. See the "Stack upgrade branch" section of `docs/handoff.md` for the Docker setup.
+- Tests record current behavior, including known bugs (marked "KNOWN BUG"). Change one only when the behavior change is intended.
+- Keep test names descriptive.
 
 ## Commit & Pull Request Guidelines
 - Follow existing commit style: short, sentence-case, past-tense summaries (e.g., “Added …”).
