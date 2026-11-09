@@ -1,9 +1,10 @@
 // Hand-drawn details for the lab, on Rough.js (roughjs.com): wobbly frames
 // around things, strokes that draw themselves in, and an optional "boil"
-// (the frame redrawn with a slightly different wobble ~8 times a second, the
-// way hand-drawn animation jitters). All strokes use currentColor, so CSS
+// (the frame redrawn with a slightly different wobble on each beat of the
+// music, the way hand-drawn animation jitters; still when the music is off). All strokes use currentColor, so CSS
 // colours them per theme.
-import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type Levels, type Source, useFrame } from "@/lab/music";
 import rough from "roughjs";
 
 // ---- Drawing helpers.
@@ -37,16 +38,21 @@ export function drawIn(el: SVGElement, ms = 600, delay = 0) {
   });
 }
 
-/** Cycle through a few seeds while `on`, for the boil. */
-function useBoil(on: boolean, fps = 8) {
+/** Cycle through a few seeds while `on`, one step per beat, for the boil. */
+function useBoil(on: boolean) {
   const [seed, setSeed] = useState(1);
-  useEffect(() => {
-    if (!on || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const timer = setInterval(() => setSeed((s) => (s % 3) + 1), 1000 / fps);
-    return () => clearInterval(timer);
-  }, [on, fps]);
+  const live = useRef(on);
+  live.current = on && !reducedMotion();
+  // On each beat of the music (from the beat map), the next wobble; still
+  // between beats, and when the music is off.
+  const onFrame = useCallback((levels: Record<Source, Levels>) => {
+    if (live.current && levels.map.beat) setSeed((s) => (s % 3) + 1);
+  }, []);
+  useFrame(onFrame);
   return seed;
 }
+
+const reducedMotion = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /** The size of an element, kept up to date. */
 function useSize<T extends HTMLElement>() {

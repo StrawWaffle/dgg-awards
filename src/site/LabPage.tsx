@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { ChatCalm } from "@/lab/ChatCalm";
+import { ChatStory } from "@/lab/ChatStory";
 import { Emote } from "@/lab/Emote";
 import { useSourceChoice, useStartOnFirstGesture } from "@/lab/music";
 import { Stage } from "@/lab/Stage";
@@ -11,11 +13,14 @@ import { Visualizer } from "@/lab/Visualizer";
 export const labViews = [
   { id: "stage", label: "Big screen" },
   { id: "sound", label: "Sound check" },
+  // Two takes on the year in chat (the live one is /chat), to pick from.
+  { id: "chat-calm", label: "Year in chat: calm" },
+  { id: "chat-story", label: "Year in chat: story" },
 ] as const;
 export type LabView = (typeof labViews)[number]["id"];
 
 /** The lab page: admins only (its APIs refuse everyone else too). */
-export function LabPage({ admin, view, chatOpen }: { admin: boolean; view: LabView; chatOpen: boolean }) {
+export function LabPage({ admin, view, chatOpen, onView }: { admin: boolean; view: LabView; chatOpen: boolean; onView: (v: LabView) => void }) {
   if (!admin) {
     return (
       <main className="mx-auto mt-16 max-w-md px-4">
@@ -29,10 +34,10 @@ export function LabPage({ admin, view, chatOpen }: { admin: boolean; view: LabVi
       </main>
     );
   }
-  return <Experiments view={view} chatOpen={chatOpen} />;
+  return <Experiments view={view} chatOpen={chatOpen} onView={onView} />;
 }
 
-function Experiments({ view, chatOpen }: { view: LabView; chatOpen: boolean }) {
+function Experiments({ view, chatOpen, onView }: { view: LabView; chatOpen: boolean; onView: (v: LabView) => void }) {
   const [emotes, setEmotes] = useState<string[]>([]);
   const [source, setSource] = useSourceChoice();
   // In the lab the music starts on the first click anywhere (not on the
@@ -45,6 +50,14 @@ function Experiments({ view, chatOpen }: { view: LabView; chatOpen: boolean }) {
       .catch(() => setEmotes([]));
   }, []);
   if (view === "stage") return <Stage source={source} emotes={emotes} chatOpen={chatOpen} />;
+  if (view === "chat-story") return <ChatStory onCalm={() => onView("chat-calm")} />;
+  if (view === "chat-calm") {
+    return (
+      <main className="px-4 py-10">
+        <ChatCalm />
+      </main>
+    );
+  }
   return (
     <main className="mx-auto max-w-7xl space-y-5 px-4 py-6">
       <Visualizer source={source} setSource={setSource} />

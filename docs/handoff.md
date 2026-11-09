@@ -552,6 +552,15 @@ StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, an
   - typecheck and 92 unit tests; 49 API tests, with the preview addresses added
   - in the browser: both preview menus (hover, jump, close, current page marked, the admin one on a phone), every stage and page, a preview vote not saved, the old addresses rewritten, `/lab#sound` kept, non-admin and signed-out refusals, the big screen switched to simulated votes with the reveal running, and the music's first play starting at 6.02 s
 
+### Two takes on the year in chat, and the wobble on the beat (2026-11-10, deployed)
+
+rinlux on `/chat`: "cute! but maybe a bit busy … the sketch style … updates so fast on the top banner … break it up or just negative space to help highlight things". StrawWaffle asked for both directions as rough drafts, behind the admin lock, to pick from:
+- **Lab → "Year in chat: calm"** (`src/lab/ChatCalm.tsx`, `/preview/lab#chat-calm`): a quieter cover (three headline numbers, the rest on one line), then each section leads with one highlight, big and centred with room around it, then two facts without boxes. Everything else (other cards, top-5 bars, tables, lists) is folded under "See all the numbers".
+- **Lab → "Year in chat: story"** (`src/lab/ChatStory.tsx`, `/preview/lab#chat-story`): one highlight per full screen (30 screens: the numbers, each section's best cards, three greentexts), snapping as you scroll or with the arrow and page keys, dots on the right to jump, each section on its own background, and at the end "See all the numbers" (to the calm version).
+- The live `/chat` page is unchanged until one is picked. Both drafts read the data through `/api/chat-review?preview=1`, so admins only.
+- **The drawn frames' wobble follows the music now** (StrawWaffle: "could it match the beat of the music?"). `useBoil` in `sketch.tsx` moves to the next wobble on each beat of the beat map (about twice a second) and holds still between beats and when the music is off. It used to redraw 8 times a second all the time. This is everywhere a frame boils: the front page countdown, the year in chat's cover, the big screen's sign and clips. Measured: one shape over 2 s with the music off, three with it on.
+- The lab now follows changes to its `#` address (typing `#chat-story` switches view).
+
 ### The year in DGG chat (2026-11-09, deployed)
 
 StrawWaffle asked for a page from dgg-scs's report (`C:\Users\<user>\Desktop\dgg\dgg-scs\data\report-cache\year-in-review-2026.html`, data in `yir-2026.json` beside it), with a funny spin per entry, shown once the results are out, in the site's look.

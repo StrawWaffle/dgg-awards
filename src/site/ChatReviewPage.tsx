@@ -5,14 +5,14 @@ import { Sketch } from "@/lab/sketch";
 import type { Me, SiteConfig } from "@/site/Site";
 
 /** The page's data (`src/archive/chat-<year>.json`, from scripts/build-chat-review.py), served by /api/chat-review. */
-type Review = typeof import("@/archive/chat-2026.json");
-type Card = { emote: string; big: string; title: string; text: string };
+export type Review = typeof import("@/archive/chat-2026.json");
+export type Card = { emote: string; big: string; title: string; text: string };
 type Bar = { name: string; value: number; sub?: string; emote?: string };
 
-const fmt = (n: number) => n.toLocaleString("en-US");
-const day = (iso: string, year = false) =>
+export const fmt = (n: number) => n.toLocaleString("en-US");
+export const day = (iso: string, year = false) =>
   new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long", ...(year ? { year: "numeric" } : {}), timeZone: "UTC" });
-const monthName = (m: string) => new Date(`${m}-15T12:00:00Z`).toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" });
+export const monthName = (m: string) => new Date(`${m}-15T12:00:00Z`).toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" });
 
 const SECTIONS = [
   { id: "emotes", label: "Emotes", emote: "OMEGALUL" },
@@ -330,7 +330,7 @@ function ChatReview({ data, preview }: { data: Review; preview: boolean }) {
   );
 }
 
-function Section({ id, title, emote, onEmote, children }: { id: string; title: string; emote: string; onEmote: (e: string) => (ev: React.MouseEvent) => void; children: ReactNode }) {
+export function Section({ id, title, emote, onEmote, children }: { id: string; title: string; emote: string; onEmote: (e: string) => (ev: React.MouseEvent) => void; children: ReactNode }) {
   return (
     <section id={id} className="cozy-panel scroll-mt-[calc(var(--lab-header,64px)+1rem)] space-y-6 p-6 sm:p-8">
       <h2 className="flex items-center gap-3 text-3xl font-black">
@@ -345,7 +345,7 @@ function Section({ id, title, emote, onEmote, children }: { id: string; title: s
 }
 
 /** One cell of the name table: who said it most, and how often. */
-function Crown({ cell, year = false }: { cell: { nick: string; n: number } | null; year?: boolean }) {
+export function Crown({ cell, year = false }: { cell: { nick: string; n: number } | null; year?: boolean }) {
   return (
     <td className="rounded-xl px-3 py-1" style={{ background: year ? "var(--highlight)" : "var(--cream)" }}>
       {cell ? (
@@ -363,7 +363,7 @@ function Crown({ cell, year = false }: { cell: { nick: string; n: number } | nul
 }
 
 /** The highlights: an emote, a big number in handwriting, and the story. */
-function Cards({ cards, onEmote }: { cards: Card[]; onEmote: (e: string) => (ev: React.MouseEvent) => void }) {
+export function Cards({ cards, onEmote }: { cards: Card[]; onEmote: (e: string) => (ev: React.MouseEvent) => void }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {cards.map((c) => (
@@ -385,7 +385,7 @@ function Cards({ cards, onEmote }: { cards: Card[]; onEmote: (e: string) => (ev:
 }
 
 /** Sorted bars from zero, labelled, growing in as they scroll into view. */
-function Bars({ title, bars }: { title: string; bars: Bar[] }) {
+export function Bars({ title, bars }: { title: string; bars: Bar[] }) {
   const list = useRef<HTMLOListElement>(null);
   const [seen, setSeen] = useState(false);
   useEffect(() => {
@@ -427,7 +427,7 @@ function Bars({ title, bars }: { title: string; bars: Bar[] }) {
   );
 }
 
-function Chips({ title, chips, note }: { title: string; chips: { label: string; n: number }[]; note?: string }) {
+export function Chips({ title, chips, note }: { title: string; chips: { label: string; n: number }[]; note?: string }) {
   return (
     <div>
       <h3 className="mb-2 font-black">{title}</h3>

@@ -126,8 +126,17 @@ export function Site() {
       .then(setMe)
       .catch(() => setMe(null));
     const back = () => setRoute(routeOf(location));
+    // The lab's experiment is in the hash: follow it when it changes.
+    const hash = () => {
+      const v = location.hash.slice(1);
+      if (labViews.some((x) => x.id === v)) setLabView(v as LabView);
+    };
     addEventListener("popstate", back);
-    return () => removeEventListener("popstate", back);
+    addEventListener("hashchange", hash);
+    return () => {
+      removeEventListener("popstate", back);
+      removeEventListener("hashchange", hash);
+    };
   }, []);
   useEffect(() => {
     const year = config?.awardYear ? ` ${config.awardYear}` : "";
@@ -238,7 +247,7 @@ export function Site() {
       );
     }
     if (p === "lab") {
-      return me === undefined ? null : <LabPage admin={admin} view={labView} chatOpen={chatOpen} />;
+      return me === undefined ? null : <LabPage admin={admin} view={labView} chatOpen={chatOpen} onView={showLab} />;
     }
     return (
       <>
