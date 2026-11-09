@@ -27,7 +27,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 
 ### At a glance (end of session 2, 2026-11-09)
 
-**Live** (`main` at `55c5ce1` plus docs, deployed and pushed):
+**Live** (`main` at `2986962` plus docs, deployed and pushed):
 - **Infrastructure:** the Docker preview behind a Cloudflare tunnel, real destiny.gg sign-in, the stack upgrade (Bun 1.4, Hono, Zod, TS 7), and clips into Cloudflare R2 at 1080p.
 - **Admin page:**
   - a left sidebar, dark theme, drag to reorder, and collapsible sections
@@ -52,18 +52,28 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
   - nominees without a built clip play from the source (YouTube, Twitch, Streamable embeds, or a video file)
   - the big screen fills the window and presents in scenes per award: title, a DVD-style nominee menu, the results reveal, and the winner. Clips are lowered in and the music fades out for them. Tabs slide, and background emotes show their colours on hover.
 
-**Waiting on rinlux** (StrawWaffle is asking; they decide on privacy):
-- **The lab as the 2026 design.** What they think of the voting flow, the big screen's scenes (title, nominee menu, reveal, winner), the results summary, the look, the music and the chat characters. The lab moves into the real site only once they approve.
-- **What's missing** compared with the live 2025 site.
-- **Their nominee data:** the format they use now, and whether they still need an import. The old form routes `POST /api/admin/import`, `/category` and `/nominee` stay until then.
-- **The real 2025 votes:** do they have the production database, an export or the final numbers? Needed for the archive, the Omegalul numbers (the wiki's add up to 125%) and checking whether the announced winners match a correct count (the 2025 code double-counted nominees in several categories).
-- **Privacy decisions:**
-  - Whether the public results summary may show the number of unique voters and votes per day (aggregates only; the admin stats have them).
-  - Where voters are: an IP lookup, asking voters, or browser location, or none.
-  - Who else gets access: a presenter allowlist for the big screen (it uses the live chat relay), editors or moderators with fewer rights, and preview access for chosen people.
-  - Locking the site behind sign-in before voting, with a countdown.
-  - Embedding YouTube and Twitch players for clips we haven't built: they load those sites in visitors' browsers.
-  - The privacy page's content, and whether the repo can ever be public (the nominee data names real people).
+**The live site is set up for the 2026 awards** (2026-11-09). The 2025 test setup was cleared after a backup (Drive `dgg-awards-2026-11-09T20-37Z.db.enc`, and `/data/backups/…-before-2026-setup.db`): its 22 awards, 174 nominees, 9,328 generated votes and 500 generated voters.
+- Settings: award year 2026, mode **locked** (the public sees only the front page's countdown and `/2025`; admins preview), voting from **15 December 2026 00:00 UTC** ("for now", StrawWaffle), no end date yet.
+- **The 22 awards** are 2025's, with their descriptions, in the same order. **159 draft nominees** came from rinlux's per-award Google Docs in the Drive folder: Ally 4, Antagonist 5, Brainlet 3, Buddy 4, DGGer 123, Drama 6, Employee 5, Frenemy 4, Meme Phrase 3, Yikestiny 2. Each is described as "Draft from rinlux's list". It's in the history as one import, which can be undone.
+- **DGGer** is planned in groups: "5 groups of 12, 5 wildcard spots" (Groups A–E, plus "Wildcards, 67 to choose from, top 5 advance"). Each draft's description names its group. The site has no grouped or multi-round voting yet: ask rinlux how it should work.
+- The Drive folder's top-level "new links" doc holds two links; not used yet.
+
+**rinlux's answers (2026-11-09):**
+- The lab is the direction for 2026. Not much is missing compared with 2025.
+- They keep nominees in assorted docs and as clips. They want an import "for backup and restoration": the full backup and restore covers that.
+- **No 2025 production data.** Their 2025 recap is a compilation video. The 2025 page stays on the wiki's percentages.
+- **The public results may show a tally:** voters and votes per day. No location lookup. Idea: check the results against the DGG census for inconsistencies.
+- **Access:** JaydrVernanda (an admin since 2026-11-09) and "bing". Get bing's exact destiny.gg name from StrawWaffle.
+- **Locking the site before voting:** yes, so they can test, touch up and preview. Done with "locked" plus the countdown.
+- **The code is never to be public.**
+
+**Still open:**
+- bing's destiny.gg name.
+- The voting end date.
+- How DGGer's groups and wildcards should vote.
+- **Simulated results for admins** (StrawWaffle asked): a switch in the admin results previews (summary and big screen) that makes up ballots in memory, never saved. Not built yet.
+- **The new voting page** (next, see the front page section). Until then "Vote now" goes to the old page at `/vote`.
+- The public tally (voters, votes per day) on the results page.
 
 **Ideas from StrawWaffle, not built (some need rinlux's say):**
 - **Roles:** presentation mode for an allowlist (the stream screen, admins included; the lab's chat relay is admins-only for now), moderators or editors with fewer rights, and letting chosen people preview pages.
@@ -89,7 +99,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 - Fast-forward `main`, run `docker compose --profile tunnel up -d --build app`, then check `/`, `/api/config`, `/lab`, `/admin` (200), `/api/admin/checks` and `/api/lab/emotes` (401), and `/signin` (to destiny.gg).
 - Push `main`.
 
-**Worktrees:** everything under `.claude/worktrees/` is merged (`admin-pass`, `editor-scroll`, `lab`, `lab-polish`, `lab-polish-2`, `lab-polish-3`, `lab-polish-4`, `lab-summary`, `admin-lab-link`, `duel-reveal`, `plain-admin`, `clip-preview`, `library-pictures`, `backups`, `nominee-images`, `sketchy`) and can be removed.
+**Worktrees:** everything under `.claude/worktrees/` is merged (`admin-pass`, `editor-scroll`, `lab`, `lab-polish`, `lab-polish-2`, `lab-polish-3`, `lab-polish-4`, `lab-summary`, `admin-lab-link`, `duel-reveal`, `plain-admin`, `clip-preview`, `library-pictures`, `backups`, `frontpage`, `nominee-images`, `sketchy`) and can be removed.
 
 **Test containers**, on network `dgga-test`, all kept running:
 
@@ -434,7 +444,7 @@ StrawWaffle wanted the live database safe, a proper full export and import, and 
   - an API test (download, restore plain and encrypted, refusals)
   - end to end against Drive in a test folder, since deleted: the backup uploaded, then was fetched back, decrypted with the script and opened (22 awards, 174 nominees, 9,328 votes, 501 users, 0 sessions)
 
-### The new front page and 2025's results (branch `worktree-frontpage`, 2026-11-09)
+### The new front page and 2025's results (2026-11-09, deployed)
 
 StrawWaffle got approval for the lab's look ("the lab is the official version now"). In that look:
 - **`/`: the front page** (`src/home/Home.tsx`, `home.html`, `react-home.tsx`). A countdown to the voting start set in Settings (`startTime`), titled with `awardYear`, then "Voting is open!" with a Vote button and a countdown to the close, then "Voting has closed". With no start set, "Voting dates are coming soon". It switches by itself at the start, with a cheer. "Meanwhile, check out last year's results" goes to `/2025`. It has the lab's extras: music (starts only from its button, not on any first click as in the lab), drawn look, theme, and the drifting emotes. The lab's header controls are now `src/lab/HeaderTools.tsx`, shared.
