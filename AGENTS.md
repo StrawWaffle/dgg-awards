@@ -1,50 +1,86 @@
-# Repository Guidelines
+# DGG Awards — agent guide
 
-**Start with `docs/handoff.md`**: current state, working agreements, open questions, planned features and backlog. Keep it updated at the end of each session.
+Voting and results site for the yearly destiny.gg community awards (DGG Awards). Live preview: https://dgg-awards.strawwaffle.dev (StrawWaffle's PC, Cloudflare tunnel). Private repo: https://github.com/StrawWaffle/dgg-awards.
 
-The preview runs in Docker (`compose.yaml`); Bun is not installed on the host.
+**Read `docs/handoff.md` first.** It has the current state, the people involved, decisions, open questions, the planned features in order and the backlog of problems from the 2025 awards stream. Update it at the end of every session.
 
-## Project Structure & Module Organization
-- `src/` holds the Bun + React app; entry point is `src/index.tsx`.
-- `src/server/` is the Hono API: `app.tsx` assembles it, `routes/` holds the handlers, `schemas.ts` the Zod input schemas. `src/index.tsx` serves the two HTML pages and hands everything else to the Hono app.
-- `src/lib/client.ts` and `src/lib/queries.ts` are the typed client (`hc<AppType>`); don't hand-write API response types.
-- `src/admin/` contains admin UI pages.
-- `src/components/` is shared UI; `src/lib/` is utilities and types; `src/context/` is providers.
-- `src/media/` stores bundled static assets; `src/index.css` is Tailwind styling.
-- `drizzle/` stores SQL migrations; see `drizzle.config.ts` and `drizzle-prod.config.ts`.
-- `scripts/` contains utilities like `make-admin.ts` and `data-to-json.ts`.
-- `dist/` is the production build output; `sqlite.db` is the local dev database.
+## Working agreements (from StrawWaffle)
 
-## Build, Test, and Development Commands
-- `bun install` installs dependencies.
-- `bun dev` starts the hot-reload dev server.
-- `bun start` runs the production server (`NODE_ENV=production`).
-- `bun run build.ts` builds the production bundle into `dist/`.
-- `bunx --bun drizzle-kit generate` and `bunx --bun drizzle-kit push` manage migrations.
-- `bun run scripts/make-admin.ts --db ./sqlite.db --username <name>` grants admin access.
-- `bun run scripts/data-to-json.ts` outputs `scripts/data-to-json.out.json`.
+- **Check with StrawWaffle before building a feature or changing behaviour or looks.** Infrastructure, tests and fixes he has approved are fine. When unsure, ask.
+- **Git:** commit with short, sentence-case, past-tense messages ("Added …"). Push `main` only to the private repo (`origin`). Never push anywhere else, and never make it public: the nominee data names real people and is unreviewed for privacy.
+- **Work in a git worktree** for anything bigger than a docs edit. Test it, then fast-forward `main` and deploy once StrawWaffle agrees.
+- **Writing:** apply the `unslop` skill to prose. **UI:** apply the `uncodixify` skill, and match the existing look rather than inventing one.
+- **Secrets** live only in the live `.env` (gitignored). Never print them or put them in commits, chat or command output. Ask StrawWaffle for new ones through T3's `request_secret` cards.
+- **Keep the test containers running** (see Testing) until StrawWaffle says otherwise.
+- StrawWaffle uses voice-to-text; ask when something reads oddly.
 
-## Coding Style & Naming Conventions
-- Use Prettier (`.prettierrc`) with import sorting and Tailwind class ordering; run `bunx prettier --write .` when needed.
-- Keep 2-space indentation and let Prettier format.
-- Use absolute imports via the `@/` alias from `tsconfig.json`; do not use relative imports.
-- Component filenames are PascalCase (e.g., `src/components/AuthButton.tsx`).
+## Environment
 
-## Testing Guidelines
+- **Windows host, Docker Desktop. Bun is not installed on the host:** run everything in containers. Shell is Git Bash. Prefix `docker` commands that contain `/paths` with `MSYS_NO_PATHCONV=1`, or Git Bash rewrites `/data/...` into a Windows path.
+- **Run project commands** (type check, unit tests, drizzle-kit) in a Bun container with the repo mounted and `node_modules` in a volume:
+  ```bash
+  MSYS_NO_PATHCONV=1 docker run --rm -v "C:\\Users\\<user>\\.t3\\projects\\dgg-awards:/w" \
+    -v dgga-nm:/w/node_modules -w /w oven/bun:1.4 \
+    sh -c "bun install --frozen-lockfile >/dev/null && bun run typecheck && bun test tests/links.test.ts tests/checks.test.ts tests/data.test.ts tests/dgg-profile.test.ts tests/voting.test.ts tests/storage.test.ts tests/ids.test.ts"
+  ```
+  For a worktree, mount its folder instead (`.claude\\worktrees\\<name>`).
+- **Worktree sessions refuse complex one-liners** they can't prove stay inside the worktree. Write the commands to a script file (e.g. in the scratchpad) and run `bash <file>`.
+
+## Architecture
+
+- **Runtime:** Bun 1.4, React 19, Tailwind 4 (Tailwind 4.1's font stack is pinned in `src/index.css`), radix-ui, TanStack Query. SQLite via Drizzle. Hono + Zod for the API, with a typed client (`hc`). TypeScript 7.
+- `src/index.tsx`: Bun serves the two HTML pages (`/` and the admin page at a random `/admin/<nonce>` path) and passes everything else to the Hono app. It also resumes interrupted clip jobs at start.
+- `src/server/`
+  - `app.tsx` assembles the API, `/robots.txt`, `/Media/*` (bundled images in `src/media`), `/files/*` (locally stored clips) and `/error`.
+  - `routes/auth.ts` (destiny.gg OAuth, `/api/me`), `routes/public.ts` (nominees, voting, results) and `routes/admin.ts` (everything under `/api/admin`, admin-only via `.use(requireAdmin)`: register new routes **after** that line).
+  - `schemas.ts`: Zod schemas for every input. They check shape only; data quality is `src/lib/nominee-checks.ts`.
+  - `clips.ts`: the clip pipeline (yt-dlp section download, ffmpeg, thumbnails; a one-at-a-time background queue whose state lives on the nominee).
+  - `storage.ts`: R2 when all five `R2_*` settings are set, otherwise local `MEDIA_DIR`.
+  - `dgg-profile.ts` reads destiny.gg membership cards, and rebuilds the signature SVG from its path data only.
+  - `present.ts` turns storage keys into URLs.
+- `src/lib/`
+  - `client.ts` and `queries.ts`: the typed API client. Don't hand-write API response types; infer them. Editor calls throw the server's error message.
+  - `links.ts` (link types, timestamps, labels), `nominee-checks.ts` (data checks), `voting.ts` (single or ranked, instant runoff), `ids.ts` (ids from titles).
+  - `data/schema.ts` and `data/driver.ts`: Drizzle schema and queries. Votes join nominees on **(optionId, categoryId)**; ids are only unique within a category.
+- `src/admin/components/editor/`: the admin nominee editor. `src/components/`: public UI (`ClipEmbed.tsx` is our clip player).
+- `drizzle/`: migrations, applied at container start by `scripts/migrate.ts`. **Always read a generated migration before committing.** drizzle-kit once generated a copy step that selected a column which didn't exist yet (0003, fixed by hand).
+- `src/data.ts`: last year's (2025) nominees, used as sample data by `scripts/seed.ts`.
+
+## Deploying (live preview)
+
+From the repo root on `main`: `docker compose --profile tunnel up -d --build app`. Migrations run on start. Then check:
+- `https://dgg-awards.strawwaffle.dev` and `/api/config` answer 200
+- `/api/admin/checks` answers 401 when signed out
+- `/signin` redirects to www.destiny.gg
+
+The live `.env` holds the real DGG OAuth app, `AUTH_SECRET`, the tunnel token, `ADMIN_USERNAMES` and the five `R2_*` settings (see `.env.example` for names). Its database is the `dgg-awards_awards_data` volume.
+
+## Testing
+
 - `bun run typecheck` must pass.
-- Unit tests, no server needed: `bun test tests/links.test.ts tests/checks.test.ts tests/data.test.ts tests/dgg-profile.test.ts tests/voting.test.ts tests/storage.test.ts tests/ids.test.ts`. Run them on Linux (the oven/bun image), because filename case matters there.
-- `bun scripts/check-nominees.ts` scores the nominee data with `src/lib/nominee-checks.ts` and exits 1 while there are errors.
-- `tests/api.test.ts`: HTTP characterization tests (`bun test`), run against a live container with `bash tests/run.sh <container> --ci`.
-- `tests/visual/`: Playwright full-page screenshots, pixel-compared between two builds. See the "Stack upgrade branch" section of `docs/handoff.md` for the Docker setup.
-- Tests record current behavior, including known bugs (marked "KNOWN BUG"). Change one only when the behavior change is intended.
-- Keep test names descriptive.
+- **Unit tests** (no server): `tests/{links,checks,data,dgg-profile,voting,storage,ids}.test.ts`. Run on Linux, since `data.test.ts` checks filename case.
+- **API tests:** `bash tests/run.sh <app-container> --ci`. 36 characterization tests with snapshots, run over HTTP against a running app on the Docker network `dgga-test`. `tests/reset.sh` reseeds first.
+- **Screenshots:** `bash tests/visual/run.sh capture <container> <name>`, then `… compare <a> <b>`. These are full-page Playwright screenshots, pinned so two runs of the same code are pixel-identical.
+- **Data score:** `bun scripts/check-nominees.ts` (exits 1 while there are errors).
+- **Test containers** (network `dgga-test`):
 
-## Commit & Pull Request Guidelines
-- Follow existing commit style: short, sentence-case, past-tense summaries (e.g., “Added …”).
-- PRs should include a clear description, linked issues if applicable, and screenshots for UI changes.
-- Call out migration or data changes explicitly.
+  | Name | Port | What it is |
+  |---|---|---|
+  | `dgga-mock` | 8790 | `dev/dgg-oauth/server.mjs`, a destiny.gg login stand-in |
+  | `dgga-files` | – | nginx serving the main repo's `tests/fixtures`; needs byte ranges |
+  | `dgga-base` | 3100 | the original 2025 code |
+  | `dgga-main` | 3400 | the current live image |
+  | `dgga-new` | 3200 | the build under test |
 
-## Configuration & Security Notes
-- Use `.env` (copy from `.env.example`) for OAuth and secrets; do not commit real credentials.
-- Escape `$` characters in secrets for Bun env parsing.
-- Prefer migrations over manual edits to `sqlite.db`.
+  App containers need `ADMIN_USERNAMES=Tester`, `DGG_CLIENT_ID=dev-client`, `DGG_CLIENT_SECRET=dev-secret`, `DGG_ORIGIN=http://dgga-mock:8789`, `DGG_AUTHORIZE_ORIGIN=http://localhost:8790`, `DGG_REDIRECT=http://localhost:<port>/oauth` and an `AUTH_SECRET`. The exact `docker run` lines are in `docs/handoff.md` ("Stack upgrade" section).
+- Snapshots change only on purpose. When one changes, check the diff is exactly what you expected before `--update-snapshots`.
+- In the browser (T3 preview tools), sign in as an admin at `http://localhost:<port>/signin` with username `Tester`.
+
+## Pitfalls already hit
+
+- **Filename case:** Windows ignores it and Linux doesn't. `tests/data.test.ts` guards image names.
+- **Hono client generics:** if a response type comes out wrong, give the helper an explicit return type (see `src/server/present.ts`).
+- **React Query** calls `queryFn(context)`, so wrap functions that take optional arguments: `queryFn: () => f()`.
+- **`defaultValue` only applies on mount:** key a form on its loaded data.
+- **Byte ranges:** ffmpeg needs them on the source server, and browsers need them on ours to seek video.
+- **Cloudflare:** the free CDN restricts video, so clips are served from R2 (free bandwidth). See the cost notes in the handoff.

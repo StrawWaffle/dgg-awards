@@ -25,12 +25,42 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 
 ## Current state
 
+### At a glance (end of session 1, 2026-11-09)
+
+**Done and live:**
+- Docker preview behind a Cloudflare tunnel, with real destiny.gg sign-in.
+- Stack upgrade (Bun 1.4, Hono, Zod, TS 7).
+- Fixes: admin import auth, vote paging, emote names, results banner and the **double-count bug**.
+- Nominee model and data checks, DGG profile cards, ranked voting with instant runoff, the clip pipeline into **Cloudflare R2** (1080p, single encode), and the admin editor with add, edit, clips, thumbnails and previews.
+
+**Repo:** `main` = deployed, pushed to the private repo. The tests and pitfalls are documented in `AGENTS.md`.
+
+**Waiting on others:**
+- rinlux's feedback on the preview.
+- The voting-style decision for 2026 is made (per category, instant runoff), but the UI waits for the redesign.
+- The real 2025 votes, for the archive and the double-count re-check.
+
+**Next, in StrawWaffle's order** (see "Planned features" and "Backlog"):
+1. **Voting page redesign:** ranked-voting UI, one category per page with progress (like jadseya.com), cuter. The hill-climbing method applies.
+2. **Results reveal and presenter mode:** reveal-all-but-last-three, clips that stop, room for the stream camera, charts per StrawWaffle's visualization article, and the runoff rounds.
+3. **Re-check the double-count fix** against the original code, and against the real 2025 votes if they turn up.
+4. Smaller items:
+   - Re-pull emotes from the DGG CDN.
+   - Privacy page.
+   - Bot-vote comparison.
+   - Precompute results when voting closes (scale).
+   - A "Remove clip" button: there's no way to remove a clip in the editor yet.
+
 ### Running preview
 
 | | |
 |---|---|
 | Site | https://dgg-awards.strawwaffle.dev |
+| Clips | https://dgg-awards-media.strawwaffle.dev (R2 bucket `dgg-awards-media`) |
 | Local | http://localhost:3000 (pages load, but sign-in only works on the tunnel URL) |
+
+- **Clips are 1080p** (since 2026-11-09). yt-dlp's precise cut encodes once, and the result is only repackaged if it's already H.264/AAC, ≤1080p and ≤~4 Mbps. Otherwise it's re-encoded once (CRF 21, capped at 4 Mbps). A typical 15 s clip is ~4 MB at ~2.1 Mbps. Peter Miller (Ally) has a test clip from StrawWaffle, built at the old 720p setting; press **Rebuild clip** to get 1080p.
+- **R2 cost:** StrawWaffle wants to stay on the free tier. As of 2026-11, the free tier is 10 GB storage, 1M writes and 10M reads a month, and bandwidth is always free. The estimate for 2026 is ~1–2 GB and ~2M reads at worst, before Cloudflare's cache. Quality doesn't affect cost. A payment method is on file, so StrawWaffle was advised to set up a Cloudflare usage notification. Separate presenter-only or mobile versions were considered and not needed. Revisit only if usage grows.
 
 - **Sign-in is real destiny.gg OAuth** (switched 2026-11-09, verified by StrawWaffle signing in and reaching `/admin`). The app is registered on the DGG account StrawWaffle set up for this, with the redirect `https://dgg-awards.strawwaffle.dev/oauth`. The credentials are only in `.env` (gitignored). `DGG_CLIENT_SECRET` contains `$`, so it's wrapped in single quotes there, which stops Compose from expanding it.
 - Docker Compose runs `app` (Bun, with SQLite in the `awards_data` volume) and `tunnel` (cloudflared, profile `tunnel`). The `dgg-oauth` stand-in (profile `mock-auth`) is no longer run on the live stack. It's kept for local and test use, see `tests/`. Its `dgg-awards-login` Cloudflare route has been deleted.
@@ -53,15 +83,12 @@ In Git Bash, `MSYS_NO_PATHCONV=1` is needed or `/data/...` gets rewritten into a
 
 ### Git history
 
-1. `Imported dgga25 source from recovered zip`: the original code, unchanged. Diff against this to see everything we changed.
-2. `Added Docker preview stack with mock destiny.gg login`
-3. `Added open questions list` (now merged into this file)
-4. `Added ADMIN_USERNAMES allowlist applied at sign-in`
-5. `Blocked crawlers and AI indexing`
+- The first commit after "Initial commit" is `Imported dgga25 source from recovered zip`: the original code, unchanged. Diff against it to see everything we changed. The source zip was deleted at StrawWaffle's request, so that commit is the only copy.
+- Everything since is on `main` (`git log --oneline`). Each feature step is one or a few commits with detailed messages.
 
-The source zip (`dgga25.zip`) was deleted at StrawWaffle's request, so commit 1 is the only copy.
+### First infrastructure changes to the original
 
-### Code changes made to the original (all infrastructure)
+These were the first changes. The routes have since moved to `src/server/` (Hono).
 
 - `src/routes/signin.ts`: sends `code_challenge_method=S256`, which destiny.gg's guide lists as required. Not yet tested against the real destiny.gg. Also adds the optional `DGG_AUTHORIZE_ORIGIN` for when the browser and server reach the login provider at different addresses.
 - `src/routes/oauth.ts`: the `ADMIN_USERNAMES` allowlist.
@@ -135,7 +162,30 @@ How to test (Docker only, network `dgga-test`):
 - `tests/reset.sh` wipes users, sessions and votes and reseeds, so every run starts from the same state.
 - The screenshot script pins everything else that would vary: external requests are stubbed, animated images are swapped for a still, the clock is frozen, and the app is always reached as `app.test`.
 
-## Planned features (agreed, not started)
+Test container commands, from Git Bash. Recreate any that are missing, and run the build from the folder under test (the repo or a worktree):
+
+```bash
+export MSYS_NO_PATHCONV=1
+docker network create dgga-test
+REPO='C:\Users\<user>\.t3\projects\dgg-awards'
+# Login stand-in and fixture server (nginx, because ffmpeg needs byte ranges)
+docker run -d --name dgga-mock --network dgga-test -p 127.0.0.1:8790:8789 -e PORT=8789 \
+  -e DGG_CLIENT_ID=dev-client -e DGG_CLIENT_SECRET=dev-secret \
+  -v "$REPO\dev\dgg-oauth\server.mjs:/srv/server.mjs:ro" node:22-alpine node /srv/server.mjs
+docker run -d --name dgga-files --network dgga-test \
+  -v "$REPO\tests\fixtures:/usr/share/nginx/html:ro" nginx:1.27-alpine
+# An app under test: build an image, then run it with a name and port
+docker build -t dgga:new "$REPO"   # or the worktree folder
+docker run -d --name dgga-new --network dgga-test -p 127.0.0.1:3200:3000 \
+  -e DGG_CLIENT_ID=dev-client -e DGG_CLIENT_SECRET=dev-secret \
+  -e DGG_ORIGIN=http://dgga-mock:8789 -e DGG_AUTHORIZE_ORIGIN=http://localhost:8790 \
+  -e DGG_REDIRECT=http://localhost:3200/oauth -e AUTH_SECRET=test-secret-test-secret \
+  -e ADMIN_USERNAMES=Tester -e MEDIA_URL=https://cdn.dgg.events/ dgga:new
+```
+
+`dgga-main` (port 3400) is the same with the live image `dgg-awards-app`, and `dgga-base` (3100) is the original code (`dgga:baseline`). Tests must never use the real R2 settings: without them, test containers store clips locally.
+
+## Planned features (1–4 done; see each item)
 
 Order StrawWaffle gave: preview to rinlux first, then discuss, then these.
 
