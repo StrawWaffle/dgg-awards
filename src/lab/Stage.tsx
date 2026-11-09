@@ -37,6 +37,9 @@ type Npc = {
   restore: string;
   /** While a clip plays: the spot beside it to walk to and sit at. */
   parkX?: number;
+  /** Its unscaled size, measured when needed (0: measure again). */
+  w: number;
+  h: number;
 };
 
 /** One line in the chat column: someone's emote, a verified message, or a combo. */
@@ -53,6 +56,7 @@ const ARRIVALS_PER_SECOND = 2;
 function setEmote(npc: Npc, emote: string) {
   if (npc.emote === emote) return;
   npc.emote = emote;
+  npc.w = 0;
   npc.emoteEl.className = `emote ${emote}`;
 }
 
@@ -74,10 +78,21 @@ const SCENE_WIDTH: Record<Scene, string> = {
 };
 
 /** A spot beside the middle box `sides`, on the left or the right. */
-function sideSpot(toLeft: boolean, sides: { left: number; right: number }, width: number) {
-  const lo = toLeft ? 8 : sides.right + 12;
-  const hi = toLeft ? sides.left - 56 : width - 48;
+function sideSpot(toLeft: boolean, sides: { left: number; right: number }, width: number, size = 44) {
+  const lo = toLeft ? 8 : sides.right + 14;
+  const hi = toLeft ? sides.left - size - 14 : width - size - 8;
   return lo <= hi ? lo + Math.random() * (hi - lo) : toLeft ? Math.max(0, hi) : Math.min(width - 40, lo);
+}
+
+/** An element's box within `stage`, from layout offsets (transforms ignored). */
+function boxIn(el: HTMLElement, stage: Element | null) {
+  let left = 0;
+  let top = 0;
+  for (let e: HTMLElement | null = el; e && e !== stage; e = e.offsetParent as HTMLElement | null) {
+    left += e.offsetLeft;
+    top += e.offsetTop;
+  }
+  return { left, right: left + el.offsetWidth, top, bottom: top + el.offsetHeight };
 }
 
 const nickClass = (flair: string | null) => `nick${flair ? ` nick-${flair}` : ""}`;
@@ -140,8 +155,8 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
   const [revealed, setRevealed] = useState(false);
   const award = show?.[awardIndex] ?? null;
   const sceneBox = useRef<HTMLDivElement>(null);
-  /** The box in the middle the cast keeps clear of, if any. */
-  const sides = useRef<{ left: number; right: number } | null>(null);
+  const sceneNow = useRef(scene);
+  sceneNow.current = scene;
   const [bursts, fire] = useBursts();
   const drawn = useDrawnLook();
   const settings = useRef({ rate, emoteShare, max, names, showSaid });
@@ -172,7 +187,6 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
     // In from the left or the right edge, walking onto the stage.
     const fromLeft = Math.random() < 0.5;
     const width = box.clientWidth;
-    const keepClear = sides.current;
     const npc: Npc = {
       el,
       emoteEl,
@@ -187,13 +201,14 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
       hop: 0,
       bob: 0,
       opacity: 0,
-      entering: !keepClear,
-      parkX: keepClear ? sideSpot(fromLeft, keepClear, width) : undefined,
+      entering: true,
       leaving: false,
       lastSeen: performance.now(),
       bubbleUntil: 0,
       clapUntil: 0,
       restore: emote,
+      w: 0,
+      h: 0,
     };
     npcs.current.set(nick, npc);
     return npc;
@@ -351,21 +366,62 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
     const showNames = settings.current.names;
     const everyone = [...npcs.current.values(), ...leavingNpcs.current];
     const still = clipOn.current;
+    // The scene's box (not the title's), measured each frame so it follows its
+    // size and the chat column opening or closing. Offsets ignore the
+    // lowering animation's transform, so this is where it ends up.
+    const middle = !still && sceneNow.current !== "title" ? sceneBox.current : null;
+    const keep = middle ? boxIn(middle, box.offsetParent) : null;
     // The floor runs from the horizon to just above the controls.
     const top = height * 0.42;
     const depthRange = Math.max(40, height - controlsH.current - 70 - top);
     for (const n of everyone) {
+      const ground = top + n.depth * depthRange;
       // The music: a jump on the one of each bar, a little bob on the others.
       if (!n.entering && !n.leaving && !still) {
         if (music.downbeat) n.hop = Math.max(n.hop, 0.75);
         else if (music.beat) n.bob = 1;
       }
+      const was = n.x;
       n.x += n.vx * dt;
+      // Behind the scene's box is out of bounds for anyone in a row it covers:
+      // they roam beside it, or anywhere in the rows below it.
+      // Its drawn box: scaled about its centre, and up to a hop's height above.
+      if (keep && !n.w) {
+        n.w = n.el.offsetWidth;
+        n.h = n.el.offsetHeight;
+      }
+      const scale = 0.7 + n.depth * 0.6;
+      const drawnTop = ground + (n.h * (1 - scale)) / 2 - 32;
+      if (keep && !n.leaving && drawnTop < keep.bottom + 4) {
+        const inset = (n.w * (1 - scale)) / 2;
+        const band = (x: number) => x + inset + n.w * scale > keep.left - 6 && x + inset < keep.right + 6;
+        if (n.entering) {
+          // Newcomers stay on the side they came in from, so none crosses behind it.
+          const fromLeft = n.vx > 0;
+          const wrongSide = fromLeft ? n.targetX > keep.left : n.targetX < keep.right;
+          if (wrongSide || band(n.targetX)) n.targetX = sideSpot(fromLeft, keep, width, n.w || 44);
+        } else if (n.parkX === undefined && band(n.x)) {
+          if (band(was)) {
+            // Already behind it (it just arrived): walk out to the nearer side.
+            n.parkX = sideSpot(n.x + 20 < (keep.left + keep.right) / 2, keep, width, n.w || 44);
+            n.vx = (n.parkX >= n.x ? 1 : -1) * 150;
+          } else {
+            // Wandering into it: turn back.
+            n.x = was;
+            n.vx = -n.vx;
+          }
+        }
+      }
       if (n.parkX !== undefined) {
-        // Walking to the side of the clip, then sitting still there.
+        // Walking to a spot beside the clip or the scene; for a clip they sit
+        // still there, otherwise they go back to wandering.
         if ((n.vx >= 0 && n.x >= n.parkX) || (n.vx <= 0 && n.x <= n.parkX)) {
           n.x = n.parkX;
-          n.vx = 0;
+          if (still) n.vx = 0;
+          else {
+            n.parkX = undefined;
+            n.vx = (Math.random() < 0.5 ? -1 : 1) * (8 + Math.random() * 22);
+          }
         }
       } else if (n.entering) {
         // Walk to their spot, then slow to a wander.
@@ -386,8 +442,7 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
       n.hop = Math.max(0, n.hop - dt * 2.4);
       n.bob = Math.max(0, n.bob - dt * 7);
       // On the grass: back row higher and smaller, front row lower and bigger.
-      const y = top + n.depth * depthRange - Math.sin(n.hop * Math.PI) * 30 * n.hop - n.bob * 5;
-      const scale = 0.7 + n.depth * 0.6;
+      const y = ground - Math.sin(n.hop * Math.PI) * 30 * n.hop - n.bob * 5;
       // The bob squashes a little, like landing.
       n.el.style.transform = `translate3d(${n.x}px, ${y}px, 0) scale(${scale * (1 + n.bob * 0.04)}, ${scale * (1 - n.bob * 0.06)})`;
       n.el.style.opacity = String(Math.max(0, n.opacity));
@@ -405,14 +460,13 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
   }, []);
   useFrame(onFrame);
 
-  // Something in the middle (a clip, or every scene but the title): everyone
-  // walks out of its way, left or right, and waits there. Otherwise they roam.
+  // A clip lowers in: everyone walks out of its way, left or right, and sits
+  // still there until it's gone. (Scenes are kept clear in the frame loop.)
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
       const box = floor.current;
-      const middle = playing ? clipBox.current : scene !== "title" ? sceneBox.current : null;
+      const middle = playing ? clipBox.current : null;
       if (!box || !middle) {
-        sides.current = null;
         for (const n of npcs.current.values()) {
           if (n.parkX === undefined) continue;
           n.parkX = undefined;
@@ -420,23 +474,18 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
         }
         return;
       }
-      const b = box.getBoundingClientRect();
-      const c = middle.getBoundingClientRect();
-      const keep = { left: c.left - b.left, right: c.right - b.left };
-      sides.current = keep;
+      const keep = boxIn(middle, box.offsetParent);
       for (const n of npcs.current.values()) {
-        const x = sideSpot(n.x + 20 < (keep.left + keep.right) / 2, keep, b.width);
+        const x = sideSpot(n.x + 20 < (keep.left + keep.right) / 2, keep, box.clientWidth, n.w || 44);
         n.entering = false;
         n.parkX = x;
-        n.vx = (x >= n.x ? 1 : -1) * 150;
-        if (playing) {
-          n.bubble.classList.add("hidden");
-          n.bubbleUntil = 0;
-        }
+        n.vx = (x >= n.x ? 1 : -1) * 260;
+        n.bubble.classList.add("hidden");
+        n.bubbleUntil = 0;
       }
     });
     return () => cancelAnimationFrame(frame);
-  }, [playing, scene, awardIndex, show]);
+  }, [playing]);
   const playingRef = useRef(playing);
   playingRef.current = playing;
   // Read from a ref: the end-of-clip timer may fire after it was closed by hand.
