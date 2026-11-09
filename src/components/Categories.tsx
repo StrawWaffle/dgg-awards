@@ -110,13 +110,14 @@ export function Categories() {
   );
 }
 
-export function CategoriesWithResults() {
+/** `preview`: an admin looking at results before the reveal. */
+export function CategoriesWithResults({ preview = false }: { preview?: boolean }) {
   const dggBannerSrc =
     "/Media/dgg_chatter_of_the_year_banner_cutechristiangirl.webp";
 
   const resultsQuery = useQuery({
-    queryKey: ["vote_results"],
-    queryFn: getVoteResults,
+    queryKey: ["vote_results", preview],
+    queryFn: () => getVoteResults(preview),
     staleTime: Infinity,
   });
 

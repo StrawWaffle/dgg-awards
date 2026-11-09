@@ -38,8 +38,11 @@ export async function fetchUserVotes() {
   return parseResponse(client.api.vote.$get());
 }
 
-export async function getVoteResults() {
-  return parseResponse(client.api.vote.results.$get());
+/** `preview`: admins can see results in any mode (the server checks). */
+export async function getVoteResults(preview = false) {
+  return parseResponse(
+    client.api.vote.results.$get({ query: preview ? { preview: "1" } : {} }),
+  );
 }
 
 /** Fire the vote. A refused vote (already voted, voting closed) is ignored, as before. */
@@ -99,6 +102,70 @@ export type NomineePatch = Parameters<
 
 export async function updateNominee(data: NomineePatch) {
   await client.api.admin.nominee.$patch({ json: data });
+}
+
+// Editor calls: unlike the fire-and-forget helpers above, these throw an
+// Error carrying the server's message, so the form can show what went wrong.
+
+export type AdminCategory = Awaited<ReturnType<typeof fetchAdminNom>>[number];
+export type AdminNominee = AdminCategory["options"][number];
+export type Issue = Awaited<ReturnType<typeof fetchChecks>>[number];
+export type DggProfile = Awaited<ReturnType<typeof fetchDggProfile>>;
+
+async function ok(
+  res: { ok: boolean; status: number; text(): Promise<string> },
+  fallback: string,
+) {
+  if (res.ok) return;
+  const text = await res.text().catch(() => "");
+  throw new Error(text || `${fallback} (${res.status})`);
+}
+
+export async function fetchChecks() {
+  return parseResponse(client.api.admin.checks.$get());
+}
+
+export async function saveNominee(data: NomineePatch) {
+  await ok(await client.api.admin.nominee.$patch({ json: data }), "Couldn't save the nominee");
+}
+
+export type CategoryPatch = Parameters<typeof client.api.admin.category.$patch>[0]["json"];
+
+export async function saveCategory(data: CategoryPatch) {
+  await ok(await client.api.admin.category.$patch({ json: data }), "Couldn't save the category");
+}
+
+export type SettingsPatch = Parameters<typeof client.api.admin.settings.$patch>[0]["json"];
+
+export async function saveSettings(data: SettingsPatch) {
+  const res = await client.api.admin.settings.$patch({ json: data });
+  await ok(res, "Couldn't save the settings");
+}
+
+export async function buildClip(categoryId: string, id: string) {
+  await ok(await client.api.admin.clip.$post({ json: { categoryId, id } }), "Couldn't start the clip");
+}
+
+export async function pickThumbnail(categoryId: string, id: string, at: number) {
+  await ok(
+    await client.api.admin.thumbnail.$post({ json: { categoryId, id, at } }),
+    "Couldn't take that frame",
+  );
+}
+
+export async function uploadThumbnail(categoryId: string, id: string, file: File) {
+  await ok(
+    await client.api.admin.thumbnail.upload.$post({ form: { categoryId, id, file } }),
+    "Couldn't use that image",
+  );
+}
+
+/** A destiny.gg membership card; null if there's no such user. */
+export async function fetchDggProfile(name: string) {
+  const res = await client.api.admin["dgg-profile"][":name"].$get({ param: { name } });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Couldn't load the profile (${res.status})`);
+  return parseResponse(Promise.resolve(res));
 }
 
 export async function makeAdmin(uid: number) {

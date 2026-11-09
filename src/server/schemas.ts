@@ -21,6 +21,8 @@ export const voteSubmit = z.union([
   z.object({ category_id: required, ranking: z.array(required).min(1).max(100) }),
 ]);
 
+export const resultsQuery = z.object({ preview: z.literal("1").optional() });
+
 export const settingsPatch = z.object({
   awardYear: z.number().int().min(2000).max(2100).optional(),
   defaultVotingStyle: z.enum(votingStyles).optional(),

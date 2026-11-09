@@ -173,5 +173,5 @@ export const authRoutes = new Hono()
     if (!user) {
       return c.body(null, 400);
     }
-    return c.json({ ...session, name: user.name }, 200);
+    return c.json({ ...session, name: user.name, admin: user.admin }, 200);
   });

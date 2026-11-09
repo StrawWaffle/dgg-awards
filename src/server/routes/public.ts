@@ -13,13 +13,16 @@ import {
 import { nowS } from "@/lib/util";
 import { effectiveStyle, withEffectiveStyles } from "@/lib/voting";
 import { categoriesWithMediaUrls, withMediaUrls } from "@/server/present";
+import { getCookie } from "hono/cookie";
+import { verifyAdminSession } from "@/lib/auth";
 import {
+  SESSION_COOKIE,
   type SessionEnv,
   rejectInvalid,
   requireSession,
   zValidator,
 } from "@/server/middleware";
-import { voteSubmit } from "@/server/schemas";
+import { resultsQuery, voteSubmit } from "@/server/schemas";
 
 /** 401 with no body unless voting is open right now. */
 const requireVotingOpen = createMiddleware(async (c, next) => {
@@ -94,9 +97,14 @@ export const publicRoutes = new Hono<SessionEnv>()
     },
   )
 
-  .get("/api/vote/results", async (c) => {
+  // Results are public once the site is in reviewing mode. Admins can see
+  // them any time with ?preview=1, to check the reveal before the stream.
+  .get("/api/vote/results", zValidator("query", resultsQuery, rejectInvalid), async (c) => {
     const config = await getConfig();
-    if (config.viewingMode !== "reviewing") {
+    const preview =
+      c.req.valid("query").preview === "1" &&
+      (await verifyAdminSession(getCookie(c, SESSION_COOKIE))) !== null;
+    if (config.viewingMode !== "reviewing" && !preview) {
       return c.body(null, 401);
     }
     return c.json(

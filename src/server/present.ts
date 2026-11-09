@@ -17,6 +17,13 @@ export function withMediaUrls<T extends WithMedia>(nominee: T) {
   };
 }
 
-export function categoriesWithMediaUrls<C extends { options: WithMedia[] }>(categories: C[]) {
-  return categories.map((c) => ({ ...c, options: c.options.map(withMediaUrls) }));
+type MediaUrls = { clipUrl: string | null; thumbnailUrl: string | null };
+
+export function categoriesWithMediaUrls<C extends { options: WithMedia[] }>(
+  categories: C[],
+): (Omit<C, "options"> & { options: (C["options"][number] & MediaUrls)[] })[] {
+  return categories.map((c) => ({
+    ...c,
+    options: c.options.map((o) => withMediaUrls(o as C["options"][number])),
+  }));
 }

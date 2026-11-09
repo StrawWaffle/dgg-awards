@@ -169,8 +169,9 @@ describe("sign-in", () => {
     expect(me.status).toBe(200);
     const body = await me.json();
     expect(body.name).toBe("Alice");
+    expect(body.admin).toBe(false);
     expect(Object.keys(body).sort()).toEqual(
-      ["agent", "createdAt", "expiresAt", "id", "ip", "name", "uid"].sort(),
+      ["admin", "agent", "createdAt", "expiresAt", "id", "ip", "name", "uid"].sort(),
     );
   });
 
@@ -464,6 +465,19 @@ describe("admin", () => {
   test("DGG profile lookup is admin-only and checks the name", async () => {
     expect((await req("/api/admin/dgg-profile/StrawWaffle", {}, user)).status).toBe(401);
     expect((await req("/api/admin/dgg-profile/bad%20name!", {}, admin)).status).toBe(400);
+  });
+
+  test("admins can preview results before the reveal; nobody else can", async () => {
+    // The site is in voting mode here.
+    expect((await req("/api/me", {}, admin)).ok).toBe(true);
+    expect((await (await req("/api/me", {}, admin)).json()).admin).toBe(true);
+    expect((await req("/api/vote/results?preview=1")).status).toBe(401);
+    expect((await req("/api/vote/results?preview=1", {}, user)).status).toBe(401);
+    expect((await req("/api/vote/results", {}, admin)).status).toBe(401);
+    const preview = await req("/api/vote/results?preview=1", {}, admin);
+    expect(preview.status).toBe(200);
+    expect(await preview.json()).toHaveLength(22);
+    expect((await req("/api/vote/results?preview=yes", {}, admin)).status).toBe(400);
   });
 
   test("make admin by uid", async () => {

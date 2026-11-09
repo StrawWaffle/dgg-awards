@@ -39,9 +39,14 @@ export function Admin() {
             </a>
             DGG AWARDS 2025 :: Admin
           </h1>
-          <div className="flex items-center gap-2 text-xs text-neutral-500">
-            <div className="h-2 w-2 rounded-full bg-emerald-500" />
-            {meQuery.data?.name || "noauth"}
+          <div className="flex items-center gap-4 text-sm">
+            <a className="text-emerald-800 underline" href="/?preview=voting" target="_blank" rel="noopener">
+              Preview voting
+            </a>
+            <a className="text-emerald-800 underline" href="/?preview=results" target="_blank" rel="noopener">
+              Preview results
+            </a>
+            <span className="text-xs text-neutral-500">{meQuery.data?.name || "noauth"}</span>
           </div>
         </header>
 

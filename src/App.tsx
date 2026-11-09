@@ -12,7 +12,7 @@ import { TopPosts } from "@/components/TopPosts";
 import { Sidebar } from "@/components/Sidebar";
 import { Status } from "@/components/Status";
 import { VoteSummary } from "@/components/VoteSummary";
-import { fetchConfig } from "@/lib/queries";
+import { fetchAuthSession, fetchConfig } from "@/lib/queries";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -27,9 +27,38 @@ export function App() {
     { queryKey: ["config"], queryFn: fetchConfig },
     queryClient,
   );
+  const me = useQuery(
+    { queryKey: ["me"], queryFn: fetchAuthSession, retry: false },
+    queryClient,
+  );
+
+  // Admins can open /?preview=voting or /?preview=results to see either
+  // page whatever mode the site is in. Everyone else gets the real mode.
+  const requested = new URLSearchParams(window.location.search).get("preview");
+  const preview =
+    me.data?.admin && (requested === "voting" || requested === "results")
+      ? requested
+      : null;
+  const viewingMode =
+    preview === "results"
+      ? "reviewing"
+      : preview === "voting"
+        ? "voting"
+        : config.data?.viewingMode;
 
   return (
     <QueryClientProvider client={queryClient}>
+      {preview && (
+        <div className="bg-black-1 text-white-1 sticky top-0 z-50 flex flex-wrap items-center justify-center gap-x-3 px-3 py-2 text-sm">
+          <span>
+            Admin preview of the {preview === "results" ? "results" : "voting"} page.
+            Visitors see the site in {config.data?.viewingMode ?? "?"} mode.
+          </span>
+          <a className="text-orange-1 underline" href="/">
+            Leave preview
+          </a>
+        </div>
+      )}
       <span className="absolute top-0" id="top" />
       <Sidebar />
       <AuthButton />
@@ -48,25 +77,25 @@ export function App() {
               Awards
             </a>
           </div>
-          {config.data?.viewingMode !== "reviewing" ? (
+          {viewingMode !== "reviewing" ? (
             <Status />
           ) : (
             <p className="text-orange-1 text-xl font-bold">
               Thanks for participating! View the results below!
             </p>
           )}
-          {config.data?.viewingMode === "locked" && (
+          {viewingMode === "locked" && (
             <p className="flex items-center gap-x-1">
               <LockClosedIcon /> This page has been locked by an admin.
             </p>
           )}
-          {config.data?.viewingMode === "idle" && (
+          {viewingMode === "idle" && (
             <p className="flex items-center gap-x-1">
               <LapTimerIcon />
               An admin set this page to read-only.
             </p>
           )}
-          {config.data?.viewingMode === "voting" && (
+          {viewingMode === "voting" && (
             <a
               href={"#nominees"}
               className="bg-black-1/50 mt-4 block cursor-pointer rounded p-1"
@@ -75,10 +104,10 @@ export function App() {
             </a>
           )}
         </div>
-        {config.data?.viewingMode === "reviewing" ? (
+        {viewingMode === "reviewing" ? (
 
           <div className="relative mx-auto">
-            <CategoriesWithResults />
+            <CategoriesWithResults preview={preview === "results"} />
             <TopPosts />
           </div>
         ) : (
