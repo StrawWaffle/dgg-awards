@@ -29,10 +29,33 @@ import { env } from "@/lib/util";
 const nonce = crypto.getRandomValues(new Uint8Array(64)).toHex();
 
 const mediaUrl = env("MEDIA_URL", "https://cdn.dgg.events/");
+
+const noIndex = "noindex, nofollow, noarchive, nosnippet, noimageindex, noai, noimageai";
+// Disallow everyone, and name the AI crawlers too, since some only obey
+// rules addressed to them.
+const aiCrawlers = [
+  "GPTBot", "ChatGPT-User", "OAI-SearchBot", "ClaudeBot", "Claude-User",
+  "Claude-SearchBot", "anthropic-ai", "Google-Extended", "GoogleOther",
+  "Applebot-Extended", "CCBot", "PerplexityBot", "Perplexity-User",
+  "Bytespider", "Amazonbot", "meta-externalagent", "FacebookBot",
+  "cohere-ai", "Diffbot", "ImagesiftBot", "Omgilibot", "Timpibot",
+  "YouBot", "MistralAI-User", "DuckAssistBot",
+];
+const robotsTxt = [
+  ...aiCrawlers.map((bot) => `User-agent: ${bot}\nDisallow: /\n`),
+  "User-agent: *\nDisallow: /\n",
+].join("\n");
 const server = serve({
   //@ts-ignore
   routes: {
     "/": index,
+    "/robots.txt": () =>
+      new Response(robotsTxt, {
+        headers: [
+          ["Content-Type", "text/plain; charset=utf-8"],
+          ["X-Robots-Tag", noIndex],
+        ],
+      }),
     "/admin": async (req) => {
       const session = await verifyAdminRequest(req);
       if (!session) {
@@ -145,7 +168,10 @@ const server = serve({
         const file = Bun.file(`${import.meta.dir}/media/${name}`);
         if (await file.exists()) {
           return new Response(file, {
-            headers: [["Cache-Control", "public, max-age=3600"]],
+            headers: [
+              ["Cache-Control", "public, max-age=3600"],
+              ["X-Robots-Tag", noIndex],
+            ],
           });
         }
       }
