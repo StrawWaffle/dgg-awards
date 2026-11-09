@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Section } from "@/admin/components/Section";
 import { PictureCropper } from "@/admin/components/editor/PictureCropper";
+import { ClipPreview } from "@/admin/components/editor/ClipPreview";
 import { HistoryList } from "@/admin/components/history/HistoryList";
 import { Button, ErrorText, Field, TimeInput, inputClass } from "@/admin/components/editor/fields";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -199,6 +200,8 @@ export function NomineeForm({ nominee, issues }: { nominee: AdminNominee; issues
               </select>
             </Field>
           </div>
+
+          <ClipPreview url={draft.url} type={type} start={draft.clipStart} end={draft.clipEnd} />
 
           {draft.url && type && draft.clipStart != null && (
             <p className="text-sm text-neutral-600">

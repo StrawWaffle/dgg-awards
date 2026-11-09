@@ -377,6 +377,18 @@ StrawWaffle saw what looked like being signed out after every deploy. Sessions w
 - The API tests now check the admin API instead of the old redirect (42 pass).
 - **Signing in returns you to where you were:** `/signin?next=/admin` (the admin page and the lab use it) keeps the path in a short-lived cookie and redirects there after destiny.gg. `safeNext()` in `routes/auth.ts` only allows paths on this site (`//…`, `https://…`, backslashes and control characters go to `/`), so it can't be used as an open redirect. Covered by an API test (43 now).
 
+### Clip preview in the editor (branch `worktree-clip-preview`, 2026-11-09, not deployed)
+
+rinlux asked to preview the window they pick before building, to check the timecodes. Under the clip start and end in the nominee editor (`ClipPreview.tsx`):
+- **"Preview the clip"** plays the source from the start to the end, using the times as typed, before saving. **"Check the ending"** plays the last 5 s, to check the cut.
+- It uses `embedUrl()` for YouTube (stops at the end) and Twitch VODs (start only, so it says to watch for the cut), and a media fragment for direct video files (stops at the end).
+- Twitch clips and Streamable are already cut, so the times don't apply to them.
+- Kick, X and Reddit can't be embedded: it says to build the clip and check that, as before. Channels, profiles and pages show nothing.
+- If the times change while it's open, it says so, and "Play the clip again" plays the new window.
+- Tested in the browser: YouTube 30–45 s and its ending 40–45 s, a Twitch VOD's ending at 45 s, the Kick note, and a video file in Firefox.
+
+**Next, waiting on rinlux's answers:** uploading clips they've already downloaded. The plan: pick a file, preview and trim it locally with the same fields, then send it to the server in chunks (the tunnel rejects single requests over 100 MB). The server converts it to the usual MP4, cuts it and stores it in R2. Asked: are their files already cut, and how big are they and in what format?
+
 ### Next: the lab page (StrawWaffle's answers, 2026-11-09)
 
 StrawWaffle wants the front page and the presentation to feel fun, quirky and wholesome. It gets built on an experimental page first (`/lab`, admins only) until rinlux approves. Order: the follow-ups above, merge and deploy, then the lab.
