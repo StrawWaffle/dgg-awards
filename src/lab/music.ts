@@ -23,14 +23,31 @@ export type Source = "live" | "map";
 
 const SILENT: Levels = { bass: 0, mid: 0, high: 0, beat: false, downbeat: false, time: 0 };
 const PREFS_KEY = "lab.music";
-const DEFAULT_VOLUME = 0.25;
+/**
+ * `volume` is the slider's position, 0 to 1, as loudness is heard. Ears hear
+ * gain roughly logarithmically, so a linear slider does everything in its
+ * first quarter. Cubing the position spreads it out: halfway is −18 dB and
+ * 10% is −60 dB (powers of 3 to 4 are the usual choice).
+ */
+const CURVE = 3;
+export const gainOf = (volume: number) => volume ** CURVE;
 
-type Prefs = { volume: number; muted: boolean; off: boolean };
+/** Where the slider starts: a quarter of full gain, as before the curve. */
+const DEFAULT_VOLUME = Math.cbrt(0.25);
+
+type Prefs = { volume: number; muted: boolean; off: boolean; curve?: number };
 function loadPrefs(): Prefs {
+  const fresh: Prefs = { volume: DEFAULT_VOLUME, muted: false, off: false, curve: CURVE };
   try {
-    return { volume: DEFAULT_VOLUME, muted: false, off: false, ...JSON.parse(localStorage.getItem(PREFS_KEY) ?? "{}") };
+    const saved = JSON.parse(localStorage.getItem(PREFS_KEY) ?? "null");
+    if (!saved) return fresh;
+    // Saved under another curve (none meant `volume` was the gain itself):
+    // move the slider so the music stays as loud.
+    const was = typeof saved.curve === "number" ? saved.curve : 1;
+    if (was !== CURVE && typeof saved.volume === "number") saved.volume = saved.volume ** (was / CURVE);
+    return { ...fresh, ...saved, curve: CURVE };
   } catch {
-    return { volume: DEFAULT_VOLUME, muted: false, off: false };
+    return fresh;
   }
 }
 
@@ -102,7 +119,7 @@ class Music {
 
   private applyVolume(glide = 0.05) {
     if (!this.gain || !this.ctx) return;
-    const target = this.prefs.muted ? 0 : this.prefs.volume * (this.ducked ? 0.2 : 1);
+    const target = this.prefs.muted ? 0 : gainOf(this.prefs.volume) * (this.ducked ? 0.2 : 1);
     this.gain.gain.setTargetAtTime(target, this.ctx.currentTime, glide / 3);
   }
 
