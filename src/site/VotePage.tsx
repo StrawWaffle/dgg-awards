@@ -38,8 +38,8 @@ const when = (ms: number) =>
  * a cast, Skip on a skip, a cheer at the end.
  *
  * Voting happens only while it's open (Settings: voting mode and dates) and
- * signed in. Admins can always go through it as a preview: nothing is saved
- * (`?preview=voting` forces that even while voting is open).
+ * signed in. Admins can go through it as a preview with `?preview=voting`
+ * (nothing is saved); without it they see what visitors see.
  */
 export function VotePage({ me, config, onHome }: { me: Me | undefined; config: SiteConfig | null; onHome: (e: React.MouseEvent) => void }) {
   const admin = !!me?.admin;
@@ -48,7 +48,7 @@ export function VotePage({ me, config, onHome }: { me: Me | undefined; config: S
   const end = seconds(config?.endTime);
   // As the server decides it: voting mode, and between both dates.
   const open = config?.viewingMode === "voting" && !!start && !!end && now >= start && now <= end;
-  const preview = admin && (!open || new URLSearchParams(location.search).get("preview") === "voting");
+  const preview = admin && new URLSearchParams(location.search).get("preview") === "voting";
 
   const [awards, setAwards] = useState<Award[] | null | "locked">(null);
   const [voted, setVoted] = useState<Record<string, string[]>>({});

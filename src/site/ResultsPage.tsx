@@ -7,12 +7,15 @@ type Tally = { voters: number; ballots: number; days: { day: string; voters: num
 
 /**
  * This year's results, to read through after the show: public once the site
- * is in reviewing mode. Admins can preview them any time, with real votes or
- * simulated ones (made up in the browser, never saved) while there are none.
+ * is in reviewing mode. Admins can preview them any time with `?preview=1`
+ * (or `/vote?preview=results`), with real votes or simulated ones (made up in
+ * the browser, never saved); without it they see what visitors see.
  * With them, the tally: how many voted, and per day (counts only).
  */
 export function ResultsPage({ me, config, onHome }: { me: Me | undefined; config: SiteConfig | null; onHome: (e: React.MouseEvent) => void }) {
-  const admin = !!me?.admin;
+  const params = new URLSearchParams(location.search);
+  const asked = params.get("preview") === "1" || params.get("preview") === "results";
+  const admin = !!me?.admin && asked;
   const published = config?.viewingMode === "reviewing";
   const [tally, setTally] = useState<Tally | null>(null);
   const [simulated, setSimulated] = useState<boolean | null>(null);

@@ -18,6 +18,10 @@ import type {
   DggOauthTokenResponse,
 } from "@/lib/types";
 import { SESSION_COOKIE, requireSession } from "@/server/middleware";
+import { type DggProfile, fetchDggProfile } from "@/server/dgg-profile";
+
+/** Signed-in people's own destiny.gg profiles, kept 10 minutes. */
+const profiles = new Map<string, { at: number; profile: DggProfile | null }>();
 
 const client_id = env("DGG_CLIENT_ID");
 const client_secret = env("DGG_CLIENT_SECRET");
@@ -194,4 +198,24 @@ export const authRoutes = new Hono()
       return c.body(null, 400);
     }
     return c.json({ ...session, name: user.name, admin: user.admin }, 200);
+  })
+
+  /**
+   * Your own destiny.gg profile (the public profile page: picture, subscriber
+   * tier, team, member since), for the site's header. Null if destiny.gg has
+   * none or can't be reached.
+   */
+  .get("/api/me/profile", requireSession, async (c) => {
+    const user = await getUser(c.get("session").uid);
+    if (!user) return c.body(null, 400);
+    const cached = profiles.get(user.name);
+    if (cached && Date.now() - cached.at < 10 * 60_000) return c.json({ profile: cached.profile }, 200);
+    let profile: DggProfile | null = null;
+    try {
+      profile = await fetchDggProfile(user.name);
+    } catch (error) {
+      console.error("destiny.gg profile:", (error as Error).message);
+    }
+    profiles.set(user.name, { at: Date.now(), profile });
+    return c.json({ profile }, 200);
   });

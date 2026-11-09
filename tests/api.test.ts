@@ -185,6 +185,10 @@ describe("sign-in", () => {
     );
   });
 
+  test("your own destiny.gg profile is only for you, signed in", async () => {
+    expect((await req("/api/me/profile")).status).toBe(401);
+  });
+
   test("tampered session is rejected", async () => {
     const jar = await signIn("Mallory");
     const [msg] = decodeURIComponent(jar.get("session")!).split(".");

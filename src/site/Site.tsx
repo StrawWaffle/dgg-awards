@@ -7,6 +7,7 @@ import { Summary, loadArchive2025 } from "@/lab/Summary";
 import { Countdown } from "@/site/Countdown";
 import { LabPage, type LabView, labViews } from "@/site/LabPage";
 import { ResultsPage } from "@/site/ResultsPage";
+import { UserMenu } from "@/site/UserMenu";
 import { VotePage } from "@/site/VotePage";
 
 /** The settings the public pages read (`/api/config`). */
@@ -111,12 +112,13 @@ export function Site() {
 
   const admin = !!me?.admin;
   const mode = config?.viewingMode;
-  // Tabs: Vote while voting (and for admins to preview), Results once
-  // they're out (and for admins), the lab for admins.
+  // Tabs as visitors see them: Vote while voting, Results once they're out
+  // (and the page being previewed, for an admin on a ?preview address), and
+  // the lab for admins.
   const tabs: { page: Page; label: string }[] = [
     { page: "home", label: "Home" },
-    ...(admin || mode === "voting" ? [{ page: "vote" as Page, label: "Vote" }] : []),
-    ...(admin || mode === "reviewing" ? [{ page: "results" as Page, label: "Results" }] : []),
+    ...(mode === "voting" || page === "vote" ? [{ page: "vote" as Page, label: "Vote" }] : []),
+    ...(mode === "reviewing" || page === "results" ? [{ page: "results" as Page, label: "Results" }] : []),
     { page: "2025", label: "2025 results" },
     ...(admin ? [{ page: "lab" as Page, label: "Lab" }] : []),
   ];
@@ -208,6 +210,7 @@ export function Site() {
               </button>
             )}
             <HeaderTools />
+            <UserMenu me={me} />
           </div>
         </div>
         {/* The lab's own tabs: its experiments. */}
