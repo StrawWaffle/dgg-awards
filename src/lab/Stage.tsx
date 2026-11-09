@@ -20,8 +20,10 @@ type Npc = {
   /** A small bounce on each beat, apart from the hop on the one. */
   bob: number;
   opacity: number;
-  /** Walking in from an edge; doesn't turn round until it's on stage. */
+  /** Walking in from an edge to `targetX`, then wandering. */
   entering: boolean;
+  targetX: number;
+  bornAt: number;
   /** Walking off; removed once it's off stage or faded out. */
   leaving: boolean;
   lastSeen: number;
@@ -31,8 +33,16 @@ type Npc = {
   restore: string;
 };
 
-/** One line in the chat column. */
-type Line = { id: number; nick: string; flair: string | null; emote?: string; text?: string };
+/** One line in the chat column: someone's emote, a verified message, or a combo. */
+type Line =
+  | { id: number; kind: "emote"; nick: string; flair: string | null; emote: string }
+  | { id: number; kind: "said"; nick: string; flair: string | null; text: string }
+  | { id: number; kind: "combo"; emote: string; count: number };
+
+/** A character stays at least this long before it can be sent off to make room. */
+const MIN_STAY_MS = 12_000;
+/** New characters a second, at most: the cast changes gradually, not in a churn. */
+const ARRIVALS_PER_SECOND = 2;
 
 function setEmote(npc: Npc, emote: string) {
   if (npc.emote === emote) return;
@@ -60,7 +70,6 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
   const [showSaid, setShowSaid] = useState(true);
   const [status, setStatus] = useState<FeedStatus>({ connected: false, note: "" });
   const [stats, setStats] = useState({ fps: 0, npcs: 0, perSecond: 0, emoteOnly: 0, ingestMs: 0 });
-  const [combo, setCombo] = useState<{ emote: string; count: number } | null>(null);
   const [winner, setWinner] = useState<string | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -95,6 +104,10 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
   const fps = useRef({ frames: 0, since: performance.now(), value: 0 });
   const clapUntil = useRef(0);
   const lineId = useRef(0);
+  /** Arrival allowance, refilled over time (a token bucket). */
+  const arrivals = useRef({ tokens: 4, at: performance.now() });
+  /** The chat line of the combo still running, to count it up in place. */
+  const liveCombo = useRef<{ id: number; emote: string } | null>(null);
 
   const spawn = useCallback((nick: string, emote: string, flair: string | null) => {
     const box = floor.current!;
@@ -113,6 +126,7 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
     el.style.opacity = "0";
     // In from the left or the right edge, walking onto the stage.
     const fromLeft = Math.random() < 0.5;
+    const width = box.clientWidth;
     const npc: Npc = {
       el,
       emoteEl,
@@ -121,7 +135,9 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
       emote,
       x: fromLeft ? -50 : box.clientWidth + 10,
       depth: Math.random(),
-      vx: (fromLeft ? 1 : -1) * (45 + Math.random() * 35),
+      vx: (fromLeft ? 1 : -1) * (70 + Math.random() * 40),
+      targetX: 40 + Math.random() * Math.max(40, width - 120),
+      bornAt: performance.now(),
       hop: 0,
       bob: 0,
       opacity: 0,
@@ -154,15 +170,25 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
       setStatus(feedStatus);
       const now = performance.now();
       const all = npcs.current;
+      const bucket = arrivals.current;
+      bucket.tokens = Math.min(4, bucket.tokens + ((now - bucket.at) / 1000) * ARRIVALS_PER_SECOND);
+      bucket.at = now;
       for (const event of summary.events) {
         let npc = all.get(event.nick);
         if (!npc) {
+          // Arrivals are paced, and nobody is sent off before they've had
+          // their moment; if neither allows it, this chatter isn't shown.
+          if (bucket.tokens < 1) continue;
           if (all.size >= settings.current.max) {
-            // Make room: whoever has been quiet longest walks off.
             let oldest: Npc | null = null;
-            for (const n of all.values()) if (!oldest || n.lastSeen < oldest.lastSeen) oldest = n;
-            if (oldest) leave(oldest);
+            for (const n of all.values()) {
+              if (n.entering || now - n.bornAt < MIN_STAY_MS) continue;
+              if (!oldest || n.lastSeen < oldest.lastSeen) oldest = n;
+            }
+            if (!oldest) continue;
+            leave(oldest);
           }
+          bucket.tokens -= 1;
           npc = spawn(event.nick, event.emote, event.flair);
           if (clapUntil.current > now) npc.clapUntil = clapUntil.current;
         }
@@ -183,14 +209,37 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
       // The chat column: a few of this window's characters, and what verified
       // people said, newest at the bottom.
       const added: Line[] = [
-        ...summary.events.slice(0, 6).map((e) => ({ id: lineId.current++, nick: e.nick, flair: e.flair, emote: e.emote })),
-        ...said.map((s) => ({ id: lineId.current++, nick: s.nick, flair: s.flair, text: s.text })),
+        ...summary.events
+          .slice(0, 2)
+          .map((e) => ({ id: lineId.current++, kind: "emote" as const, nick: e.nick, flair: e.flair, emote: e.emote })),
+        ...said.map((s) => ({ id: lineId.current++, kind: "said" as const, nick: s.nick, flair: s.flair, text: s.text })),
       ];
-      if (added.length > 0) setLines((l) => [...l, ...added].slice(-40));
+      // Combos as their own lines, as chat shows them: one that's still going
+      // counts up in place; one that ended in between gets its final count.
+      const counts = new Map<number, number>();
+      for (const e of summary.ended) {
+        if (liveCombo.current?.emote === e.emote) {
+          counts.set(liveCombo.current.id, e.count);
+          liveCombo.current = null;
+        } else added.push({ id: lineId.current++, kind: "combo", emote: e.emote, count: e.count });
+      }
+      if (summary.combo) {
+        if (liveCombo.current?.emote === summary.combo.emote) counts.set(liveCombo.current.id, summary.combo.count);
+        else {
+          const id = lineId.current++;
+          liveCombo.current = { id, emote: summary.combo.emote };
+          added.push({ id, kind: "combo", emote: summary.combo.emote, count: summary.combo.count });
+        }
+      } else liveCombo.current = null;
+      if (added.length > 0 || counts.size > 0) {
+        setLines((l) =>
+          [...l.map((line) => (line.kind === "combo" && counts.has(line.id) ? { ...line, count: counts.get(line.id)! } : line)), ...added].slice(-60),
+        );
+      }
+      // Everyone on the combo's emote jumps with it.
       if (summary.combo && summary.combo.count >= 3) {
-        setCombo(summary.combo);
-        for (const n of all.values()) if (n.emote === summary.combo.emote) n.hop = 1.4;
-      } else setCombo(null);
+        for (const n of all.values()) if (n.emote === summary.combo.emote && !n.entering) n.hop = 1.4;
+      }
       // Characters walk off after a minute of silence.
       for (const n of [...all.values()]) if (now - n.lastSeen > 60_000) leave(n);
       setStats((s) => ({
@@ -248,10 +297,10 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
       }
       n.x += n.vx * dt;
       if (n.entering) {
-        // Stroll in, then slow to a wander once on stage.
-        if (n.x >= 0 && n.x <= width - 40) {
+        // Walk to their spot, then slow to a wander.
+        if ((n.vx > 0 && n.x >= n.targetX) || (n.vx < 0 && n.x <= n.targetX)) {
           n.entering = false;
-          n.vx = Math.sign(n.vx) * (15 + Math.random() * 35);
+          n.vx = (Math.random() < 0.5 ? -1 : 1) * (8 + Math.random() * 22);
         }
       } else if (!n.leaving && (n.x < 0 || n.x > width - 40)) {
         n.vx = -n.vx;
@@ -419,25 +468,29 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
           <span className={`cozy-chip ${status.connected ? "green" : ""}`}>{status.connected ? "connected" : "waiting"}</span>
         </div>
         <div ref={chat} className="flex-1 space-y-1 overflow-y-auto px-3 py-2 text-sm">
-          {lines.map((l) => (
-            <div
-              key={l.id}
-              className="rounded-lg px-1.5 py-0.5"
-              style={l.text ? { background: "var(--highlight)", borderLeft: "3px solid var(--primary-shadow)" } : undefined}
-            >
-              <span className={nickClass(l.flair)}>{l.nick}</span>:{" "}
-              {l.emote ? <Emote name={l.emote} size={0.85} /> : <span className="font-semibold">{l.text}</span>}
-            </div>
-          ))}
-        </div>
-        <div className="h-12 border-t-2 px-4 py-2" style={{ borderColor: "var(--panel-border)" }}>
-          {combo && (
-            <div key={combo.count} className="lab-combo flex items-center gap-2 text-xl font-black italic">
-              <Emote name={combo.emote} size={0.9} title="" />
-              <span className="text-sm not-italic">{combo.count}×</span> COMBO
-            </div>
+          {lines.map((l) =>
+            l.kind === "combo" ? (
+              // As chat shows a combo: the emote, the count, and HITS or, from 5, C-C-C-COMBO.
+              <div key={l.id} className="flex items-center gap-2 px-1.5 py-1">
+                <Emote name={l.emote} size={0.95} />
+                <span className="text-sm font-black">{l.count}×</span>
+                <span key={l.count} className="lab-combo text-lg font-black italic">
+                  {l.count >= 5 ? "C-C-C-COMBO" : "HITS"}
+                </span>
+              </div>
+            ) : (
+              <div
+                key={l.id}
+                className="rounded-lg px-1.5 py-0.5"
+                style={l.kind === "said" ? { background: "var(--highlight)", borderLeft: "3px solid var(--primary-shadow)" } : undefined}
+              >
+                <span className={nickClass(l.flair)}>{l.nick}</span>:{" "}
+                {l.kind === "emote" ? <Emote name={l.emote} size={0.85} /> : <span className="font-semibold">{l.text}</span>}
+              </div>
+            ),
           )}
         </div>
+
       </aside>
     </div>
   );

@@ -64,7 +64,11 @@ describe("chat aggregator", () => {
     agg.ingest(msg("d", "Klappa"));
     expect(agg.flush().combo).toEqual({ emote: "Klappa", count: 4 });
     agg.ingest(msg("e", "Klappa YEE"));
-    expect(agg.flush().combo).toBeNull();
+    const broken = agg.flush();
+    expect(broken.combo).toBeNull();
+    // The combo that ended is reported, so a short one isn't lost between windows.
+    expect(broken.ended).toEqual([{ emote: "Klappa", count: 4 }]);
+    expect(agg.flush().ended).toEqual([]);
   });
 
   test("a flood stays cheap and the summary stays small", () => {

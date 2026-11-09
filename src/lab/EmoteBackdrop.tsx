@@ -60,7 +60,8 @@ function scatter(width: number, height: number): Leaf[] {
 /**
  * Faint emote silhouettes drifting behind the page like leaves on a breeze:
  * each floats slowly right and up, swaying and turning, and comes back round
- * when it leaves the window. They sway a little more with the music's bass.
+ * when it leaves the window. The music blows through them: each beat nudges
+ * them all the same way, the first beat of each bar harder.
  * Still for people who ask for less motion.
  */
 export function EmoteBackdrop() {
@@ -82,22 +83,42 @@ export function EmoteBackdrop() {
     return () => removeEventListener("resize", update);
   }, []);
 
-  const place = (el: HTMLSpanElement, l: Leaf, sway: number) => {
-    const swayX = Math.sin(time.current * 0.6 + l.phase) * 18 * sway;
-    const swayRot = Math.sin(time.current * 0.8 + l.phase) * 10 * sway;
-    el.style.transform = `translate3d(${l.x + swayX}px, ${l.y}px, 0) rotate(${l.rot + swayRot}deg) scale(${l.size})`;
+  /** The gust: one push shared by every leaf, in screen directions. */
+  const gust = useRef({ x: 0, y: 0, vx: 0, vy: 0 });
+
+  const place = (el: HTMLSpanElement, l: Leaf) => {
+    // Each leaf's own gentle sway, then the shared gust, both in screen space:
+    // the translate comes first, so neither follows the leaf's own turn.
+    const swayX = Math.sin(time.current * 0.6 + l.phase) * 14;
+    const swayRot = Math.sin(time.current * 0.8 + l.phase) * 8;
+    const g = gust.current;
+    el.style.transform = `translate3d(${l.x + swayX + g.x}px, ${l.y + g.y}px, 0) rotate(${l.rot + swayRot}deg) scale(${l.size})`;
   };
 
   const onFrame = useCallback((levels: Record<Source, Levels>, dt: number) => {
     const list = state.current;
     if (list.length === 0) return;
     if (still.current) {
-      list.forEach((l, i) => els.current[i] && place(els.current[i]!, l, 0));
+      list.forEach((l, i) => els.current[i] && place(els.current[i]!, l));
       return;
     }
     time.current += dt;
-    // A touch more sway when the bass is up; never more than half again.
-    const sway = 1 + Math.min(0.5, levels.map.bass * 0.5);
+    // The music as a breeze: every beat nudges all the leaves the same way
+    // (right and a little up), the one of each bar harder; a spring brings
+    // them back.
+    const music = levels.map;
+    const g = gust.current;
+    if (music.downbeat) {
+      g.vx += 70;
+      g.vy -= 30;
+    } else if (music.beat) {
+      g.vx += 25;
+      g.vy -= 10;
+    }
+    g.vx += (-g.x * 18 - g.vx * 5) * dt;
+    g.vy += (-g.y * 18 - g.vy * 5) * dt;
+    g.x += g.vx * dt;
+    g.y += g.vy * dt;
     const w = innerWidth + MARGIN;
     const h = innerHeight + MARGIN;
     list.forEach((l, i) => {
@@ -108,7 +129,7 @@ export function EmoteBackdrop() {
       if (l.x > w) l.x -= w + MARGIN;
       if (l.y < -MARGIN) l.y += h + MARGIN;
       const el = els.current[i];
-      if (el) place(el, l, sway);
+      if (el) place(el, l);
     });
   }, []);
   useFrame(onFrame);

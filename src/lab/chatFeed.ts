@@ -18,7 +18,7 @@ export function liveFeed(onSummary: OnSummary) {
   };
   socket.onclose = () =>
     onSummary(
-      { at: Date.now(), messages: 0, emoteOnly: 0, events: [], top: [], combo: null, said: [] },
+      { at: Date.now(), messages: 0, emoteOnly: 0, events: [], top: [], combo: null, ended: [], said: [] },
       { connected: false, note: "Disconnected from the relay (admins only; reload to retry)" },
     );
   return () => socket.close();
@@ -47,16 +47,19 @@ export function simulatedFeed(emotes: string[], rate: () => number, emoteShare: 
     carry += rate() / 4;
     const count = Math.floor(carry);
     carry -= count;
-    if (comboLeft <= 0 && Math.random() < 0.05) {
+    if (comboLeft <= 0 && Math.random() < 0.08) {
       comboEmote = pick(pool);
-      comboLeft = 10 + Math.floor(Math.random() * Math.max(20, count));
+      comboLeft = 3 + Math.floor(Math.random() * 25);
     }
     const started = performance.now();
+    // A combo is a run of back-to-back messages of the one emote, as in chat;
+    // it continues into the next window until it's used up.
+    const run = Math.min(comboLeft, count);
     for (let i = 0; i < count; i++) {
       const nick = `chatter${Math.floor(Math.random() * 4000)}`;
       let text: string;
       let features: string[] = [];
-      if (comboLeft > 0 && Math.random() < 0.6) {
+      if (i < run) {
         text = comboEmote!;
         comboLeft--;
       } else if (Math.random() < emoteShare()) {

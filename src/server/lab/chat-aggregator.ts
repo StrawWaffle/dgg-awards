@@ -27,6 +27,8 @@ export type ChatSummary = {
   top: [emote: string, count: number][];
   /** A run of messages that were all the same single emote, as chat counts combos. */
   combo: { emote: string; count: number } | null;
+  /** Combos of 2 or more that ended during the window (they'd be missed otherwise). */
+  ended: { emote: string; count: number }[];
   said: ChatSaid[];
 };
 
@@ -45,6 +47,7 @@ export class ChatAggregator {
   private counts = new Map<string, number>();
   private said: ChatSaid[] = [];
   private combo: { emote: string; count: number } | null = null;
+  private ended: { emote: string; count: number }[] = [];
   private readonly verified: Set<string>;
 
   constructor(
@@ -90,11 +93,10 @@ export class ChatAggregator {
     const flair = SHOWN_FLAIRS.find((f) => features.includes(f)) ?? null;
 
     // Combos: consecutive messages that are exactly one emote, the same one.
-    if (allEmotes && words.length === 1 && last) {
-      this.combo = this.combo?.emote === last ? { emote: last, count: this.combo.count + 1 } : { emote: last, count: 1 };
-    } else {
-      this.combo = null;
-    }
+    const continues = allEmotes && words.length === 1 && last !== null && this.combo?.emote === last;
+    if (!continues && this.combo && this.combo.count >= 2 && this.ended.length < 10) this.ended.push(this.combo);
+    if (continues) this.combo = { emote: last!, count: this.combo!.count + 1 };
+    else this.combo = allEmotes && words.length === 1 && last ? { emote: last, count: 1 } : null;
 
     if (allEmotes && last) {
       this.emoteOnly++;
@@ -122,8 +124,10 @@ export class ChatAggregator {
       events: this.sample,
       top: [...this.counts].sort((a, b) => b[1] - a[1]).slice(0, 8),
       combo: this.combo && this.combo.count >= 2 ? this.combo : null,
+      ended: this.ended,
       said: this.said,
     };
+    this.ended = [];
     this.messages = 0;
     this.emoteOnly = 0;
     this.sample = [];
