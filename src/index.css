@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+@theme {
+  --color-blue-1: #0090ff;
+  --color-blue-2: #0c1d40;
+  --color-blue-2-light: #15326c;
+  --color-white-1: #edeef0;
+  --color-black-1: #111113;
+  --color-orange-1: #f3b122;
+}
+
+@keyframes sizepulse {
+  0% {
+    transform: scale(100%);
+  }
+  50% {
+    transform: scale(105%);
+  }
+  100% {
+    transform: scale(100%);
+  }
+}
+
