@@ -244,6 +244,7 @@ StrawWaffle's notes after trying the lab:
   - Voting cards with a built clip get a "▶ Clip" button over the picture (a separate button, not nested in the card), which opens it in a dialog.
   - The big screen has "Play a clip", which shows a random built clip on the stage with the characters in front. It closes itself after the clip ends.
 - **Checked:** clips play in Firefox. Plain Chromium (the test browser) has no H.264 (error 4), unlike real Chrome and Edge.
+- **Drifting silhouettes.** The backdrop emotes float slowly right and up like leaves on a breeze, swaying and turning, and wrap round at the edges. They sway up to half again more with the bass, and stay still for reduced motion. Also fixed: they were bunched on the right, because the `.emote` base rule (`position: relative`, later in the file) overrode their `position: absolute`. Measured: evenly spread across the window, and 38 of 40 moved within 3 s.
 
 ### Next: the lab page (StrawWaffle's answers, 2026-11-09)
 
