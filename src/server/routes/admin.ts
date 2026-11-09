@@ -50,13 +50,15 @@ import {
   clipProblem,
   enqueueClip,
   enqueueUpload,
+  enqueueLibrary,
   thumbnailFromClip,
   thumbnailFromUpload,
   clearThumbnail,
 } from "@/server/clips";
 import { DGG_NAME, fetchDggProfile } from "@/server/dgg-profile";
 import { categoriesWithMediaUrls } from "@/server/present";
-import { storage } from "@/server/storage";
+import { serveFile, storage } from "@/server/storage";
+import { libraryFile, listLibrary } from "@/server/library";
 import { type SessionEnv, rejectInvalid, requireAdmin, zValidator } from "@/server/middleware";
 import {
   categoryCreate,
@@ -76,6 +78,8 @@ import {
   thumbnailAt,
   thumbnailUpload,
   clipUpload,
+  clipFromLibrary,
+  libraryFileQuery,
   historyQuery,
   undoBody,
   userAdminBody,
@@ -344,6 +348,30 @@ export const adminRoutes = new Hono<SessionEnv>()
     if (!(await getNominee(categoryId, id))) return c.body(null, 404);
     try {
       await enqueueUpload(categoryId, id, file, start ?? null, end ?? null);
+    } catch (error) {
+      if (error instanceof UserError) return c.text(error.message, 400);
+      throw error;
+    }
+    return c.json({ clipStatus: "pending" as const }, 202);
+  })
+  // The video library (admins only): what's in it, a file to watch while
+  // marking, and a clip cut from one.
+  .get("/library", async (c) => c.json(await listLibrary(), 200))
+  .get("/library/file", zValidator("query", libraryFileQuery, rejectInvalid), async (c) => {
+    const file = await libraryFile(c.req.valid("query").path);
+    if (!file) return c.body(null, 404);
+    const res = await serveFile(Bun.file(file), c.req.header("Range") ?? null);
+    // Private: never kept by Cloudflare or shared caches.
+    res.headers.set("Cache-Control", "private, max-age=3600");
+    return res;
+  })
+  .post("/clip/library", zValidator("json", clipFromLibrary, rejectInvalid), async (c) => {
+    const { categoryId, id, path, start, end } = c.req.valid("json");
+    if (!(await getNominee(categoryId, id))) return c.body(null, 404);
+    const file = await libraryFile(path);
+    if (!file) return c.text("That file isn't in the library.", 404);
+    try {
+      await enqueueLibrary(categoryId, id, file, start ?? null, end ?? null);
     } catch (error) {
       if (error instanceof UserError) return c.text(error.message, 400);
       throw error;

@@ -1124,6 +1124,50 @@ describe("admin", () => {
     60_000,
   );
 
+  test(
+    "clips: cut from a video in the library, which keeps it",
+    async () => {
+      const json = (body: unknown) => ({
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const items = await (await req("/api/admin/library", {}, admin)).json();
+      const item = items.find((i: any) => i.path === "Ally of the Year/sample.mp4");
+      expect(item).toEqual({ path: "Ally of the Year/sample.mp4", folder: "Ally of the Year", name: "sample.mp4", kind: "video", size: expect.any(Number) });
+      expect((await req("/api/admin/library", {}, user)).status).toBe(401);
+
+      // Watched while marking: with byte ranges, never cached publicly.
+      const url = `/api/admin/library/file?path=${encodeURIComponent(item.path)}`;
+      const part = await req(url, { headers: { Range: "bytes=0-99" } }, admin);
+      expect(part.status).toBe(206);
+      expect(part.headers.get("cache-control")).toBe("private, max-age=3600");
+      expect((await req(url, {}, user)).status).toBe(401);
+      for (const evil of ["../sqlite.db", "/data/sqlite.db", "Ally of the Year/../../sqlite.db"]) {
+        expect((await req(`/api/admin/library/file?path=${encodeURIComponent(evil)}`, {}, admin)).status).toBe(404);
+      }
+
+      const started = await req("/api/admin/clip/library", json({ categoryId: "ally", id: "adam_mockler", path: item.path, start: 1, end: 3 }), admin);
+      expect(started.status).toBe(202);
+      expect((await req("/api/admin/clip/library", json({ categoryId: "ally", id: "adam_mockler", path: "nope.mp4" }), admin)).status).toBe(404);
+      let n: any;
+      for (let i = 0; i < 120; i++) {
+        n = (await (await req("/api/admin/nominees", {}, admin)).json())
+          .find((c: any) => c.id === "ally")
+          .options.find((o: any) => o.id === "adam_mockler");
+        if (n.clipStatus === "ready" || n.clipStatus === "failed") break;
+        await Bun.sleep(500);
+      }
+      expect(n.clipError).toBeNull();
+      expect(n.clipStatus).toBe("ready");
+      expect(n.thumbnailAt).toBe(0); // a third of 2 s
+      // The library file is still there.
+      const after = await (await req("/api/admin/library", {}, admin)).json();
+      expect(after.some((i: any) => i.path === item.path)).toBe(true);
+    },
+    60_000,
+  );
+
   test("locked mode hides nominees", async () => {
     await setMode(admin, "locked");
     const res = await req("/api/nominees");

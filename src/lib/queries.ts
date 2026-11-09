@@ -210,6 +210,19 @@ export async function buildClip(categoryId: string, id: string) {
   await ok(await client.api.admin.clip.$post({ json: { categoryId, id } }), "Couldn't start the clip");
 }
 
+/** The video library on the server. */
+export async function fetchLibrary() {
+  return parseResponse(client.api.admin.library.$get());
+}
+export type LibraryItem = Awaited<ReturnType<typeof fetchLibrary>>[number];
+
+export async function clipFromLibrary(categoryId: string, id: string, path: string, start: number | null, end: number | null) {
+  await ok(
+    await client.api.admin.clip.library.$post({ json: { categoryId, id, path, start, end } }),
+    "Couldn't make the clip",
+  );
+}
+
 export async function pickThumbnail(categoryId: string, id: string, at: number) {
   await ok(
     await client.api.admin.thumbnail.$post({ json: { categoryId, id, at } }),

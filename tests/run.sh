@@ -13,6 +13,9 @@ shift
 here=$(cd "$(dirname "$0")/.." && (pwd -W 2>/dev/null || pwd))
 export MSYS_NO_PATHCONV=1
 "$(dirname "$0")/reset.sh" "$app"
+# The library test needs a video in the app's library.
+docker exec "$app" mkdir -p "/data/library/Ally of the Year"
+docker cp "$(dirname "$0")/fixtures/sample.mp4" "$app:/data/library/Ally of the Year/sample.mp4" >/dev/null
 docker run --rm --network dgga-test -v "$here:/w" -w /w \
   -e BASE_URL="http://$app:3000" -e MOCK_URL=http://dgga-mock:8789 \
   oven/bun:1.4 bun test tests/api.test.ts "$@"

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, ErrorText } from "@/admin/components/editor/fields";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Button, ErrorText, inputClass } from "@/admin/components/editor/fields";
 import { formatTimestamp } from "@/lib/links";
+import { type LibraryItem, clipFromLibrary, fetchLibrary } from "@/lib/queries";
 
 /** Matches the server's limit (the tunnel refuses requests over 100 MB). */
 const MAX_BYTES = 95 * 1024 * 1024;
@@ -11,11 +13,16 @@ const ENDING = 5;
 /** Seconds to "m:ss.s", for marks that fall between whole seconds. */
 const stamp = (s: number) => `${formatTimestamp(Math.floor(s))}${s % 1 >= 0.05 ? `.${Math.floor((s % 1) * 10)}` : ""}`;
 
+/** Folder names and award titles compared loosely ("DANKMEMES of the Year"). */
+const simple = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
 /**
- * Make the clip from a video file you already have: pick it, watch it here
- * (it plays from your computer, nothing is sent yet), mark where the clip
- * starts and ends, check the cut, then upload. The server cuts and converts
- * it like a built clip. Without marks, the whole video is used.
+ * Make the clip from a video you already have: one from the library on the
+ * server (the award's own folder first), or a file from your computer. Watch
+ * it here (a computer file plays locally, nothing is sent yet), mark where
+ * the clip starts and ends, check the cut, then make the clip. The server
+ * cuts and converts it like a built clip. Without marks, the whole video is
+ * used. Library files stay in the library.
  */
 export function ClipUpload({
   categoryId,
@@ -30,6 +37,12 @@ export function ClipUpload({
   onStarted: () => void;
 }) {
   const [file, setFile] = useState<File | null>(null);
+  const [libraryPath, setLibraryPath] = useState<string | null>(null);
+  const library = useQuery({ queryKey: ["library"], queryFn: fetchLibrary });
+  // The award's title, from the editor's list, to put its folder first.
+  const award = useQueryClient()
+    .getQueryData<{ id: string; title: string }[]>(["admin-nominees"])
+    ?.find((c) => c.id === categoryId)?.title;
   const [src, setSrc] = useState<string | null>(null);
   const [length, setLength] = useState(0);
   const [start, setStart] = useState<number | null>(null);
@@ -47,6 +60,7 @@ export function ClipUpload({
     setStart(null);
     setEnd(null);
     setLength(0);
+    setLibraryPath(null);
     if (!f) return;
     if (f.size > MAX_BYTES) {
       setError(`That file is ${Math.round(f.size / 1024 / 1024)} MB; the limit is 95 MB. Trim it first, or export it smaller.`);
@@ -55,8 +69,18 @@ export function ClipUpload({
     setFile(f);
     setSrc(URL.createObjectURL(f));
   };
+  const pickLibrary = (path: string) => {
+    setError(null);
+    setStart(null);
+    setEnd(null);
+    setLength(0);
+    setFile(null);
+    setSrc(null);
+    setLibraryPath(path || null);
+  };
   const reset = () => {
     setFile(null);
+    setLibraryPath(null);
     setSrc(null);
     setStart(null);
     setEnd(null);
@@ -81,7 +105,22 @@ export function ClipUpload({
         ? `Clips can be at most ${MAX_SECONDS} seconds; this part is ${Math.round(part)}. Mark a shorter part.`
         : null;
 
+  const fromLibrary = async () => {
+    if (!libraryPath) return;
+    setError(null);
+    setProgress(0);
+    try {
+      await clipFromLibrary(categoryId, id, libraryPath, start, end);
+      reset();
+      onStarted();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setProgress(null);
+    }
+  };
   const upload = () => {
+    if (libraryPath) return void fromLibrary();
     if (!file) return;
     setError(null);
     setProgress(0);
@@ -111,10 +150,42 @@ export function ClipUpload({
     xhr.send(form);
   };
 
+  // Library videos by folder, this award's folder first.
+  const videos = (library.data ?? []).filter((v) => v.kind === "video");
+  const folders = [...new Set(videos.map((v) => v.folder))].sort((a, b) => {
+    const mine = (f: string) => (award && simple(f) === simple(award) ? 0 : 1);
+    return mine(a) - mine(b) || a.localeCompare(b);
+  });
+  const shownSrc = libraryPath ? `/api/admin/library/file?path=${encodeURIComponent(libraryPath)}` : src;
+  const chosen = !!file || !!libraryPath;
+
   return (
     <div className="space-y-3 rounded border border-neutral-200 p-3">
+      <p className="text-sm font-medium">Or make it from a video you have</p>
       <div className="flex flex-wrap items-center gap-3 text-sm">
-        <span className="font-medium">Or upload a video you have</span>
+        {videos.length > 0 && (
+          <select
+            className={`${inputClass} w-auto max-w-md`}
+            value={libraryPath ?? ""}
+            disabled={progress !== null}
+            onChange={(e) => pickLibrary(e.currentTarget.value)}
+            aria-label="Video from the library"
+          >
+            <option value="">From the library…</option>
+            {folders.map((f) => (
+              <optgroup key={f} label={`${f || "Top level"}${award && simple(f) === simple(award) ? " (this award)" : ""}`}>
+                {videos
+                  .filter((v: LibraryItem) => v.folder === f)
+                  .map((v) => (
+                    <option key={v.path} value={v.path}>
+                      {v.name} ({Math.round(v.size / 1024 / 1024)} MB)
+                    </option>
+                  ))}
+              </optgroup>
+            ))}
+          </select>
+        )}
+        <span className="text-neutral-500">{videos.length > 0 ? "or from your computer:" : "From your computer:"}</span>
         <input
           type="file"
           accept="video/*,.mkv"
@@ -123,15 +194,20 @@ export function ClipUpload({
           onChange={(e) => choose(e.currentTarget.files?.[0] ?? null)}
           aria-label="Video file"
         />
-        {file && progress === null && <Button onClick={reset}>Cancel</Button>}
+        {chosen && progress === null && <Button onClick={reset}>Cancel</Button>}
       </div>
-      {!file && <p className="text-xs text-neutral-500">MP4, MOV, MKV or WebM, up to 95 MB. You mark the part to keep before uploading.</p>}
+      {!chosen && (
+        <p className="text-xs text-neutral-500">
+          A computer file can be MP4, MOV, MKV or WebM, up to 95 MB. You mark the part to keep before the clip is made.
+        </p>
+      )}
 
-      {src && (
+      {shownSrc && (
         <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <video
+            key={shownSrc}
             ref={video}
-            src={src}
+            src={shownSrc}
             controls
             className="aspect-video w-full rounded bg-black"
             onLoadedMetadata={(e) => setLength(e.currentTarget.duration)}
@@ -172,7 +248,13 @@ export function ClipUpload({
                 disabled={!!problem || progress !== null || busy || length === 0}
                 title={busy ? "Wait for the clip being built" : undefined}
               >
-                {progress !== null ? `Uploading… ${Math.round(progress * 100)}%` : "Upload and make the clip"}
+                {progress !== null
+                  ? libraryPath
+                    ? "Starting…"
+                    : `Uploading… ${Math.round(progress * 100)}%`
+                  : libraryPath
+                    ? "Make the clip"
+                    : "Upload and make the clip"}
               </Button>
               <span className="text-xs text-neutral-500">Replaces the current clip. The old one stays in the history.</span>
             </div>

@@ -168,6 +168,17 @@ export const clipUpload = z.object({
   end: z.coerce.number().positive().optional(),
 });
 
+/** A clip cut from a video in the library. */
+export const clipFromLibrary = z.object({
+  categoryId: required,
+  id: required,
+  path: required,
+  start: z.number().nonnegative().nullable().optional(),
+  end: z.number().positive().nullable().optional(),
+});
+
+export const libraryFileQuery = z.object({ path: required });
+
 export const votesQuery = z.object({
   filter_ip: z.string().optional(),
   filter_uid: z.string().regex(/^-?\d+$/).optional(),

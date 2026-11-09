@@ -45,7 +45,8 @@ const VIDEO_EXTENSIONS = ["mp4", "m4v", "mov", "mkv", "webm"];
  * says which file and which part of it.
  */
 const UPLOAD_DIR = join(dirname(process.env.DB_FILE_NAME ?? "./sqlite.db"), "uploads");
-type UploadJob = { file: string; start: number | null; end: number | null };
+/** `keep`: the file is the library's own, so it stays after the build. */
+type UploadJob = { file: string; start: number | null; end: number | null; keep?: boolean };
 const jobPath = (categoryId: string, id: string) => join(UPLOAD_DIR, `${categoryId}__${id}.json`);
 
 type Nominee = NonNullable<Awaited<ReturnType<typeof getNominee>>>;
@@ -108,9 +109,21 @@ export async function enqueueUpload(categoryId: string, id: string, file: File, 
   const path = join(UPLOAD_DIR, `${categoryId}__${id}-${Date.now()}.${VIDEO_EXTENSIONS.includes(ext) ? ext : "mp4"}`);
   await Bun.write(path, file);
   // A job still waiting for a previous upload gives way to this one.
+  await writeJob(categoryId, id, { file: path, start, end });
+}
+
+/** Build the nominee's clip from a video in the library, cut from `start` to `end`. */
+export async function enqueueLibrary(categoryId: string, id: string, file: string, start: number | null, end: number | null) {
+  if (start != null && end != null && end <= start) throw new UserError("The end must come after the start.");
+  await mkdir(UPLOAD_DIR, { recursive: true });
+  await writeJob(categoryId, id, { file, start, end, keep: true });
+}
+
+async function writeJob(categoryId: string, id: string, job: UploadJob) {
+  // A job still waiting for a previous upload gives way to this one.
   const old = await readJob(categoryId, id);
-  if (old && old.file !== path) await rm(old.file, { force: true });
-  await Bun.write(jobPath(categoryId, id), JSON.stringify({ file: path, start, end } satisfies UploadJob));
+  if (old && old.file !== job.file && !old.keep) await rm(old.file, { force: true });
+  await Bun.write(jobPath(categoryId, id), JSON.stringify(job));
   await enqueueClip(categoryId, id);
 }
 
@@ -244,7 +257,7 @@ async function buildFromUpload(n: Nominee, job: UploadJob) {
           ],
       ENCODE_TIMEOUT_MS,
     );
-    const name = job.file.split(/[\\/]/).pop()!;
+    const name = job.keep ? `library|${job.file}` : job.file.split(/[\\/]/).pop()!;
     await finishClip(n, out, dir, (await sha256(`upload|${name}|${start}|${end}`)).slice(0, 10));
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -256,7 +269,7 @@ async function dropJob(categoryId: string, id: string, job: UploadJob) {
   // Only if no newer upload has replaced this job meanwhile.
   const current = await readJob(categoryId, id);
   if (current?.file === job.file) await rm(jobPath(categoryId, id), { force: true });
-  await rm(job.file, { force: true });
+  if (!job.keep) await rm(job.file, { force: true });
 }
 
 /** Store a finished clip and its thumbnail, mark it ready, and record it. */

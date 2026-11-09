@@ -393,7 +393,14 @@ rinlux asked to preview the window they pick before building, to check the timec
 - `POST /api/admin/clip/upload`, then `enqueueUpload()` in `clips.ts`. The file waits in `uploads/` next to the database (on its volume) with a small job file, so a restart picks it up again. The usual queue builds it: cut with an encode when trimmed (frame-exact), repackaged when whole and already fitting, then stored, thumbnailed and recorded in the history like a built clip. The upload is deleted afterwards. At most 180 s.
 - **Also changed for all clips:** a failed new clip no longer hides a working one. Status goes back to ready with the error beside it ("The new clip failed: … The previous clip is still in use."). It used to switch to failed and the old clip vanished from the site.
 - Tested: an API test (whole file, cut 1–3 s is smaller, refusals, a mark past the end keeps the working clip; 44 pass) and in Firefox (marks 0:01–0:03.5, the preview stopped at 3.5, the upload built a 2.52 s H.264 clip, and `uploads/` was empty after).
-- Not done: picking straight from Google Drive (download first, then upload). The site still loses its clip briefly while a rebuild is pending, as before.
+- **The video library** (same branch). StrawWaffle asked to bring rinlux's whole Drive folder in, so they can work from the admin page:
+  - `scripts/import-drive.py <folder-id> <library-dir>` copies a public Drive folder, keeping its folders and skipping Google Docs and files already there (so it can be run again). It's run in a `python:3.12-slim` container with gdown, against the data volume (`/data/library`).
+  - The 2025 folder is `1EtYiAUl7ifEwLDlDncTTheA2c9uGqpiU`: 46 videos and 11 pictures in folders mostly named after awards, plus 11 "new links" Google Docs that weren't copied.
+  - `src/server/library.ts` lists the library and resolves paths, refusing anything outside it. Admin routes: `GET /api/admin/library`, `GET /api/admin/library/file?path=` (byte ranges, `Cache-Control: private`), and `POST /api/admin/clip/library` (`{categoryId, id, path, start, end}`).
+  - In the editor's clip section, "From the library…" lists the videos by folder, with the award's own folder first (matched loosely on the award's title). A picked video goes into the same mark, preview and make steps. The job is marked `keep`, so the library copy stays after the build.
+  - The library is on the server's data volume only, never in the public bucket. Files are not matched to nominees automatically, because their names describe moments, not nominees.
+  - Tested by an API test (`tests/run.sh` copies the sample video into the container's library first): the listing, private ranged serving, traversal refused, non-admins refused, a 1–3 s clip, and the file kept.
+- Not done: picking straight from Google Drive in the browser (use the import script instead). The site still loses its clip briefly while a rebuild is pending, as before.
 
 ### Next: the lab page (StrawWaffle's answers, 2026-11-09)
 
