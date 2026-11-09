@@ -8,6 +8,7 @@ import { SESSION_COOKIE } from "@/server/middleware";
 import { adminRoutes } from "@/server/routes/admin";
 import { authRoutes } from "@/server/routes/auth";
 import { publicRoutes } from "@/server/routes/public";
+import { MEDIA_KEY, serveFile, storage } from "@/server/storage";
 
 const mediaUrl = env("MEDIA_URL", "https://cdn.dgg.events/");
 const mediaDir = join(import.meta.dir, "..", "media");
@@ -44,6 +45,14 @@ export function createApp(adminPath: string) {
         return c.body(null, 401);
       }
       return c.redirect(adminPath, 302);
+    })
+
+    // Clips and thumbnails when they're stored locally (not on R2).
+    .get("/files/*", async (c) => {
+      const key = decodeURIComponent(c.req.path.slice("/files/".length));
+      const file = MEDIA_KEY.test(key) ? storage.localFile?.(key) : null;
+      if (!file) return c.body(null, 404);
+      return serveFile(file, c.req.header("Range") ?? null);
     })
 
     .get("/robots.txt", (c) => {

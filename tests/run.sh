@@ -3,6 +3,10 @@
 #   tests/run.sh <app-container> [extra bun test args]
 # Expects the container and dgga-mock on the docker network dgga-test, with
 # ADMIN_USERNAMES=Tester and the dev-client/dev-secret stand-in credentials.
+# The clip test also needs dgga-files: tests/fixtures served by a web server
+# that supports byte ranges (ffmpeg seeks into the file), e.g.
+#   docker run -d --name dgga-files --network dgga-test \
+#     -v "$PWD/tests/fixtures:/usr/share/nginx/html:ro" nginx:1.27-alpine
 set -euo pipefail
 app=${1:?app container name}
 shift

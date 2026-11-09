@@ -1,11 +1,15 @@
 import { useState } from "react";
 import clsx from "clsx";
+import { ClipEmbed } from "@/components/ClipEmbed";
 import { VideoEmbed } from "@/components/VideoEmbed";
 import { VoteButton } from "@/components/VoteButton";
 import { PossibleLink } from "@/components/util";
 import type { Option } from "@/lib/types";
 
 type Props = Option & {
+  /** Set by the server once the nominee's clip is built (src/server/present.ts). */
+  clipUrl?: string | null;
+  thumbnailUrl?: string | null;
   maintainAspect: boolean;
   compact: boolean;
   voted: boolean;
@@ -36,10 +40,20 @@ export function Option(props: Props) {
         [hoverHighlightClass]: !props.disabled,
       })}
     >
-      {props.videoId && (
+      {props.clipUrl && (
+        <ClipEmbed
+          title={props.title}
+          clipUrl={props.clipUrl}
+          thumbnailUrl={props.thumbnailUrl ?? null}
+          sourceUrl={props.url}
+          linkType={props.linkType}
+          clipStart={props.clipStart}
+        />
+      )}
+      {!props.clipUrl && props.videoId && (
         <VideoEmbed code={props.videoId} externalUrl={props.url} />
       )}
-      {props.imageId && (
+      {!props.clipUrl && props.imageId && (
         <PossibleLink
           activeClassName="peer hover:brightness-115 transition-all cursor-pointer"
           href={props.url}
@@ -55,7 +69,7 @@ export function Option(props: Props) {
           />
         </PossibleLink>
       )}
-      {!props.videoId && !props.imageId && (
+      {!props.clipUrl && !props.videoId && !props.imageId && (
         <img
           loading="lazy"
           src="/Media/waiting.png"

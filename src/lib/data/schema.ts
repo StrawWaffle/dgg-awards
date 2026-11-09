@@ -8,6 +8,8 @@ import {
   text,
 } from "drizzle-orm/sqlite-core";
 import type { LinkType } from "@/lib/links";
+
+export type ClipStatus = "pending" | "processing" | "ready" | "failed";
 import type { Session } from "@/lib/types";
 import type { VotingStyle } from "@/lib/voting";
 
@@ -73,6 +75,15 @@ export const optionsTable = sqliteTable(
     /** The clip's range within the source, in seconds. */
     clipStart: int(),
     clipEnd: int(),
+    /** The downloaded clip (src/server/clips.ts), as a media storage key. */
+    clipKey: text(),
+    clipStatus: text().$type<ClipStatus>(),
+    /** Why the last clip build failed, for the admin page. */
+    clipError: text(),
+    /** The nominee's thumbnail, from a clip frame or an upload. */
+    thumbnailKey: text(),
+    /** Seconds into the clip the thumbnail frame was taken at. */
+    thumbnailAt: int(),
   },
   (table) => [primaryKey({ columns: [table.id, table.categoryId] })],
 );

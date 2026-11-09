@@ -100,6 +100,17 @@ export const idQuery = z.object({ id: required });
 
 export const nomineeQuery = z.object({ categoryId: required, id: required });
 
+/** Which nominee (in a JSON body). */
+export const nomineeRef = z.object({ categoryId: required, id: required });
+
+export const thumbnailAt = nomineeRef.extend({ at: z.number().int().min(0) });
+
+export const thumbnailUpload = z.object({
+  categoryId: required,
+  id: required,
+  file: z.instanceof(File),
+});
+
 export const votesQuery = z.object({
   filter_ip: z.string().optional(),
   filter_uid: z.string().optional(),

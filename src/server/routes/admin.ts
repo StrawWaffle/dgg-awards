@@ -9,6 +9,7 @@ import {
   pinVotedCategoryStyles,
   setSetting,
   getConfig,
+  getNominee,
   getNominees,
   insertCategory,
   insertNominee,
@@ -19,7 +20,16 @@ import {
 } from "@/lib/data/driver";
 import { checkAwards } from "@/lib/nominee-checks";
 import { effectiveStyle, withEffectiveStyles } from "@/lib/voting";
+import {
+  UserError,
+  clipProblem,
+  enqueueClip,
+  thumbnailFromClip,
+  thumbnailFromUpload,
+} from "@/server/clips";
 import { DGG_NAME, fetchDggProfile } from "@/server/dgg-profile";
+import { categoriesWithMediaUrls } from "@/server/present";
+import { storage } from "@/server/storage";
 import { type SessionEnv, rejectInvalid, requireAdmin, zValidator } from "@/server/middleware";
 import {
   categoryForm,
@@ -30,7 +40,10 @@ import {
   nomineeForm,
   nomineePatch,
   nomineeQuery,
+  nomineeRef,
   settingsPatch,
+  thumbnailAt,
+  thumbnailUpload,
   userIdBody,
   votesQuery,
 } from "@/server/schemas";
@@ -121,13 +134,50 @@ export const adminRoutes = new Hono<SessionEnv>()
   })
   .delete("/nominee", zValidator("query", nomineeQuery, rejectInvalid), async (c) => {
     const { categoryId, id } = c.req.valid("query");
+    const nominee = await getNominee(categoryId, id);
     await deleteNominee(categoryId, id);
+    for (const key of [nominee?.clipKey, nominee?.thumbnailKey]) {
+      if (key) await storage.delete(key).catch(() => {});
+    }
     return c.body(null, 200);
+  })
+
+  // Clips: build from the nominee's link and clip range, in the background.
+  // Progress shows as clipStatus/clipError on the admin nominee list.
+  .post("/clip", zValidator("json", nomineeRef, rejectInvalid), async (c) => {
+    const { categoryId, id } = c.req.valid("json");
+    const nominee = await getNominee(categoryId, id);
+    if (!nominee) return c.body(null, 404);
+    const problem = clipProblem(nominee);
+    if (problem) return c.text(problem, 400);
+    await enqueueClip(categoryId, id);
+    return c.json({ clipStatus: "pending" as const }, 202);
+  })
+  // Thumbnails: a frame from the clip, or an uploaded image.
+  .post("/thumbnail", zValidator("json", thumbnailAt, rejectInvalid), async (c) => {
+    const { categoryId, id, at } = c.req.valid("json");
+    try {
+      const key = await thumbnailFromClip(categoryId, id, at);
+      return c.json({ thumbnailUrl: storage.url(key) }, 200);
+    } catch (error) {
+      if (error instanceof UserError) return c.text(error.message, 400);
+      throw error;
+    }
+  })
+  .post("/thumbnail/upload", zValidator("form", thumbnailUpload, rejectInvalid), async (c) => {
+    const { categoryId, id, file } = c.req.valid("form");
+    try {
+      const key = await thumbnailFromUpload(categoryId, id, file);
+      return c.json({ thumbnailUrl: storage.url(key) }, 200);
+    } catch (error) {
+      if (error instanceof UserError) return c.text(error.message, 400);
+      throw error;
+    }
   })
 
   .get("/nominees", async (c) => {
     const config = await getConfig();
-    return c.json(withEffectiveStyles(await getNominees(), config.defaultVotingStyle), 200);
+    return c.json(categoriesWithMediaUrls(withEffectiveStyles(await getNominees(), config.defaultVotingStyle)), 200);
   })
   // Everything wrong with the nominees, for the admin editor. Problems come
   // from src/lib/nominee-checks.ts; the year from the awardYear setting.

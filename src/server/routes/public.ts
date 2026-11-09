@@ -12,6 +12,7 @@ import {
 } from "@/lib/data/driver";
 import { nowS } from "@/lib/util";
 import { effectiveStyle, withEffectiveStyles } from "@/lib/voting";
+import { categoriesWithMediaUrls, withMediaUrls } from "@/server/present";
 import {
   type SessionEnv,
   rejectInvalid,
@@ -45,7 +46,7 @@ export const publicRoutes = new Hono<SessionEnv>()
     if (config.viewingMode === "locked") {
       return c.text("locked", 200);
     }
-    return c.json(withEffectiveStyles(await getNominees(), config.defaultVotingStyle), 200);
+    return c.json(categoriesWithMediaUrls(withEffectiveStyles(await getNominees(), config.defaultVotingStyle)), 200);
   })
 
   /** First choice per category. */
@@ -98,5 +99,11 @@ export const publicRoutes = new Hono<SessionEnv>()
     if (config.viewingMode !== "reviewing") {
       return c.body(null, 401);
     }
-    return c.json(await getVotingResults(), 200);
+    return c.json(
+      (await getVotingResults()).map((cat) => ({
+        ...cat,
+        options: cat.options.map((o) => ({ ...o, payload: withMediaUrls(o.payload) })),
+      })),
+      200,
+    );
   });

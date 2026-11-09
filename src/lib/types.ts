@@ -23,7 +23,16 @@ export type PublicSession = Pick<Session, "id" | "uid">;
 export type Option = InferSelectModel<typeof optionsTable>;
 export type Category = InferSelectModel<typeof categoriesTable>;
 /** Nominee fields added after 2025; optional in data files and imports. */
-export type NomineeDetails = "date" | "linkType" | "clipStart" | "clipEnd";
+export type NomineeDetails =
+  | "date"
+  | "linkType"
+  | "clipStart"
+  | "clipEnd"
+  | "clipKey"
+  | "clipStatus"
+  | "clipError"
+  | "thumbnailKey"
+  | "thumbnailAt";
 
 export type ImportableData = (Omit<Category, "votingStyle"> &
   Partial<Pick<Category, "votingStyle">> & {

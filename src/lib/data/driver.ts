@@ -260,6 +260,37 @@ export async function getAllVotesFiltered(
   });
 }
 
+export async function getNominee(categoryId: string, id: string) {
+  return db.query.optionsTable.findFirst({
+    where: (o, { and, eq }) => and(eq(o.categoryId, categoryId), eq(o.id, id)),
+  });
+}
+
+/** Clip fields managed by src/server/clips.ts. */
+export async function setNomineeMedia(
+  categoryId: string,
+  id: string,
+  media: Partial<
+    Pick<
+      InferInsertModel<typeof schema.optionsTable>,
+      "clipKey" | "clipStatus" | "clipError" | "thumbnailKey" | "thumbnailAt"
+    >
+  >,
+) {
+  await db
+    .update(schema.optionsTable)
+    .set(media)
+    .where(and(eq(schema.optionsTable.categoryId, categoryId), eq(schema.optionsTable.id, id)));
+}
+
+/** Nominees whose clip job was queued or running when the server stopped. */
+export async function listUnfinishedClips() {
+  return db.query.optionsTable.findMany({
+    where: (o, { inArray }) => inArray(o.clipStatus, ["pending", "processing"]),
+    columns: { categoryId: true, id: true },
+  });
+}
+
 export async function getNominees() {
   return await db.query.categoriesTable.findMany({ with: { options: true } });
 }

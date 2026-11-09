@@ -161,6 +161,15 @@ Order StrawWaffle gave: preview to rinlux first, then discuss, then these.
      - The site plays clips in its own `<video>`: no looping, and it stops at the end.
      - **Always link the original source at the clip's start time** (e.g. `&t=83`), so viewers can get the full context.
      - The 2025 site never did this. It embedded YouTube and Streamable by id.
+     - **Built in step 3**, on branch `worktree-clips`:
+       - **Image:** ffmpeg and yt-dlp, which is pinned and checksum-verified in the Dockerfile. Bump `YT_DLP_VERSION`/`YT_DLP_SHA256` when sites break it. yt-dlp uses Bun as its JavaScript runtime for YouTube.
+       - **`src/server/clips.ts`:** a one-at-a-time background queue. Each job downloads the section with yt-dlp, converts it with ffmpeg (≤720p, H.264/AAC, fast start) and takes a thumbnail at 1/3 of the clip. Its status lives on the nominee, and unfinished jobs resume on restart.
+       - **`src/server/storage.ts`:** local storage under `MEDIA_DIR=/data/media`, served at `/files/...` with byte ranges. Setting `R2_ENDPOINT`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and `R2_PUBLIC_URL` switches to R2, which uses Bun's S3 client but hasn't been tested against a real bucket yet.
+       - **Admin endpoints:** `POST /api/admin/clip`, `/thumbnail` (a frame at a given second) and `/thumbnail/upload` (re-encoded to JPEG, so only our own output is served).
+       - **`ClipEmbed`:** the thumbnail opens a player that doesn't loop, with "↗ Full context: YouTube video at 1:00" linking to the source at the start time.
+       - **Verified:** a real YouTube clip, 15 s, built in 16 s. It plays in the browser, stops at the end, and the link goes to `&t=60s`.
+       - **No admin form for clips yet.** That's step 4.
+       - **Tests** need the `dgga-files` container (nginx serving `tests/fixtures`, with byte ranges). See `tests/run.sh`.
    - **Scale.** 2025 had about 67,000 votes in 3.5 days (stream at 3:53, the caption is garbled as "67,44"), so roughly 3,000 voters.
      - Serve clips from **Cloudflare R2**, not the home tunnel. Cloudflare's free CDN terms restrict video, and the home upload couldn't handle hundreds of GB.
      - Compute results once when voting closes and serve that copy. Today every request recounts all votes.

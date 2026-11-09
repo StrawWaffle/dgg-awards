@@ -621,6 +621,128 @@ describe("admin", () => {
     }
   });
 
+  // Needs the dgga-files container serving tests/fixtures (see tests/run.sh).
+  test(
+    "clips: build in the background, serve with ranges, pick thumbnails",
+    async () => {
+      const FILES = process.env.FILES_URL ?? "http://dgga-files";
+      const json = (method: string, body: unknown) => ({
+        method,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const addNominee = (id: string, fields: Record<string, string>) =>
+        req(
+          "/api/admin/nominee",
+          {
+            method: "POST",
+            body: form({
+              nominee_id: id,
+              category_id: "ally",
+              nominee_title: id,
+              nominee_description: "d",
+              ...fields,
+            }),
+          },
+          admin,
+        );
+      const nominee = async (id: string) =>
+        (await (await req("/api/admin/nominees", {}, admin)).json())
+          .find((c: any) => c.id === "ally")
+          .options.find((o: any) => o.id === id);
+      const waitForClip = async (id: string) => {
+        for (let i = 0; i < 120; i++) {
+          const n = await nominee(id);
+          if (n.clipStatus === "ready" || n.clipStatus === "failed") return n;
+          await Bun.sleep(500);
+        }
+        throw new Error(`clip ${id} never finished`);
+      };
+
+      // Refused: no range, unknown nominee, not an admin.
+      await addNominee("clipnorange", { url: `${FILES}/sample.mp4` });
+      const noRange = await req("/api/admin/clip", json("POST", { categoryId: "ally", id: "clipnorange" }), admin);
+      expect(noRange.status).toBe(400);
+      expect(await noRange.text()).toBe("Set the clip's start and end first.");
+      expect((await req("/api/admin/clip", json("POST", { categoryId: "ally", id: "nope" }), admin)).status).toBe(404);
+      expect((await req("/api/admin/clip", json("POST", { categoryId: "ally", id: "clipnorange" }), user)).status).toBe(401);
+
+      // Build a 1–4 s clip from the 6 s fixture.
+      await addNominee("clipok", { url: `${FILES}/sample.mp4`, link_type: "video-file", clip_start: "1", clip_end: "4" });
+      const started = await req("/api/admin/clip", json("POST", { categoryId: "ally", id: "clipok" }), admin);
+      expect(started.status).toBe(202);
+      const ready = await waitForClip("clipok");
+      expect(ready.clipError).toBeNull();
+      expect(ready.clipStatus).toBe("ready");
+      expect(ready.clipUrl).toMatch(/^\/files\/clips\/ally\/clipok-[0-9a-f]{10}\.mp4$/);
+      expect(ready.thumbnailUrl).toMatch(/^\/files\/thumbs\/ally\/clipok-1s-[0-9a-f]{10}\.jpg$/);
+      expect(ready.thumbnailAt).toBe(1);
+
+      // Served with byte ranges, and public.
+      const video = await req(ready.clipUrl);
+      expect(video.status).toBe(200);
+      expect(video.headers.get("content-type")).toContain("video/mp4");
+      expect(video.headers.get("accept-ranges")).toBe("bytes");
+      const size = (await video.arrayBuffer()).byteLength;
+      expect(size).toBeGreaterThan(5000);
+      const part = await req(ready.clipUrl, { headers: { Range: "bytes=0-99" } });
+      expect(part.status).toBe(206);
+      expect(part.headers.get("content-range")).toBe(`bytes 0-99/${size}`);
+      expect((await part.arrayBuffer()).byteLength).toBe(100);
+      const thumb = await req(ready.thumbnailUrl);
+      expect(thumb.headers.get("content-type")).toContain("image/jpeg");
+      const pub = (await (await req("/api/nominees")).json())
+        .find((c: any) => c.id === "ally")
+        .options.find((o: any) => o.id === "clipok");
+      expect(pub.clipUrl).toBe(ready.clipUrl);
+      expect((await req("/files/../data/sqlite.db")).status).toBe(404);
+
+      // Re-pick the thumbnail frame; the old file is removed.
+      const picked = await req("/api/admin/thumbnail", json("POST", { categoryId: "ally", id: "clipok", at: 2 }), admin);
+      expect(picked.status).toBe(200);
+      const { thumbnailUrl } = await picked.json();
+      expect(thumbnailUrl).toMatch(/clipok-2s-/);
+      expect((await req(ready.thumbnailUrl)).status).toBe(404);
+      const tooLate = await req("/api/admin/thumbnail", json("POST", { categoryId: "ally", id: "clipok", at: 99 }), admin);
+      expect(tooLate.status).toBe(400);
+
+      // Upload a thumbnail: re-encoded to JPEG; junk is refused.
+      const png = Uint8Array.from(
+        atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="),
+        (ch) => ch.charCodeAt(0),
+      );
+      const upload = (file: File) => {
+        const f = form({ categoryId: "ally", id: "clipok" });
+        f.set("file", file);
+        return req("/api/admin/thumbnail/upload", { method: "POST", body: f }, admin);
+      };
+      const uploaded = await upload(new File([png], "t.png", { type: "image/png" }));
+      expect(uploaded.status).toBe(200);
+      expect((await uploaded.json()).thumbnailUrl).toMatch(/clipok-upload-[0-9a-f]{10}\.jpg$/);
+      expect((await nominee("clipok")).thumbnailAt).toBeNull();
+      const junk = await upload(new File(["not an image"], "x.png", { type: "image/png" }));
+      expect(junk.status).toBe(400);
+      expect((await upload(new File(["<svg/>"], "x.svg", { type: "image/svg+xml" }))).status).toBe(400);
+
+      // A source that can't be downloaded ends as "failed" with a reason.
+      await addNominee("clipbad", { url: `${FILES}/missing.mp4`, link_type: "video-file", clip_start: "0", clip_end: "2" });
+      await req("/api/admin/clip", json("POST", { categoryId: "ally", id: "clipbad" }), admin);
+      const failed = await waitForClip("clipbad");
+      expect(failed.clipStatus).toBe("failed");
+      expect(failed.clipError).toContain("yt-dlp");
+      expect(failed.clipUrl).toBeNull();
+
+      // Deleting a nominee deletes its files.
+      const final = await nominee("clipok");
+      for (const id of ["clipok", "clipbad", "clipnorange"]) {
+        await req(`/api/admin/nominee?categoryId=ally&id=${id}`, { method: "DELETE" }, admin);
+      }
+      expect((await req(final.clipUrl)).status).toBe(404);
+      expect((await req(final.thumbnailUrl)).status).toBe(404);
+    },
+    120_000,
+  );
+
   test("locked mode hides nominees", async () => {
     await setMode(admin, "locked");
     const res = await req("/api/nominees");
