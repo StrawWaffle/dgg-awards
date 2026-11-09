@@ -27,7 +27,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 
 ### At a glance (end of session 2, 2026-11-09)
 
-**Live** (`main` at `1913956` plus docs, deployed and pushed):
+**Live** (`main` at `8fc0cb2` plus docs, deployed and pushed):
 - **Infrastructure:** the Docker preview behind a Cloudflare tunnel, real destiny.gg sign-in, the stack upgrade (Bun 1.4, Hono, Zod, TS 7), and clips into Cloudflare R2 at 1080p.
 - **Admin page:**
   - a left sidebar, dark theme, drag to reorder, and collapsible sections
@@ -37,6 +37,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
   - hiding categories that have votes; export, and import with an automatic database backup
   - links at the bottom left to preview voting and results, open the site, and open the lab
   - at plain `/admin` (the page checks for an admin; the API refuses everyone else), and signing in returns you to the page you came from
+  - in the clip section: a preview of the picked window, uploading a video and marking the part to keep, and the video library (rinlux's Drive folder: 46 videos and 11 pictures, 1.5 GB in `/data/library` on the live volume)
 - **Voting model:** single pick or ranked per category, ranked counted by instant runoff, and the 2025 double-count bug fixed.
 - **The lab** (`/lab`, admins only), where the 2026 voting page and presentation are being tried out:
   - a cozy look after a community destiny.gg skin, light and dark, a hand-drawn "drawn look" switch, and drifting emote silhouettes in the background
@@ -87,7 +88,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 - Fast-forward `main`, run `docker compose --profile tunnel up -d --build app`, then check `/`, `/api/config`, `/lab`, `/admin` (200), `/api/admin/checks` and `/api/lab/emotes` (401), and `/signin` (to destiny.gg).
 - Push `main`.
 
-**Worktrees:** everything under `.claude/worktrees/` is merged (`admin-pass`, `editor-scroll`, `lab`, `lab-polish`, `lab-polish-2`, `lab-polish-3`, `lab-polish-4`, `lab-summary`, `admin-lab-link`, `duel-reveal`, `plain-admin`, `nominee-images`, `sketchy`) and can be removed.
+**Worktrees:** everything under `.claude/worktrees/` is merged (`admin-pass`, `editor-scroll`, `lab`, `lab-polish`, `lab-polish-2`, `lab-polish-3`, `lab-polish-4`, `lab-summary`, `admin-lab-link`, `duel-reveal`, `plain-admin`, `clip-preview`, `nominee-images`, `sketchy`) and can be removed.
 
 **Test containers**, on network `dgga-test`, all kept running:
 
@@ -377,7 +378,7 @@ StrawWaffle saw what looked like being signed out after every deploy. Sessions w
 - The API tests now check the admin API instead of the old redirect (42 pass).
 - **Signing in returns you to where you were:** `/signin?next=/admin` (the admin page and the lab use it) keeps the path in a short-lived cookie and redirects there after destiny.gg. `safeNext()` in `routes/auth.ts` only allows paths on this site (`//…`, `https://…`, backslashes and control characters go to `/`), so it can't be used as an open redirect. Covered by an API test (43 now).
 
-### Clip preview in the editor (branch `worktree-clip-preview`, 2026-11-09, not deployed)
+### Clip preview, video upload and the video library (2026-11-09, deployed)
 
 rinlux asked to preview the window they pick before building, to check the timecodes. Under the clip start and end in the nominee editor (`ClipPreview.tsx`):
 - **"Preview the clip"** plays the source from the start to the end, using the times as typed, before saving. **"Check the ending"** plays the last 5 s, to check the cut.
@@ -395,6 +396,7 @@ rinlux asked to preview the window they pick before building, to check the timec
 - Tested: an API test (whole file, cut 1–3 s is smaller, refusals, a mark past the end keeps the working clip; 44 pass) and in Firefox (marks 0:01–0:03.5, the preview stopped at 3.5, the upload built a 2.52 s H.264 clip, and `uploads/` was empty after).
 - **The video library** (same branch). StrawWaffle asked to bring rinlux's whole Drive folder in, so they can work from the admin page:
   - `scripts/import-drive.py <folder-id> <library-dir>` copies a public Drive folder, keeping its folders and skipping Google Docs and files already there (so it can be run again). It's run in a `python:3.12-slim` container with gdown, against the data volume (`/data/library`).
+  - **Imported to live 2026-11-09:** all 57 files (46 videos in 13 folders, 11 pictures). Drive refused some downloads at first ("too many accesses"). The script now pauses and retries, and a later run picked up the rest. The copy is also in the session scratchpad. To add new files later, run the script against the live volume (`dgg-awards_awards_data`).
   - The 2025 folder is `1EtYiAUl7ifEwLDlDncTTheA2c9uGqpiU`: 46 videos and 11 pictures in folders mostly named after awards, plus 11 "new links" Google Docs that weren't copied.
   - `src/server/library.ts` lists the library and resolves paths, refusing anything outside it. Admin routes: `GET /api/admin/library`, `GET /api/admin/library/file?path=` (byte ranges, `Cache-Control: private`), and `POST /api/admin/clip/library` (`{categoryId, id, path, start, end}`).
   - In the editor's clip section, "From the library…" lists the videos by folder, with the award's own folder first (matched loosely on the award's title). A picked video goes into the same mark, preview and make steps. The job is marked `keep`, so the library copy stays after the build.
