@@ -4,6 +4,7 @@ Everything the site needs to come back, on another machine or with another maint
 
 - `database/`: the database, one plain SQLite file an hour (`dgg-awards-2026-11-09T19-42Z.db`). Every copy is kept for 2 days, then one a day for 60 days. They show who voted for what, so share the folder only with the organisers.
 - `media/`: clips and thumbnails, copied once a day.
+- `archive/`: things to keep. `dgga25-original-source.zip` is the 2025 site's code as recovered, which this repository started from (code only: no database or secrets).
 
 Until 2026-11-09 the database backups were encrypted (`.db.enc`) with a password, which StrawWaffle has. Those are deleted by the keeping rule within 60 days. Until then, they need that password to open (see Restoring).
 

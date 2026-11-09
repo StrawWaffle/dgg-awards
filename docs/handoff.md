@@ -475,6 +475,12 @@ StrawWaffle wasn't happy with removing them outright: the collaborator who'll ho
 - **The original 2025 code did record both** (`src/routes/oauth.ts` in the recovered source): the IP and user agent at sign-in, copied into every vote. The real 2025 database would have held voters' IPs. Ours only ever held fake test addresses and the admins' own.
 - API test: off by default, on keeps both, off again. 47 pass.
 
+### The original 2025 zip, checked and archived (2026-11-09)
+
+StrawWaffle downloaded the original `dgga25.zip` again (7.9 MB, 167 files, code only: no database, exports or secrets; `node_modules` empty).
+- **Compared with the import commit `6b884f8`:** 166 files are byte-for-byte identical. The only file not imported is `scripts/data-to-json.out.json`, the output of `scripts/data-to-json.ts` (the nominees as JSON). It's an **older** export than the zip's `src/data.ts`, despite its later file date (2 January against 31 December): `data.ts` has the typo fixes ("podcast", "continuously", "malicious"…) and JohnHentai's link that the JSON lacks. So nothing is missing.
+- **Archived** on Google Drive as `DGG Awards backups/archive/dgga25-original-source.zip`, uploaded with rclone and checked by MD5 against the original. Not encrypted (code only).
+
 ### Next: the lab page (StrawWaffle's answers, 2026-11-09)
 
 StrawWaffle wants the front page and the presentation to feel fun, quirky and wholesome. It gets built on an experimental page first (`/lab`, admins only) until rinlux approves. Order: the follow-ups above, merge and deploy, then the lab.
