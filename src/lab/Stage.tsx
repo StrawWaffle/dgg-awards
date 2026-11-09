@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { GearIcon } from "@radix-ui/react-icons";
 import { Emote } from "@/lab/Emote";
 import { type Clip, ClipPlayer } from "@/lab/ClipPlayer";
 import { Sketch, useDrawnLook } from "@/lab/sketch";
 import { type FeedStatus, liveFeed, simulatedFeed } from "@/lab/chatFeed";
 import { type Levels, type Source, useFrame } from "@/lab/music";
+import { useBursts } from "@/lab/Bursts";
+import { Board, loadResults } from "@/lab/Results";
+import { DvdMenu, type ShowAward, TitleCard, WinnerCard, loadShow } from "@/lab/Scenes";
 import type { ChatSummary } from "@/server/lab/chat-aggregator";
 
 type Npc = {
@@ -52,6 +56,30 @@ function setEmote(npc: Npc, emote: string) {
   npc.emoteEl.className = `emote ${emote}`;
 }
 
+/** The scenes of one award, in order; after the winner comes the next award's title. */
+const SCENES = [
+  { id: "title", label: "Title" },
+  { id: "options", label: "Nominees" },
+  { id: "results", label: "Results" },
+  { id: "winner", label: "Winner" },
+] as const;
+type Scene = (typeof SCENES)[number]["id"];
+const NEXT_LABEL: Record<Scene, string> = { title: "Nominees", options: "Results", results: "Winner", winner: "Next award" };
+/** How wide each scene's box is: narrow enough to leave the cast room at the sides. */
+const SCENE_WIDTH: Record<Scene, string> = {
+  title: "min(900px, 92%)",
+  options: "min(1000px, 66%)",
+  results: "min(860px, 62%)",
+  winner: "min(560px, 46%)",
+};
+
+/** A spot beside the middle box `sides`, on the left or the right. */
+function sideSpot(toLeft: boolean, sides: { left: number; right: number }, width: number) {
+  const lo = toLeft ? 8 : sides.right + 12;
+  const hi = toLeft ? sides.left - 56 : width - 48;
+  return lo <= hi ? lo + Math.random() * (hi - lo) : toLeft ? Math.max(0, hi) : Math.min(width - 40, lo);
+}
+
 const nickClass = (flair: string | null) => `nick${flair ? ` nick-${flair}` : ""}`;
 
 /**
@@ -97,29 +125,24 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
+  const [show, setShow] = useState<ShowAward[] | null>(null);
   useEffect(() => {
-    fetch("/api/nominees")
-      .then((r) => r.json())
-      .then((data) =>
-        setClips(
-          Array.isArray(data)
-            ? data.flatMap((c: any) =>
-                c.options
-                  .filter((o: any) => o.clipUrl)
-                  .map((o: any) => ({
-                    title: `${o.title} · ${c.title}`,
-                    clipUrl: o.clipUrl,
-                    thumbnailUrl: o.thumbnailUrl,
-                    url: o.url,
-                    linkType: o.linkType,
-                    clipStart: o.clipStart,
-                  })),
-              )
-            : [],
-        ),
-      )
-      .catch(() => setClips([]));
+    loadResults()
+      .then(loadShow)
+      .then(setShow)
+      .catch(() => setShow([]));
   }, []);
+  const [awardIndex, setAwardIndex] = useState(0);
+  const [scene, setScene] = useState<Scene>("title");
+  /** Results scene: how many rows to reveal, and a counter to start the board over. */
+  const [target, setTarget] = useState(0);
+  const [run, setRun] = useState(0);
+  const [revealed, setRevealed] = useState(false);
+  const award = show?.[awardIndex] ?? null;
+  const sceneBox = useRef<HTMLDivElement>(null);
+  /** The box in the middle the cast keeps clear of, if any. */
+  const sides = useRef<{ left: number; right: number } | null>(null);
+  const [bursts, fire] = useBursts();
   const drawn = useDrawnLook();
   const settings = useRef({ rate, emoteShare, max, names, showSaid });
   settings.current = { rate, emoteShare, max, names, showSaid };
@@ -149,6 +172,7 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
     // In from the left or the right edge, walking onto the stage.
     const fromLeft = Math.random() < 0.5;
     const width = box.clientWidth;
+    const keepClear = sides.current;
     const npc: Npc = {
       el,
       emoteEl,
@@ -163,7 +187,8 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
       hop: 0,
       bob: 0,
       opacity: 0,
-      entering: true,
+      entering: !keepClear,
+      parkX: keepClear ? sideSpot(fromLeft, keepClear, width) : undefined,
       leaving: false,
       lastSeen: performance.now(),
       bubbleUntil: 0,
@@ -225,7 +250,13 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
       const said = settings.current.showSaid ? summary.said : [];
       // No speech bubbles over a clip.
       if (!clipOn.current) for (const s of said) {
-        const npc = all.get(s.nick) ?? spawn(s.nick, "PepoG", s.flair);
+        // A verified message gets a character too, within the same limits.
+        let npc = all.get(s.nick);
+        if (!npc) {
+          if (bucket.tokens < 1 || all.size >= settings.current.max) continue;
+          bucket.tokens -= 1;
+          npc = spawn(s.nick, "PepoG", s.flair);
+        }
         npc.bubble.textContent = s.text;
         npc.bubble.classList.remove("hidden");
         npc.bubbleUntil = now + 5000;
@@ -267,6 +298,11 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
       }
       // Characters walk off after a minute of silence.
       if (!clipOn.current) for (const n of [...all.values()]) if (now - n.lastSeen > 60_000) leave(n);
+      // Over the limit (it was lowered): the quietest go, a few at a time.
+      if (all.size > settings.current.max && !clipOn.current) {
+        const quiet = [...all.values()].filter((n) => !n.entering).sort((a, b) => a.lastSeen - b.lastSeen);
+        for (const n of quiet.slice(0, Math.min(6, all.size - settings.current.max))) leave(n);
+      }
       setStats((s) => ({
         fps: fps.current.value,
         npcs: all.size,
@@ -369,39 +405,38 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
   }, []);
   useFrame(onFrame);
 
-  // A clip lowers in: everyone walks out of its way, left or right, and sits.
+  // Something in the middle (a clip, or every scene but the title): everyone
+  // walks out of its way, left or right, and waits there. Otherwise they roam.
   useEffect(() => {
-    if (!playing) {
-      for (const n of npcs.current.values()) {
-        if (n.parkX === undefined) continue;
-        n.parkX = undefined;
-        n.vx = (Math.random() < 0.5 ? -1 : 1) * (8 + Math.random() * 22);
-      }
-      return;
-    }
     const frame = requestAnimationFrame(() => {
       const box = floor.current;
-      const clip = clipBox.current;
-      if (!box || !clip) return;
+      const middle = playing ? clipBox.current : scene !== "title" ? sceneBox.current : null;
+      if (!box || !middle) {
+        sides.current = null;
+        for (const n of npcs.current.values()) {
+          if (n.parkX === undefined) continue;
+          n.parkX = undefined;
+          n.vx = (Math.random() < 0.5 ? -1 : 1) * (8 + Math.random() * 22);
+        }
+        return;
+      }
       const b = box.getBoundingClientRect();
-      const c = clip.getBoundingClientRect();
-      const left = c.left - b.left;
-      const right = c.right - b.left;
-      const width = b.width;
+      const c = middle.getBoundingClientRect();
+      const keep = { left: c.left - b.left, right: c.right - b.left };
+      sides.current = keep;
       for (const n of npcs.current.values()) {
-        const toLeft = n.x + 20 < (left + right) / 2;
-        const lo = toLeft ? 8 : right + 12;
-        const hi = toLeft ? left - 56 : width - 48;
-        const x = lo <= hi ? lo + Math.random() * (hi - lo) : toLeft ? Math.max(0, hi) : Math.min(width - 40, lo);
+        const x = sideSpot(n.x + 20 < (keep.left + keep.right) / 2, keep, b.width);
         n.entering = false;
         n.parkX = x;
         n.vx = (x >= n.x ? 1 : -1) * 150;
-        n.bubble.classList.add("hidden");
-        n.bubbleUntil = 0;
+        if (playing) {
+          n.bubble.classList.add("hidden");
+          n.bubbleUntil = 0;
+        }
       }
     });
     return () => cancelAnimationFrame(frame);
-  }, [playing]);
+  }, [playing, scene, awardIndex, show]);
   const playingRef = useRef(playing);
   playingRef.current = playing;
   // Read from a ref: the end-of-clip timer may fire after it was closed by hand.
@@ -415,8 +450,22 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
   };
   const shownClip = playing ?? raising;
 
-  const winnerMoment = () => {
-    setWinner("Destiny Makes a Joke");
+  const winnerTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  /** Ends a cheer early: the banner goes back and everyone stops clapping. */
+  const endCheer = () => {
+    for (const t of winnerTimers.current) clearTimeout(t);
+    winnerTimers.current = [];
+    setWinner(null);
+    clapUntil.current = 0;
+    for (const n of npcs.current.values()) {
+      if (!n.clapUntil) continue;
+      n.clapUntil = 0;
+      setEmote(n, n.restore);
+    }
+  };
+  const winnerMoment = (name: string) => {
+    for (const t of winnerTimers.current) clearTimeout(t);
+    setWinner(name);
     const until = performance.now() + 4000;
     clapUntil.current = until;
     for (const n of npcs.current.values()) {
@@ -425,7 +474,43 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
       n.clapUntil = until;
       if (!n.entering) n.hop = 1;
     }
-    setTimeout(() => setWinner(null), 4000);
+    winnerTimers.current = [setTimeout(() => setWinner(null), 4000)];
+  };
+  const winnerOf = (a: ShowAward) =>
+    (a.results.find((r) => r.isWinner) ?? [...a.results].sort((x, y) => y.count - x.count)[0])?.title ?? "";
+  const sceneAt = SCENES.findIndex((x) => x.id === scene);
+
+  /** Moves between scenes; past the winner is the next award's title. */
+  const goTo = (index: number, next: Scene, backwards = false) => {
+    if (!show?.length) return;
+    const i = (index + show.length) % show.length;
+    closeClip();
+    endCheer();
+    setAwardIndex(i);
+    setScene(next);
+    if (next === "results") {
+      // Coming back from the winner, the board is shown finished.
+      setTarget(backwards ? show[i]!.results.length : 0);
+      setRevealed(backwards);
+      setRun((r) => r + 1);
+    }
+    if (next === "winner") {
+      const t = setTimeout(() => winnerMoment(winnerOf(show[i]!)), 700);
+      winnerTimers.current.push(t);
+    }
+  };
+  const step = (by: 1 | -1) => {
+    const at = SCENES.findIndex((x) => x.id === scene) + by;
+    if (at >= SCENES.length) goTo(awardIndex + 1, "title");
+    else if (at < 0) goTo(awardIndex - 1, "winner", true);
+    else goTo(awardIndex, SCENES[at]!.id, by < 0);
+  };
+  const cheer = (el: HTMLElement) => {
+    const frame = sceneBox.current?.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    if (!frame) return;
+    fire("CHEERSTINY", r.left - frame.left + 40, r.top - frame.top, 8);
+    setTimeout(() => fire("Klappa", r.left - frame.left + 180, r.top - frame.top, 8), 200);
   };
 
   return (
@@ -439,27 +524,63 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
           className="absolute inset-x-0 bottom-0 h-[52%]"
           style={{ background: "var(--ground)", borderTop: "6px solid var(--ground-edge)", borderRadius: "50% 50% 0 0 / 28px 28px 0 0" }}
         />
-        <div className="absolute inset-x-0 top-[5%] z-[200] text-center">
-          <Sketch className="inline-block" pad={3} radius={20} boil={!!winner} drawOn>
+        {/* The award's name along the top, except on its own title scene. */}
+        {award && (scene !== "title" || winner) && (
+          <div className="absolute inset-x-0 top-[5%] z-[200] text-center">
+            <Sketch className="inline-block" pad={3} radius={20} boil={!!winner} drawOn>
+              <div
+                key={winner ?? award.id}
+                className={`${drawn ? "rounded-[20px]" : "cozy-panel"} lab-pop inline-block px-7 py-3 text-2xl font-black sm:text-4xl`}
+                style={drawn ? { background: "var(--panel)" } : undefined}
+              >
+                {winner ? (
+                  <span className="flex items-center gap-3">
+                    <Emote name="CHEERSTINY" size={1.1} title="" /> {winner}
+                  </span>
+                ) : (
+                  award.title
+                )}
+              </div>
+            </Sketch>
+          </div>
+        )}
+        {show && show.length === 0 && (
+          <div className="absolute inset-x-0 top-[20%] z-[150] text-center">
+            <span className="cozy-panel inline-block px-6 py-4 font-bold">No awards to present.</span>
+          </div>
+        )}
+        {/* The scene, lowered in; out of sight while a clip plays over it. */}
+        {award && (
+          <div
+            className="pointer-events-none absolute inset-x-4 z-[150] flex justify-center"
+            style={{ top: scene === "title" ? "12%" : "calc(5% + 100px)", bottom: controlsHeight + 32 }}
+          >
             <div
-              key={winner ?? "award"}
-              className={`${drawn ? "rounded-[20px]" : "cozy-panel"} lab-pop inline-block px-7 py-3 text-2xl font-black sm:text-4xl`}
-              style={drawn ? { background: "var(--panel)" } : undefined}
+              key={`${scene}-${award.id}`}
+              ref={sceneBox}
+              className={`lab-lower pointer-events-auto relative h-fit max-h-full overflow-y-auto ${shownClip ? "invisible" : ""}`}
+              style={{ width: SCENE_WIDTH[scene] }}
             >
-              {winner ? (
-                <span className="flex items-center gap-3">
-                  <Emote name="CHEERSTINY" size={1.1} title="" /> {winner}
-                </span>
-              ) : (
-                "Omegalul of the Year"
+              {scene === "title" && <TitleCard award={award} index={awardIndex} count={show!.length} />}
+              {scene === "options" && <DvdMenu award={award} onPlay={setPlaying} keys={!playing} />}
+              {scene === "results" && (
+                <div className="cozy-panel relative overflow-hidden p-6">
+                  {bursts}
+                  <div className="mb-4 flex flex-wrap items-center gap-2">
+                    <span className="cozy-chip coral">Results</span>
+                    <span className="cozy-chip green hand text-base!">{award.total.toLocaleString()} votes</span>
+                  </div>
+                  <Board key={`${award.id}-${run}`} award={award} target={target} onWinner={cheer} onFinished={() => setRevealed(true)} />
+                </div>
               )}
+              {scene === "winner" && <WinnerCard award={award} onPlay={setPlaying} onCheer={() => winnerMoment(winnerOf(award))} />}
             </div>
-          </Sketch>
-        </div>
+          </div>
+        )}
         {shownClip && (
           // Lowered from the top to just above the controls, and raised away.
           <div
-            className="pointer-events-none absolute inset-x-4 z-[150] flex justify-center"
+            className="pointer-events-none absolute inset-x-4 z-[155] flex justify-center"
             style={{ top: "calc(5% + 100px)", bottom: controlsHeight + 32 }}
           >
             <div
@@ -515,36 +636,95 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
                 </label>
                 <p className="sm:col-span-2" style={{ color: "var(--muted)" }}>
                   {status.note}
+                  {feed === "sim" &&
+                    ` ${stats.emoteOnly.toLocaleString()} emote-only/s; the aggregator takes ${stats.ingestMs.toFixed(1)} ms each ¼ s.`}
                 </p>
               </div>
             )}
             <div className="flex flex-wrap items-center gap-3">
               <span className="cozy-chip coral">Presenting</span>
-              <span className="mr-auto text-xl font-black">Omegalul of the Year</span>
+              <select
+                value={awardIndex}
+                onChange={(e) => goTo(Number(e.currentTarget.value), "title")}
+                className="cozy-input mr-auto max-w-80 py-1! font-extrabold"
+                aria-label="Award"
+              >
+                {show?.map((a, i) => (
+                  <option key={a.id} value={i}>
+                    {i + 1}. {a.title}
+                  </option>
+                ))}
+              </select>
               <span className="cozy-chip">{stats.perSecond.toLocaleString()} msg/s</span>
               <span className="cozy-chip green">{feed === "live" ? "Live chat" : "Simulator"}</span>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <button type="button" className="cozy-btn primary" onClick={winnerMoment}>
-                <Emote name="Klappa" size={0.6} title="" /> Winner moment
-              </button>
-              <button
-                type="button"
-                className="cozy-btn"
-                disabled={clips.length === 0}
-                title={clips.length === 0 ? "No nominee has a built clip yet; build one in the admin editor" : undefined}
-                onClick={() => (playing ? closeClip() : !raising && setPlaying(clips[Math.floor(Math.random() * clips.length)]!))}
+            <div className="flex flex-wrap items-center gap-2">
+              <nav
+                aria-label="Scenes"
+                className="flex gap-1 rounded-full p-1"
+                style={{ background: "var(--cream)", border: "2px solid var(--panel-border)" }}
               >
-                {playing ? "Close the clip" : `Play a clip${clips.length ? ` (${clips.length})` : ""}`}
-              </button>
-              <button type="button" className="cozy-btn" onClick={() => setSettingsOpen(!settingsOpen)} aria-expanded={settingsOpen}>
-                Stage settings
-              </button>
-              {feed === "sim" && (
-                <span className="cozy-chip ml-auto">
-                  {stats.emoteOnly.toLocaleString()} emote-only/s · aggregator {stats.ingestMs.toFixed(1)} ms / ¼ s
-                </span>
+                {SCENES.map((x, i) => (
+                  <button
+                    key={x.id}
+                    type="button"
+                    onClick={() => scene !== x.id && goTo(awardIndex, x.id, i < sceneAt)}
+                    aria-current={scene === x.id ? "step" : undefined}
+                    className="rounded-full px-3 py-1 text-sm font-extrabold transition-colors"
+                    style={scene === x.id ? { background: "var(--header)", color: "white" } : { color: "var(--muted)" }}
+                  >
+                    {i + 1}. {x.label}
+                  </button>
+                ))}
+              </nav>
+              {scene === "results" && award && (
+                <>
+                  <button
+                    type="button"
+                    className="cozy-btn"
+                    onClick={() => setTarget((t) => Math.min(award.results.length, t + 1))}
+                    disabled={target >= award.results.length}
+                  >
+                    Reveal next
+                  </button>
+                  <button
+                    type="button"
+                    className="cozy-btn"
+                    onClick={() => setTarget(award.results.length)}
+                    disabled={target >= award.results.length}
+                  >
+                    Reveal all
+                  </button>
+                </>
               )}
+              {playing && (
+                <button type="button" className="cozy-btn" onClick={closeClip}>
+                  Close the clip
+                </button>
+              )}
+              <div className="ml-auto flex items-center gap-2">
+                <button type="button" className="cozy-btn" onClick={() => step(-1)} disabled={!show?.length}>
+                  ← Back
+                </button>
+                <button
+                  type="button"
+                  className={`cozy-btn ${scene !== "results" || revealed ? "primary" : ""}`}
+                  onClick={() => step(1)}
+                  disabled={!show?.length}
+                >
+                  {NEXT_LABEL[scene]} →
+                </button>
+                <button
+                  type="button"
+                  className={`cozy-btn round h-10 w-10 ${settingsOpen ? "primary" : ""}`}
+                  onClick={() => setSettingsOpen(!settingsOpen)}
+                  aria-expanded={settingsOpen}
+                  aria-label="Stage settings"
+                  title="Stage settings"
+                >
+                  <GearIcon />
+                </button>
+              </div>
             </div>
           </div>
         </div>

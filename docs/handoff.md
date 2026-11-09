@@ -319,6 +319,13 @@ StrawWaffle's notes, built:
   - the cast walks out of its way, left or right, and sits still: no hops, no newcomers, no leaving and no speech bubbles
   - characters already out still change emote when they send a new one
   - the music now fades out completely during a clip (it used to drop to a fifth)
+- **Presenting in scenes** (`Scenes.tsx`, driven from the big screen's controls). Each award goes through four scenes, and after the winner comes the next award's title:
+  1. **Title:** the award's name and description, big; the cast roams.
+  2. **Nominees:** a DVD-style menu. The highlighted nominee (arrow keys or the pointer) plays its clip silently in its tile, and Enter or a click plays it properly, lowered in.
+  3. **Results:** the results tab's reveal (`Board`, now exported from `Results.tsx` with `onFinished`), with Reveal next and Reveal all.
+  4. **Winner:** their picture, votes, "Play it again" and "Cheer again". Everyone claps as it opens.
+  - From the Nominees scene on, the cast keeps to the sides of what's in the middle, and newcomers walk straight to the sides. Back and Next step through, the numbered steps jump, and a dropdown picks the award. The data is the admin results preview joined to `/api/nominees`.
+- **Fixed: the "Characters at most" limit.** A verified message gave its sender a character past the limit, and lowering the limit didn't send anyone off. Now both respect it, and extras leave a few at a time.
 - **Clip controls** are our own in the lab look: play, a seek bar, the time, sound and full screen. They hide 2 s after the pointer stops while playing.
 
 ### Next: the lab page (StrawWaffle's answers, 2026-11-09)

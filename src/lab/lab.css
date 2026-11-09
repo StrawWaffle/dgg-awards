@@ -374,6 +374,17 @@ input[type="range"].cozy-range {
   animation: lab-raise 600ms ease-in forwards;
 }
 
+/* The DVD menu's pointer, nudging towards the highlighted nominee. */
+@keyframes lab-pointer {
+  50% {
+    translate: 3px 0;
+  }
+}
+.lab-pointer {
+  display: inline-block;
+  animation: lab-pointer 700ms ease-in-out infinite;
+}
+
 /* The clip's own controls: a cream bar over the bottom of the video. */
 .lab-video-bar {
   background: color-mix(in oklab, var(--panel) 92%, transparent);

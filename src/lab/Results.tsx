@@ -4,8 +4,28 @@ import { annotate } from "rough-notation";
 import { useBursts } from "@/lab/Bursts";
 import { cssVar, useDrawnLook } from "@/lab/sketch";
 
-type Result = { id: string; title: string; count: number; percentage: number; isWinner: boolean };
-type Award = { id: string; title: string; total: number; results: Result[] };
+export type Result = { id: string; title: string; count: number; percentage: number; isWinner: boolean };
+export type Award = { id: string; title: string; total: number; results: Result[] };
+
+/** Every award's results, from the admin preview (so it works before voting closes). */
+export function loadResults(): Promise<Award[]> {
+  return fetch("/api/vote/results?preview=1")
+    .then((r) => (r.ok ? r.json() : []))
+    .then((data: any[]) =>
+      data.map((c) => ({
+        id: c.categoryId,
+        title: c.categoryTitle,
+        total: c.totalVotes,
+        results: c.options.map((o: any) => ({
+          id: o.id,
+          title: o.title,
+          count: o.count,
+          percentage: o.percentage,
+          isWinner: o.isWinner,
+        })),
+      })),
+    );
+}
 
 const ROW_H = 46;
 const BAR_H = 26;
@@ -37,24 +57,8 @@ export function Results() {
   const [layer, fire] = useBursts();
 
   useEffect(() => {
-    fetch("/api/vote/results?preview=1")
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: any[]) =>
-        setAwards(
-          data.map((c) => ({
-            id: c.categoryId,
-            title: c.categoryTitle,
-            total: c.totalVotes,
-            results: c.options.map((o: any) => ({
-              id: o.id,
-              title: o.title,
-              count: o.count,
-              percentage: o.percentage,
-              isWinner: o.isWinner,
-            })),
-          })),
-        ),
-      )
+    loadResults()
+      .then(setAwards)
       .catch(() => setAwards([]));
   }, []);
 
@@ -196,7 +200,18 @@ type RowEls = {
 };
 
 /** One award's rows, revealed up to `target`, one bar at a time. */
-function Board({ award, target, onWinner }: { award: Award; target: number; onWinner: (el: HTMLElement) => void }) {
+export function Board({
+  award,
+  target,
+  onWinner,
+  onFinished,
+}: {
+  award: Award;
+  target: number;
+  onWinner: (el: HTMLElement) => void;
+  /** Once every row is drawn and in place. */
+  onFinished?: () => void;
+}) {
   const drawn = useDrawnLook();
   const n = award.results.length;
   // Last place first: the order they're revealed in.
@@ -204,6 +219,11 @@ function Board({ award, target, onWinner }: { award: Award; target: number; onWi
   const [start] = useState(() => scrambled(award.results.map((r) => r.id), award.id));
   /** How many have finished (drawn, boxed and slid into place). */
   const [done, setDone] = useState(0);
+  const finishedRef = useRef(onFinished);
+  finishedRef.current = onFinished;
+  useEffect(() => {
+    if (n > 0 && done === n) finishedRef.current?.();
+  }, [done, n]);
   const state = useRef(new Map(award.results.map((r) => [r.id, { v: 0, phase: "hidden" } as RowState])));
   const els = useRef(new Map<string, RowEls>());
   const [barW, setBarW] = useState(0);
