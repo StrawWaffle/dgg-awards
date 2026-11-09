@@ -27,13 +27,14 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 
 ### At a glance (end of session 2, 2026-11-09)
 
-**Live** (`main` at `33c108c` plus docs, deployed and pushed):
+**Live** (`main` at `55c5ce1` plus docs, deployed and pushed):
 - **Infrastructure:** the Docker preview behind a Cloudflare tunnel, real destiny.gg sign-in, the stack upgrade (Bun 1.4, Hono, Zod, TS 7), and clips into Cloudflare R2 at 1080p.
 - **Admin page:**
   - a left sidebar, dark theme, drag to reorder, and collapsible sections
   - the nominee editor with picture uploads (crop and resize in the browser), clips, data checks and DGG profile cards
   - one Settings form, admin management, vote stats with shared IPs
   - edit history with undo
+  - Settings → Backups: download a full backup, restore one, and the status of the hourly encrypted backups to Google Drive (see `docs/migration.md`)
   - hiding categories that have votes; export, and import with an automatic database backup
   - links at the bottom left to preview voting and results, open the site, and open the lab
   - at plain `/admin` (the page checks for an admin; the API refuses everyone else), and signing in returns you to the page you came from
@@ -88,7 +89,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 - Fast-forward `main`, run `docker compose --profile tunnel up -d --build app`, then check `/`, `/api/config`, `/lab`, `/admin` (200), `/api/admin/checks` and `/api/lab/emotes` (401), and `/signin` (to destiny.gg).
 - Push `main`.
 
-**Worktrees:** everything under `.claude/worktrees/` is merged (`admin-pass`, `editor-scroll`, `lab`, `lab-polish`, `lab-polish-2`, `lab-polish-3`, `lab-polish-4`, `lab-summary`, `admin-lab-link`, `duel-reveal`, `plain-admin`, `clip-preview`, `library-pictures`, `nominee-images`, `sketchy`) and can be removed.
+**Worktrees:** everything under `.claude/worktrees/` is merged (`admin-pass`, `editor-scroll`, `lab`, `lab-polish`, `lab-polish-2`, `lab-polish-3`, `lab-polish-4`, `lab-summary`, `admin-lab-link`, `duel-reveal`, `plain-admin`, `clip-preview`, `library-pictures`, `backups`, `nominee-images`, `sketchy`) and can be removed.
 
 **Test containers**, on network `dgga-test`, all kept running:
 
@@ -411,7 +412,7 @@ The Picture section has "From the library…" too: the library's pictures by fol
 - The cropper now hides "Upload as it is" when the server wouldn't take the file unchanged: AVIF (3 in the library), or over 5 MB (one 7.8 MB JPEG). Instead it converts: AVIF and JPEG come out as JPEG, others as PNG. If the result is still over 5 MB, it says to pick a smaller size.
 - Tested in the browser on the live library's files: an AVIF converted and set as the picture, the 7.8 MB JPEG converted at full size under 5 MB, and the GIF went straight up.
 
-### Full backups, restore and Google Drive (branch `worktree-backups`, 2026-11-09)
+### Full backups, restore and Google Drive (2026-11-09, deployed)
 
 StrawWaffle wanted the live database safe, a proper full export and import, and off-site backups to Google Drive (easier to share than R2, and a next maintainer won't have his R2). The guide is `docs/migration.md`.
 - **Settings → Backups** in the admin page:
@@ -425,6 +426,8 @@ StrawWaffle wanted the live database safe, a proper full export and import, and 
 - rclone 1.68.2 is in the image (pinned, checksum-checked). Its Drive remote comes from `RCLONE_CONFIG_GDRIVE_*` in `.env`, with scope `drive.file`, so it only sees its own files.
 - **Set up 2026-11-09** with StrawWaffle's Google account (15 GB). The token and `BACKUP_PASSWORD` are in the live `.env` only. StrawWaffle keeps the password in his password manager. Backups can't be restored without it.
 - `scripts/backup-decrypt.ts` decrypts a Drive backup without the site.
+- **Live since 2026-11-09 18:54 UTC.** The first database backup (268 KB) and media copy (2 files) are on Drive.
+- **Migration tested** by following `docs/migration.md` from the Drive folder alone. A new volume got the newest backup (decrypted with the script) and the media copied from Drive, then ran with local storage and no R2. It came back with the same 22 awards and 174 nominees as live, 9,328 votes and 502 users, and the clip played from local files. The test copy and volume were deleted.
 - `idleTimeout: 120` on the server: Bun's 10 s default cut off "Back up now".
 - Tested:
   - unit tests (`tests/backup.test.ts`: encryption round trip, wrong password, damage, the keeping rule)
