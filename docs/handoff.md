@@ -27,7 +27,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 
 ### At a glance (end of session 2, 2026-11-09)
 
-**Live** (`main` at `25570b2` plus docs, deployed and pushed):
+**Live** (`main` at `ff69dc6` plus docs, deployed and pushed):
 - **Infrastructure:** the Docker preview behind a Cloudflare tunnel, real destiny.gg sign-in, the stack upgrade (Bun 1.4, Hono, Zod, TS 7), and clips into Cloudflare R2 at 1080p.
 - **Admin page:**
   - a left sidebar, dark theme, drag to reorder, and collapsible sections
@@ -99,7 +99,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 - Fast-forward `main`, run `docker compose --profile tunnel up -d --build app`, then check `/`, `/api/config`, `/lab`, `/admin` (200), `/api/admin/checks` and `/api/lab/emotes` (401), and `/signin` (to destiny.gg).
 - Push `main`.
 
-**Worktrees:** everything under `.claude/worktrees/` is merged (`admin-pass`, `editor-scroll`, `lab`, `lab-polish`, `lab-polish-2`, `lab-polish-3`, `lab-polish-4`, `lab-summary`, `admin-lab-link`, `duel-reveal`, `plain-admin`, `clip-preview`, `library-pictures`, `backups`, `frontpage`, `no-ip`, `nominee-images`, `sketchy`) and can be removed.
+**Worktrees:** everything under `.claude/worktrees/` is merged (`admin-pass`, `editor-scroll`, `lab`, `lab-polish`, `lab-polish-2`, `lab-polish-3`, `lab-polish-4`, `lab-summary`, `admin-lab-link`, `duel-reveal`, `plain-admin`, `clip-preview`, `library-pictures`, `backups`, `frontpage`, `no-ip`, `privacy-flags`, `nominee-images`, `sketchy`) and can be removed.
 
 **Test containers**, on network `dgga-test`, all kept running:
 
@@ -464,7 +464,7 @@ StrawWaffle: "remove the ip tracking, and we don't need the encryption thing any
 - **Backups:** off-site backups are plain `.db` files now (they show who voted for what, so share the Drive folder only with organisers). They need only the rclone token. The older encrypted `.db.enc` files still restore with `BACKUP_PASSWORD` (kept in `.env` for that) and are deleted by the keeping rule within 60 days.
 - **Still holding IPs, until they age out:** the local backups in `/data/backups/` from before this (they keep the newest 20) and the encrypted Drive backups (60 days). They hold the test voters' fake "seed" addresses and the admins' sign-in addresses.
 
-### IP and browser recording as switches (branch `worktree-privacy-flags`, 2026-11-09)
+### IP and browser recording as switches (2026-11-09, deployed)
 
 StrawWaffle wasn't happy with removing them outright: the collaborator who'll host it later might want them. So both are now switches in **Settings → Privacy**, off for now:
 - `recordIp` keeps the visitor's address (Cloudflare's `CF-Connecting-IP`) with each new sign-in, and through it with each vote.
