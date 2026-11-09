@@ -2,7 +2,12 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import rough from "roughjs";
 import { annotate } from "rough-notation";
 import { useBursts } from "@/lab/Bursts";
-import { cssVar, drawIn, useDrawnLook } from "@/lab/sketch";
+import { cssVar, useDrawnLook } from "@/lab/sketch";
+
+/** How long one bar takes to draw, outline then hatching; and the gap between bars revealed together. */
+const OUTLINE_MS = 900;
+const HATCH_MS_PER_PX = 3;
+const STAGGER_MS = 1600;
 
 type Result = { id: string; title: string; count: number; percentage: number; isWinner: boolean };
 type Award = { id: string; title: string; total: number; results: Result[] };
@@ -18,6 +23,8 @@ export function Results() {
   const [awards, setAwards] = useState<Award[] | null>(null);
   const [index, setIndex] = useState(0);
   const [shown, setShown] = useState(0);
+  /** How many were shown before the latest reveal: rows revealed together draw one after another. */
+  const [before, setBefore] = useState(0);
   const box = useRef<HTMLDivElement>(null);
   const [layer, fire] = useBursts();
 
@@ -48,10 +55,14 @@ export function Results() {
   const go = (i: number) => {
     setIndex((i + awards.length) % awards.length);
     setShown(0);
+    setBefore(0);
   };
   const reveal = (count: number) => {
     const next = Math.min(n, count);
+    setBefore(shown);
     setShown(next);
+    // The winner's cheer waits for the bars below theirs to draw.
+    const wait = (next - shown - 1) * STAGGER_MS + 2600;
     if (next === n && box.current) {
       // The winner: a cheer from over their row, once its bar has drawn.
       setTimeout(() => {
@@ -62,7 +73,7 @@ export function Results() {
           fire("CHEERSTINY", r.left - frame.left + 60, r.top - frame.top, 8);
           setTimeout(() => fire("Klappa", r.left - frame.left + 200, r.top - frame.top, 8), 200);
         }
-      }, 900);
+      }, wait);
     }
   };
 
@@ -82,7 +93,9 @@ export function Results() {
           {award.results.map((r, i) => {
             // Row i is revealed once the bottom `shown` rows are.
             const revealed = i >= n - shown;
-            return <Row key={`${award.id}-${r.id}`} result={r} max={max} revealed={revealed} />;
+            // Bottom first: the lowest newly revealed row draws straight away.
+            const delay = Math.max(0, n - 1 - i - before) * STAGGER_MS;
+            return <Row key={`${award.id}-${r.id}`} result={r} max={max} revealed={revealed} delay={delay} />;
           })}
         </div>
       </div>
@@ -100,7 +113,14 @@ export function Results() {
         <button type="button" className="cozy-btn" onClick={() => reveal(n)} disabled={shown >= n}>
           Reveal everything
         </button>
-        <button type="button" className="cozy-btn" onClick={() => setShown(0)}>
+        <button
+          type="button"
+          className="cozy-btn"
+          onClick={() => {
+            setShown(0);
+            setBefore(0);
+          }}
+        >
           Hide again
         </button>
         <button type="button" className="cozy-btn" onClick={() => go(index + 1)}>
@@ -132,13 +152,20 @@ function Title({ text }: { text: string }) {
 }
 
 /** One nominee's row: name, a hand-drawn bar from zero, count and share. */
-function Row({ result, max, revealed }: { result: Result; max: number; revealed: boolean }) {
+function Row({ result, max, revealed, delay }: { result: Result; max: number; revealed: boolean; delay: number }) {
   const drawn = useDrawnLook();
   const bar = useRef<HTMLDivElement>(null);
   const svg = useRef<SVGSVGElement>(null);
   const name = useRef<HTMLSpanElement>(null);
   const [width, setWidth] = useState(0);
-  const count = useCountUp(revealed ? result.count : 0, revealed);
+  // Its numbers wait for the bar to start, and count up while it draws.
+  const [started, setStarted] = useState(false);
+  useEffect(() => {
+    if (!revealed) return setStarted(false);
+    const timer = setTimeout(() => setStarted(true), delay);
+    return () => clearTimeout(timer);
+  }, [revealed, delay]);
+  const count = useCountUp(started ? result.count : 0, started, OUTLINE_MS + 600);
   const colour = result.isWinner ? "var(--coral)" : "var(--primary-shadow)";
 
   useLayoutEffect(() => {
@@ -175,15 +202,35 @@ function Row({ result, max, revealed }: { result: Result; max: number; revealed:
         fillWeight: 1.6,
       });
       el.appendChild(node);
-      if (!wasRevealed.current) drawIn(el, 800);
+      if (!wasRevealed.current) {
+        // Like a pen: the outline first, then the hatching scribbled in from
+        // left to right (Rough.js draws the fill as one path of strokes in
+        // order), longer bars taking longer.
+        const paths = [...node.querySelectorAll("path")];
+        const outline = paths.slice(-1);
+        const hatch = paths.slice(0, -1);
+        const hatchMs = Math.min(3200, 500 + w * HATCH_MS_PER_PX);
+        const stroke = (path: SVGPathElement, ms: number, wait: number) => {
+          const length = path.getTotalLength();
+          path.style.strokeDasharray = `${length}`;
+          path.animate([{ strokeDashoffset: length }, { strokeDashoffset: 0 }], {
+            duration: ms,
+            delay: wait,
+            easing: "cubic-bezier(.4,.1,.4,1)",
+            fill: "backwards",
+          });
+        };
+        outline.forEach((p) => stroke(p, OUTLINE_MS, delay));
+        hatch.forEach((p) => stroke(p, hatchMs, delay + OUTLINE_MS * 0.7));
+      }
     } else {
       const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
       Object.entries({ x: 3, y: 4, width: w, height: 26, rx: 8, fill: "currentColor" }).forEach(([k, v]) => rect.setAttribute(k, String(v)));
       el.appendChild(rect);
-      rect.animate([{ width: 0 }, { width: w }], { duration: 600, easing: "ease-out" });
+      rect.animate([{ width: 0 }, { width: w }], { duration: 900, delay, easing: "ease-out", fill: "backwards" });
     }
     wasRevealed.current = true;
-  }, [revealed, width, max, result, drawn]);
+  }, [revealed, width, max, result, drawn, delay]);
 
   // Circle the winner's name once their bar is in.
   useEffect(() => {
@@ -195,12 +242,12 @@ function Row({ result, max, revealed }: { result: Result; max: number; revealed:
       padding: drawn ? 10 : 2,
       animationDuration: 800,
     });
-    const timer = setTimeout(() => a.show(), 850);
+    const timer = setTimeout(() => a.show(), delay + 2400);
     return () => {
       clearTimeout(timer);
       a.remove();
     };
-  }, [revealed, result.isWinner, drawn]);
+  }, [revealed, result.isWinner, drawn, delay]);
 
   return (
     <div className="grid grid-cols-[minmax(8rem,14rem)_1fr_7rem] items-center gap-4" data-winner={result.isWinner && revealed ? "" : undefined}>
@@ -210,14 +257,14 @@ function Row({ result, max, revealed }: { result: Result; max: number; revealed:
         </span>
       </span>
       <div ref={bar} className="relative h-[34px]">
-        {!revealed && (
+        {!started && (
           // A pencilled dashed line where the bar will be.
           <div className="absolute top-1/2 left-1 right-4 border-t-2 border-dashed opacity-40" style={{ borderColor: "var(--muted)" }} />
         )}
         <svg ref={svg} aria-hidden className="absolute inset-0 h-full w-full overflow-visible" style={{ color: colour }} />
       </div>
       <span className="hand text-xl font-bold tabular-nums" aria-live="polite">
-        {revealed ? (
+        {started ? (
           <>
             {count.toLocaleString()} <span style={{ color: "var(--muted)" }}>· {result.percentage}%</span>
           </>

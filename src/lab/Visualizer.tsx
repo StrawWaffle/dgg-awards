@@ -28,7 +28,9 @@ export function Visualizer({ source, setSource }: { source: Source; setSource: (
       if (dot && levels[s].beat) dot.animate([{ opacity: 1, scale: 1.6 }, { opacity: 0.2, scale: 1 }], { duration: 300 });
     }
     const l = levels[sourceRef.current];
-    if (l.beat) hop.current = 1;
+    // A big hop on the one of each bar, a little bob on the other beats.
+    if (l.downbeat) hop.current = 1;
+    else if (l.beat) hop.current = Math.max(hop.current, 0.3);
     hop.current = Math.max(0, hop.current - dt * 5);
     dancers.current.forEach((el, i) => {
       if (!el) return;

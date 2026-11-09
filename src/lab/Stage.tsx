@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Emote } from "@/lab/Emote";
+import { type Clip, ClipPlayer } from "@/lab/ClipPlayer";
 import { Sketch, useDrawnLook } from "@/lab/sketch";
 import { type FeedStatus, liveFeed, simulatedFeed } from "@/lab/chatFeed";
 import { type Levels, type Source, useFrame } from "@/lab/music";
@@ -16,6 +17,13 @@ type Npc = {
   depth: number;
   vx: number;
   hop: number;
+  /** A small bounce on each beat, apart from the hop on the one. */
+  bob: number;
+  opacity: number;
+  /** Walking in from an edge; doesn't turn round until it's on stage. */
+  entering: boolean;
+  /** Walking off; removed once it's off stage or faded out. */
+  leaving: boolean;
   lastSeen: number;
   bubbleUntil: number;
   clapUntil: number;
@@ -56,6 +64,31 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
   const [winner, setWinner] = useState<string | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [clips, setClips] = useState<Clip[]>([]);
+  const [playing, setPlaying] = useState<Clip | null>(null);
+  useEffect(() => {
+    fetch("/api/nominees")
+      .then((r) => r.json())
+      .then((data) =>
+        setClips(
+          Array.isArray(data)
+            ? data.flatMap((c: any) =>
+                c.options
+                  .filter((o: any) => o.clipUrl)
+                  .map((o: any) => ({
+                    title: `${o.title} · ${c.title}`,
+                    clipUrl: o.clipUrl,
+                    thumbnailUrl: o.thumbnailUrl,
+                    url: o.url,
+                    linkType: o.linkType,
+                    clipStart: o.clipStart,
+                  })),
+              )
+            : [],
+        ),
+      )
+      .catch(() => setClips([]));
+  }, []);
   const drawn = useDrawnLook();
   const settings = useRef({ rate, emoteShare, max, names, showSaid });
   settings.current = { rate, emoteShare, max, names, showSaid };
@@ -77,16 +110,23 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
     emoteEl.className = `emote ${emote}`;
     el.append(bubble, label, emoteEl);
     box.append(el);
+    el.style.opacity = "0";
+    // In from the left or the right edge, walking onto the stage.
+    const fromLeft = Math.random() < 0.5;
     const npc: Npc = {
       el,
       emoteEl,
       bubble,
       nick,
       emote,
-      x: Math.random() * box.clientWidth,
+      x: fromLeft ? -50 : box.clientWidth + 10,
       depth: Math.random(),
-      vx: (Math.random() < 0.5 ? -1 : 1) * (15 + Math.random() * 35),
-      hop: 1,
+      vx: (fromLeft ? 1 : -1) * (45 + Math.random() * 35),
+      hop: 0,
+      bob: 0,
+      opacity: 0,
+      entering: true,
+      leaving: false,
       lastSeen: performance.now(),
       bubbleUntil: 0,
       clapUntil: 0,
@@ -96,10 +136,18 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
     return npc;
   }, []);
 
-  const remove = useCallback((npc: Npc) => {
-    npc.el.remove();
+  /** Walk off towards the nearest edge, fading; the frame loop removes it. */
+  const leave = useCallback((npc: Npc) => {
+    if (npc.leaving) return;
+    npc.leaving = true;
+    npc.entering = false;
+    const width = floor.current?.clientWidth ?? 0;
+    npc.vx = (npc.x < width / 2 ? -1 : 1) * 130;
+    // Its nick is free again at once, so a returning chatter gets a new character.
     npcs.current.delete(npc.nick);
+    leavingNpcs.current.add(npc);
   }, []);
+  const leavingNpcs = useRef(new Set<Npc>());
 
   const onSummary = useCallback(
     (summary: ChatSummary, feedStatus: FeedStatus) => {
@@ -110,10 +158,10 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
         let npc = all.get(event.nick);
         if (!npc) {
           if (all.size >= settings.current.max) {
-            // Make room: whoever has been quiet longest goes.
+            // Make room: whoever has been quiet longest walks off.
             let oldest: Npc | null = null;
             for (const n of all.values()) if (!oldest || n.lastSeen < oldest.lastSeen) oldest = n;
-            if (oldest) remove(oldest);
+            if (oldest) leave(oldest);
           }
           npc = spawn(event.nick, event.emote, event.flair);
           if (clapUntil.current > now) npc.clapUntil = clapUntil.current;
@@ -121,7 +169,7 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
         // During a winner moment everyone claps, newcomers too.
         setEmote(npc, npc.clapUntil > now ? "Klappa" : event.emote);
         if (npc.clapUntil > now) npc.restore = event.emote;
-        npc.hop = 1;
+        if (!npc.entering) npc.hop = Math.max(npc.hop, 0.6);
         npc.lastSeen = now;
       }
       const said = settings.current.showSaid ? summary.said : [];
@@ -143,8 +191,8 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
         setCombo(summary.combo);
         for (const n of all.values()) if (n.emote === summary.combo.emote) n.hop = 1.4;
       } else setCombo(null);
-      // Characters leave after a minute of silence.
-      for (const n of all.values()) if (now - n.lastSeen > 60_000) remove(n);
+      // Characters walk off after a minute of silence.
+      for (const n of [...all.values()]) if (now - n.lastSeen > 60_000) leave(n);
       setStats((s) => ({
         fps: fps.current.value,
         npcs: all.size,
@@ -153,7 +201,7 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
         ingestMs: feedStatus.ingestMs ?? 0,
       }));
     },
-    [remove, spawn],
+    [leave, spawn],
   );
 
   useEffect(() => {
@@ -162,11 +210,11 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
     return simulatedFeed(emotes, () => settings.current.rate, () => settings.current.emoteShare, onSummary);
   }, [feed, emotes, onSummary]);
 
-  // A clean stage and chat when switching feeds.
+  // Everyone walks off and the chat clears when switching feeds.
   useEffect(() => {
-    for (const n of [...npcs.current.values()]) remove(n);
+    for (const n of [...npcs.current.values()]) leave(n);
     setLines([]);
-  }, [feed, remove]);
+  }, [feed, leave]);
 
   // Keep the chat column scrolled to the newest line.
   const chat = useRef<HTMLDivElement>(null);
@@ -191,18 +239,39 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
     const width = box.clientWidth;
     const height = box.clientHeight;
     const showNames = settings.current.names;
-    for (const n of npcs.current.values()) {
-      if (music.beat) n.hop = Math.max(n.hop, 0.5);
+    const everyone = [...npcs.current.values(), ...leavingNpcs.current];
+    for (const n of everyone) {
+      // The music: a jump on the one of each bar, a little bob on the others.
+      if (!n.entering && !n.leaving) {
+        if (music.downbeat) n.hop = Math.max(n.hop, 0.75);
+        else if (music.beat) n.bob = 1;
+      }
       n.x += n.vx * dt;
-      if (n.x < 0 || n.x > width - 40) {
+      if (n.entering) {
+        // Stroll in, then slow to a wander once on stage.
+        if (n.x >= 0 && n.x <= width - 40) {
+          n.entering = false;
+          n.vx = Math.sign(n.vx) * (15 + Math.random() * 35);
+        }
+      } else if (!n.leaving && (n.x < 0 || n.x > width - 40)) {
         n.vx = -n.vx;
         n.x = Math.max(0, Math.min(width - 40, n.x));
       }
-      n.hop = Math.max(0, n.hop - dt * 3);
+      n.opacity = n.leaving ? n.opacity - dt * 1.2 : Math.min(1, n.opacity + dt * 2.5);
+      if (n.leaving && (n.opacity <= 0 || n.x < -80 || n.x > width + 40)) {
+        n.el.remove();
+        leavingNpcs.current.delete(n);
+        continue;
+      }
+      n.hop = Math.max(0, n.hop - dt * 2.4);
+      n.bob = Math.max(0, n.bob - dt * 7);
       // On the grass: back row higher and smaller, front row lower and bigger.
-      const y = height * 0.42 + n.depth * height * 0.42 - Math.sin(n.hop * Math.PI) * 26 * n.hop;
+      const y =
+        height * 0.42 + n.depth * height * 0.42 - Math.sin(n.hop * Math.PI) * 30 * n.hop - n.bob * 5;
       const scale = 0.7 + n.depth * 0.6;
-      n.el.style.transform = `translate3d(${n.x}px, ${y}px, 0) scale(${scale})`;
+      // The bob squashes a little, like landing.
+      n.el.style.transform = `translate3d(${n.x}px, ${y}px, 0) scale(${scale * (1 + n.bob * 0.04)}, ${scale * (1 - n.bob * 0.06)})`;
+      n.el.style.opacity = String(Math.max(0, n.opacity));
       n.el.style.zIndex = String(Math.round(n.depth * 100));
       (n.el.children[1] as HTMLElement).style.display = showNames ? "" : "none";
       if (n.bubbleUntil && now > n.bubbleUntil) {
@@ -225,7 +294,7 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
       if (!n.clapUntil) n.restore = n.emote;
       setEmote(n, "Klappa");
       n.clapUntil = until;
-      n.hop = 1;
+      if (!n.entering) n.hop = 1;
     }
     setTimeout(() => setWinner(null), 4000);
   };
@@ -247,7 +316,8 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
             <div className="absolute inset-x-0 top-[7%] z-[200] text-center">
               <Sketch className="inline-block" pad={3} radius={20} boil={!!winner} drawOn>
                 <div
-                  className={`${drawn ? "rounded-[20px]" : "cozy-panel"} inline-block px-7 py-3 text-2xl font-black sm:text-4xl`}
+                  key={winner ?? "award"}
+                  className={`${drawn ? "rounded-[20px]" : "cozy-panel"} lab-pop inline-block px-7 py-3 text-2xl font-black sm:text-4xl`}
                   style={drawn ? { background: "var(--panel)" } : undefined}
                 >
                   {winner ? (
@@ -260,7 +330,12 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
                 </div>
               </Sketch>
             </div>
-            <div ref={floor} className="absolute inset-0" />
+            {playing && (
+              <div key={playing.clipUrl} className="lab-pop absolute inset-x-[16%] top-[22%] z-[150]">
+                <ClipPlayer clip={playing} onEnded={() => setTimeout(() => setPlaying(null), 1500)} />
+              </div>
+            )}
+            <div ref={floor} className="pointer-events-none absolute inset-0 z-[160]" />
             <div className="cozy-chip absolute top-3 left-3 z-[200] font-mono text-[11px]!">
               {stats.fps} fps · {stats.npcs} on stage
             </div>
@@ -281,6 +356,15 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
           <div className="flex flex-wrap gap-3">
             <button type="button" className="cozy-btn primary" onClick={winnerMoment}>
               <Emote name="Klappa" size={0.6} title="" /> Winner moment
+            </button>
+            <button
+              type="button"
+              className="cozy-btn"
+              disabled={clips.length === 0}
+              title={clips.length === 0 ? "No nominee has a built clip yet; build one in the admin editor" : undefined}
+              onClick={() => setPlaying(playing ? null : clips[Math.floor(Math.random() * clips.length)]!)}
+            >
+              {playing ? "Close the clip" : `Play a clip${clips.length ? ` (${clips.length})` : ""}`}
             </button>
             <button type="button" className="cozy-btn" onClick={() => setSettingsOpen(!settingsOpen)} aria-expanded={settingsOpen}>
               Stage settings

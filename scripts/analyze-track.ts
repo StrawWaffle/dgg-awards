@@ -199,10 +199,22 @@ function curve(values: Float64Array) {
   return out;
 }
 
+// Bars, assuming 4/4: which beat is the "one". The kick usually lands hardest
+// there, so of the four ways to group the beats, take the one whose first
+// beats carry the most bass.
+const bassAt = (t: number) => energy[0]![Math.min(frames - 1, Math.round(t / hopS))]!;
+const barScores = [0, 1, 2, 3].map((offset) =>
+  beats.reduce((sum, t, i) => (i % 4 === offset ? sum + bassAt(t) : sum), 0),
+);
+const downbeat = barScores.indexOf(Math.max(...barScores));
+console.log("bass on each beat of the bar:", barScores.map((x) => x.toFixed(0)).join(", "), "→ the one is beat", downbeat);
+
 const map = {
   track: input.split("/").pop(),
   duration: Number(duration.toFixed(3)),
   bpm: Number(bpm.toFixed(2)),
+  /** Index into `beats` of the first downbeat; every 4th beat from it starts a bar. */
+  downbeat,
   step: STEP_S,
   beats,
   onsets: onsets.map((t) => Number(t.toFixed(3))),

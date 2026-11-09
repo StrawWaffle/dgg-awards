@@ -233,6 +233,18 @@ StrawWaffle: part of what makes the skin cute is its drawn buttons and details. 
   - Checked in light and dark with no console errors.
 - **Ideas not built yet:** drawn outlines on buttons (the skin's own detail); scribbled hand-drawn icons in place of the radix ones; a drawn arrow pointing at the winner; "boiling" only at moments (the winner) and still otherwise, if the constant boil is too busy.
 
+### Lab polish (branch `worktree-lab-polish`, 2026-11-09, not deployed)
+
+StrawWaffle's notes after trying the lab:
+- **Bars draw like a pen, slowly.** Each draws its outline first (0.9 s), then scribbles its hatching in from left to right; Rough.js draws the fill as one path of strokes in order. Longer bars take longer (up to 3.2 s). Bars revealed together draw one after another from the bottom, 1.6 s apart. Numbers count up as their bar starts, the rows still waiting keep their pencilled dashes, and the winner's circle and cheer wait for their bar.
+- **One music button.** It shows Listening while the music is audible and MMMM when muted, with a speaker icon on hover. The volume slider stays. Muting keeps the track playing silently, so the visuals keep dancing.
+- **4/4 beats.** The analysis now finds which beat is the "one" by bass on each of the four positions (147 against 98 to 127, so beat 0) and stores `downbeat` in the beat map. On the stage and the sound check, characters jump on the one and do a small squash-bob on the other beats. The live analyser counts its beats in fours, but can't know which is the one.
+- **Transitions.** Characters walk on from a side edge, fading in, and walk off the nearest edge, fading out, when they leave (making room, after a minute of silence, or on a feed change). The award sign and clips pop in with a small overshoot. All of it is off for reduced motion.
+- **Clips are in the lab now** (`ClipPlayer.tsx`). The clip sits in a boiling hand-drawn frame, plays once without looping, and links to the full source at the start time. The music ducks to a fifth while it plays.
+  - Voting cards with a built clip get a "▶ Clip" button over the picture (a separate button, not nested in the card), which opens it in a dialog.
+  - The big screen has "Play a clip", which shows a random built clip on the stage with the characters in front. It closes itself after the clip ends.
+- **Checked:** clips play in Firefox. Plain Chromium (the test browser) has no H.264 (error 4), unlike real Chrome and Edge.
+
 ### Next: the lab page (StrawWaffle's answers, 2026-11-09)
 
 StrawWaffle wants the front page and the presentation to feel fun, quirky and wholesome. It gets built on an experimental page first (`/lab`, admins only) until rinlux approves. Order: the follow-ups above, merge and deploy, then the lab.

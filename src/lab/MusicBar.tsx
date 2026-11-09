@@ -1,33 +1,32 @@
+import { SpeakerLoudIcon, SpeakerOffIcon } from "@radix-ui/react-icons";
 import { Emote } from "@/lab/Emote";
 import { music, useMusic } from "@/lab/music";
 
 /**
- * Play or pause, mute and volume, for the header. Remembered per browser;
- * the music starts on the first click unless it was switched off.
+ * The music in the header: one emote button, Listening while the music plays
+ * and MMMM when it's muted (hovering shows the usual speaker icon), and the
+ * volume beside it. Remembered per browser; the music starts on the first
+ * click unless it was muted last time.
  */
 export function MusicBar() {
   const state = useMusic();
+  const audible = state.playing && !state.muted;
+  const toggle = () => {
+    if (!state.playing) {
+      music.setMuted(false);
+      music.play();
+    } else music.setMuted(!state.muted);
+  };
+  const label = audible ? "Mute the music" : "Play the music";
   return (
     <div className="flex items-center gap-2">
-      <button
-        type="button"
-        onClick={() => (state.playing ? music.pause() : music.play())}
-        className="cozy-btn round h-10 w-10"
-        aria-label={state.playing ? "Pause the music" : "Play the music"}
-        title={state.playing ? "Pause the music" : "Play the music"}
-      >
-        {/* Listening while it plays, as dgg-radio does for music. */}
-        <span className={state.playing ? "" : "opacity-40 grayscale"}>
-          <Emote name="Listening" size={0.75} title="" />
+      <button type="button" onClick={toggle} className="cozy-btn round group relative h-10 w-10" aria-label={label} title={label}>
+        <span className="transition-opacity group-hover:opacity-0">
+          <Emote name={audible ? "Listening" : "MMMM"} size={0.75} title="" />
         </span>
-      </button>
-      <button
-        type="button"
-        onClick={() => music.setMuted(!state.muted)}
-        className="cozy-btn px-3! py-1.5! text-sm"
-        aria-pressed={state.muted}
-      >
-        {state.muted ? "Unmute" : "Mute"}
+        <span className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
+          {audible ? <SpeakerOffIcon width={18} height={18} /> : <SpeakerLoudIcon width={18} height={18} />}
+        </span>
       </button>
       <input
         type="range"

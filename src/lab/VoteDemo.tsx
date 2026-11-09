@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { originOf, useBursts } from "@/lab/Bursts";
 import { Emote } from "@/lab/Emote";
+import { Dialog } from "radix-ui";
+import { type Clip, ClipPlayer } from "@/lab/ClipPlayer";
 import { cssVar, useDrawnLook } from "@/lab/sketch";
 import { annotate } from "rough-notation";
 
-type Nominee = { id: string; title: string; image: string | null };
+type Nominee = { id: string; title: string; image: string | null; clip: Clip | null };
 type Award = { id: string; title: string; description: string; nominees: Nominee[] };
 type Choice = { award: string; pick: string | null };
 
@@ -25,6 +27,7 @@ export function VoteDemo() {
   const [choices, setChoices] = useState<Choice[]>([]);
   const [picked, setPicked] = useState<string | null>(null);
   const [answer, setAnswer] = useState("");
+  const [watching, setWatching] = useState<Clip | null>(null);
   const drawn = useDrawnLook();
   const grid = useRef<HTMLDivElement>(null);
 
@@ -52,6 +55,9 @@ export function VoteDemo() {
               id: o.id,
               title: o.title,
               image: o.thumbnailUrl ?? (o.imageId ? `/Media/${o.imageId}` : null),
+              clip: o.clipUrl
+                ? { title: o.title, clipUrl: o.clipUrl, thumbnailUrl: o.thumbnailUrl, url: o.url, linkType: o.linkType, clipStart: o.clipStart }
+                : null,
             })),
           })),
         );
@@ -76,6 +82,21 @@ export function VoteDemo() {
 
   return (
     <div className="grid gap-5 md:grid-cols-[260px_1fr]">
+      <Dialog.Root open={!!watching} onOpenChange={(open) => !open && setWatching(null)}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40" />
+          <Dialog.Content
+            className="cozy-panel lab-pop fixed top-1/2 left-1/2 z-50 w-[min(880px,94vw)] -translate-x-1/2 -translate-y-1/2 space-y-3 p-5"
+            aria-describedby={undefined}
+          >
+            <div className="flex items-center justify-between">
+              <Dialog.Title className="text-xl font-black">{watching?.title}</Dialog.Title>
+              <Dialog.Close className="cozy-btn">Close</Dialog.Close>
+            </div>
+            {watching && <ClipPlayer clip={watching} />}
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
       <aside className="cozy-panel h-fit p-3">
         <div className="flex items-center justify-between px-2 pb-2">
           <span className="font-black">Your ballot</span>
@@ -128,15 +149,15 @@ export function VoteDemo() {
               {award.nominees.map((n) => {
                 const mine = picked === n.id;
                 return (
+                  <div key={n.id} className="relative">
                   <button
-                    key={n.id}
                     data-nominee={n.id}
                     type="button"
                     onClick={(e) => {
                       setPicked(n.id);
                       fire("Klappa", ...originOf(e, box.current), 6);
                     }}
-                    className="group rounded-[20px] border-2 p-2 text-left transition-[translate,box-shadow] active:translate-y-[3px]"
+                    className="group block h-full w-full rounded-[20px] border-2 p-2 text-left transition-[translate,box-shadow] active:translate-y-[3px]"
                     style={{
                       background: "var(--cream)",
                       borderColor: mine ? "var(--primary-shadow)" : "var(--panel-border)",
@@ -144,7 +165,7 @@ export function VoteDemo() {
                     }}
                     aria-pressed={mine}
                   >
-                    <div className="aspect-[4/3] overflow-hidden rounded-[14px]" style={{ background: "var(--panel-border)" }}>
+                    <div className="relative aspect-[4/3] overflow-hidden rounded-[14px]" style={{ background: "var(--panel-border)" }}>
                       {n.image && <img src={n.image} alt="" className="h-full w-full object-cover" loading="lazy" />}
                     </div>
                     <div className="flex items-center justify-between gap-2 px-1 pt-2">
@@ -152,6 +173,19 @@ export function VoteDemo() {
                       {mine && <span className="cozy-chip green shrink-0">Your pick</span>}
                     </div>
                   </button>
+                  {n.clip && (
+                    // Beside the card's button, placed over its picture (a button
+                    // can't hold another button).
+                    <button
+                      type="button"
+                      aria-label={`Watch the clip of ${n.title}`}
+                      className="cozy-chip coral absolute top-4 right-4 cursor-pointer"
+                      onClick={() => setWatching(n.clip)}
+                    >
+                      ▶ Clip
+                    </button>
+                  )}
+                  </div>
                 );
               })}
             </div>

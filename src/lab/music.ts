@@ -14,12 +14,14 @@ export type Levels = {
   high: number;
   /** True on the frame a beat lands. */
   beat: boolean;
+  /** True on the frame a bar starts (the "one" of 4/4): a bigger moment. */
+  downbeat: boolean;
   /** Seconds into the track. */
   time: number;
 };
 export type Source = "live" | "map";
 
-const SILENT: Levels = { bass: 0, mid: 0, high: 0, beat: false, time: 0 };
+const SILENT: Levels = { bass: 0, mid: 0, high: 0, beat: false, downbeat: false, time: 0 };
 const PREFS_KEY = "lab.music";
 const DEFAULT_VOLUME = 0.25;
 
@@ -44,6 +46,8 @@ class Music {
   // Live beat detection: bass well above its recent average, at most every 250 ms.
   private bassHistory: number[] = [];
   private lastLiveBeat = 0;
+  /** Live beats counted in fours; the live analyser can't tell which is the one. */
+  private liveBeats = 0;
   private lastMapTime = 0;
   readonly map = beatMap;
 
@@ -89,8 +93,17 @@ class Music {
     this.applyVolume();
   }
 
-  private applyVolume() {
-    if (this.gain) this.gain.gain.value = this.prefs.muted ? 0 : this.prefs.volume;
+  /** While a clip plays the music drops to a fifth, gliding down and back. */
+  private ducked = false;
+  setDucked(on: boolean) {
+    this.ducked = on;
+    this.applyVolume(0.6);
+  }
+
+  private applyVolume(glide = 0.05) {
+    if (!this.gain || !this.ctx) return;
+    const target = this.prefs.muted ? 0 : this.prefs.volume * (this.ducked ? 0.2 : 1);
+    this.gain.gain.setTargetAtTime(target, this.ctx.currentTime, glide / 3);
   }
 
   async play() {
@@ -138,18 +151,25 @@ class Music {
     const avg = this.bassHistory.reduce((a, b) => a + b, 0) / this.bassHistory.length;
     const now = performance.now();
     const beat = bass > 0.3 && bass > avg * 1.25 && now - this.lastLiveBeat > 250;
-    if (beat) this.lastLiveBeat = now;
+    if (beat) {
+      this.lastLiveBeat = now;
+      this.liveBeats++;
+    }
+    const downbeat = beat && this.liveBeats % 4 === 1;
     // The analyser reads quietly; stretch it to use the whole 0–1.
-    return { bass: Math.min(1, bass * 1.3), mid: Math.min(1, mid * 1.8), high: Math.min(1, high * 3), beat, time };
+    return { bass: Math.min(1, bass * 1.3), mid: Math.min(1, mid * 1.8), high: Math.min(1, high * 3), beat, downbeat, time };
   }
 
   private fromMap(time: number): Levels {
     const i = Math.min(this.map.bass.length - 1, Math.floor(time / this.map.step));
-    // A beat if one fell between the last frame and this one (looping resets).
+    // A beat if one fell between the last frame and this one (looping resets);
+    // a downbeat if it was the one of its bar.
     const from = time < this.lastMapTime ? -1 : this.lastMapTime;
-    const beat = this.map.beats.some((t) => t > from && t <= time);
+    const hit = this.map.beats.findIndex((t) => t > from && t <= time);
+    const beat = hit >= 0;
+    const downbeat = beat && (hit - this.map.downbeat) % 4 === 0;
     this.lastMapTime = time;
-    return { bass: this.map.bass[i]! / 100, mid: this.map.mid[i]! / 100, high: this.map.high[i]! / 100, beat, time };
+    return { bass: this.map.bass[i]! / 100, mid: this.map.mid[i]! / 100, high: this.map.high[i]! / 100, beat, downbeat, time };
   }
 }
 
