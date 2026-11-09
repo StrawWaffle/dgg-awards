@@ -1,6 +1,7 @@
 import "@/admin/admin.css";
 import { useEffect, useState } from "react";
 import { AdminsTab } from "@/admin/components/AdminsTab";
+import { HistoryTab } from "@/admin/components/history/HistoryTab";
 import { NomineeEditor } from "@/admin/components/editor/NomineeEditor";
 import { SettingsTab } from "@/admin/components/SettingsTab";
 import { SideLabel, TabTrigger, sideItemClass } from "@/admin/components/TabTrigger";
@@ -9,6 +10,7 @@ import { type Theme, useTheme } from "@/admin/theme";
 import { useStored } from "@/admin/useStored";
 import {
   BarChartIcon,
+  CounterClockwiseClockIcon,
   DesktopIcon,
   DoubleArrowLeftIcon,
   DoubleArrowRightIcon,
@@ -23,12 +25,17 @@ import {
 } from "@radix-ui/react-icons";
 import { Tabs } from "radix-ui";
 import clsx from "clsx";
-import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { MutationCache, QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { fetchAuthSession, fetchConfig } from "@/lib/queries";
 
-const queryClient = new QueryClient();
+// Every change made here lands in the edit history, so refresh it after any.
+const queryClient: QueryClient = new QueryClient({
+  mutationCache: new MutationCache({
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["history"] }),
+  }),
+});
 
-const tabs = ["nominees", "settings", "admins", "votes"] as const;
+const tabs = ["nominees", "settings", "admins", "votes", "history"] as const;
 type Tab = (typeof tabs)[number];
 const tabFromHash = (): Tab => {
   const hash = location.hash.slice(1);
@@ -105,6 +112,9 @@ function AdminPage() {
           <TabTrigger value="votes" icon={<BarChartIcon />} collapsed={collapsed}>
             Votes
           </TabTrigger>
+          <TabTrigger value="history" icon={<CounterClockwiseClockIcon />} collapsed={collapsed}>
+            History
+          </TabTrigger>
         </Tabs.List>
 
         <div className="flex flex-wrap items-center gap-1 border-t border-neutral-200 pt-2 md:mt-auto md:flex-col md:items-stretch">
@@ -139,6 +149,9 @@ function AdminPage() {
         </Tabs.Content>
         <Tabs.Content value="votes" className="outline-none">
           <VotesTab />
+        </Tabs.Content>
+        <Tabs.Content value="history" className="outline-none">
+          <HistoryTab />
         </Tabs.Content>
       </main>
     </Tabs.Root>

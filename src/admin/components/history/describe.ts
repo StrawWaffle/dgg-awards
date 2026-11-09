@@ -1,0 +1,99 @@
+// How history entries read: a sentence for each, and readable field values.
+import { formatTimestamp } from "@/lib/links";
+import type { HistoryEntry } from "@/lib/queries";
+
+type Snapshot = Record<string, unknown>;
+
+const fieldNames: Record<string, string> = {
+  title: "title",
+  description: "description",
+  date: "date",
+  url: "source link",
+  linkType: "link type",
+  clipStart: "clip start",
+  clipEnd: "clip end",
+  imageId: "image file",
+  renderType: "layout",
+  videoId: "video id",
+  clipKey: "clip",
+  clipStatus: "clip status",
+  clipError: "clip error",
+  thumbnailKey: "thumbnail",
+  thumbnailAt: "thumbnail frame",
+  votingStyle: "voting style",
+  viewingMode: "mode",
+  startTime: "voting opens",
+  endTime: "voting closes",
+  awardYear: "award year",
+  defaultVotingStyle: "default voting style",
+  message: "message",
+  admin: "admin",
+  ids: "order",
+};
+export const fieldName = (key: string) => fieldNames[key] ?? key;
+
+/** Not worth showing: ids, the stored order and the bookkeeping around clips. */
+const hidden = new Set(["id", "categoryId", "position", "uid", "options", "clipError"]);
+
+const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
+
+export function formatValue(key: string, value: unknown): string {
+  if (value === null || value === undefined || value === "") return "—";
+  if ((key === "startTime" || key === "endTime") && !Number.isNaN(Number(value))) {
+    return dateTime.format(new Date(Number(value) * 1000));
+  }
+  if ((key === "clipStart" || key === "clipEnd") && typeof value === "number") return formatTimestamp(value);
+  if (key === "thumbnailAt" && typeof value === "number") return `${value}s into the clip`;
+  if ((key === "clipKey" || key === "thumbnailKey") && typeof value === "string") return value.split("/").pop()!;
+  if (key === "admin") return value ? "yes" : "no";
+  if (key === "ids" && Array.isArray(value)) return value.map((id, i) => `${i + 1}. ${id}`).join("\n");
+  if (key === "votingStyle" && value === null) return "site default";
+  return String(value);
+}
+
+/** The rows of the diff: field, before, after. */
+export function diffRows(entry: HistoryEntry) {
+  const before = (entry.before ?? {}) as Snapshot;
+  const after = (entry.after ?? {}) as Snapshot;
+  const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])].filter((k) => !hidden.has(k));
+  return (
+    keys
+      // A create or delete has one side only; skip its empty fields.
+      .filter((k) => entry.action === "update" || formatValue(k, before[k] ?? after[k]) !== "—")
+      .map((k) => ({ key: k, field: fieldName(k), before: formatValue(k, before[k]), after: formatValue(k, after[k]) }))
+  );
+}
+
+const changed = (entry: HistoryEntry) =>
+  diffRows(entry)
+    .map((r) => r.field)
+    .join(", ");
+
+/** "Edited title, date of", "Deleted category", … followed by the label. */
+export function describe(entry: HistoryEntry): string {
+  const after = (entry.after ?? {}) as Snapshot;
+  switch (entry.kind) {
+    case "nominee":
+      if (entry.action === "create") return "Added nominee";
+      if (entry.action === "delete") return "Deleted nominee";
+      return `Changed ${changed(entry) || "nothing visible"} of`;
+    case "category":
+      if (entry.action === "create") return "Added category";
+      if (entry.action === "delete") {
+        const n = ((entry.before as Snapshot | null)?.options as unknown[] | undefined)?.length ?? 0;
+        return `Deleted category (with ${n} nominee${n === 1 ? "" : "s"})`;
+      }
+      return `Changed ${changed(entry)} of category`;
+    case "settings":
+      return `Changed ${changed(entry)} in`;
+    case "admin":
+      return after.admin ? "Made admin:" : "Removed as admin:";
+    case "order":
+      return "Reordered";
+    case "import":
+      return `Imported ${after.nominees ?? 0} nominees in`;
+  }
+}
+
+/** Whether Undo is offered at all (the server still checks). */
+export const undoable = (entry: HistoryEntry) => entry.kind !== "import" && entry.undoneBy === null;

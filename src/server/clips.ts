@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getNominee, listUnfinishedClips, setNomineeMedia } from "@/lib/data/driver";
 import { classifyLink, videoLinkTypes } from "@/lib/links";
+import { nomineeLabel, record, serverActor } from "@/server/history";
 import { storage } from "@/server/storage";
 
 /** Longest section we'll download (seconds). Clips should be well under it. */
@@ -157,6 +158,23 @@ async function buildClip(categoryId: string, id: string) {
       thumbnailAt: at,
     });
     await removeReplaced([n.clipKey, n.thumbnailKey], [clipKey, thumbnailKey]);
+    // In the history as the server's change, so the old clip can be put back.
+    // "Before" is the clip as it was, not the in-progress status.
+    await record(serverActor, {
+      kind: "nominee",
+      action: "update",
+      label: await nomineeLabel(categoryId, n.title),
+      categoryId,
+      nomineeId: id,
+      before: {
+        clipKey: n.clipKey,
+        clipStatus: n.clipKey ? "ready" : null,
+        clipError: null,
+        thumbnailKey: n.thumbnailKey,
+        thumbnailAt: n.thumbnailAt,
+      },
+      after: { clipKey, clipStatus: "ready", clipError: null, thumbnailKey, thumbnailAt: at },
+    });
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -247,11 +265,12 @@ async function localCopy(key: string, dir: string) {
   return path;
 }
 
-async function removeReplaced(old: (string | null)[], current: string[]) {
-  for (const key of old) {
-    if (key && !current.includes(key)) await storage.delete(key).catch(() => {});
-  }
-}
+/**
+ * Replaced files are kept: the edit history can put an old clip or thumbnail
+ * back, and the keys are versioned, so nothing is overwritten. Unused files
+ * could be swept up after the awards.
+ */
+async function removeReplaced(_old: (string | null)[], _current: string[]) {}
 
 /** Codec, height and bitrate of the first video and audio streams. */
 async function probeStreams(path: string) {

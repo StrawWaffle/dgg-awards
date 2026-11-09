@@ -43,6 +43,13 @@
       "when": 1794221553886,
       "tag": "0005_order",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1794222456617,
+      "tag": "0006_history",
+      "breakpoints": true
     }
   ]
 }

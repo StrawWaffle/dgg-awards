@@ -131,6 +131,16 @@ export const usersQuery = z.object({ q: z.string().trim().min(1).max(40).optiona
 
 export const idQuery = z.object({ id: required });
 
+export const historyQuery = z.object({
+  page: z.coerce.number().int().min(0).optional(),
+  kind: z.enum(["category", "nominee", "settings", "admin", "order", "import"]).optional(),
+  categoryId: z.string().min(1).optional(),
+  nomineeId: z.string().min(1).optional(),
+  uid: z.coerce.number().int().optional(),
+});
+
+export const undoBody = z.object({ force: z.boolean().default(false) });
+
 /** A new display order: every id, first to last. */
 export const categoryOrder = z.object({ ids: z.array(required).min(1) });
 export const nomineeOrder = z.object({ categoryId: required, ids: z.array(required).min(1) });

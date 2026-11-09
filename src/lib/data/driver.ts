@@ -6,6 +6,7 @@ import {
   asc,
   desc,
   eq,
+  getTableColumns,
   isNull,
   lt,
   sql,
@@ -339,6 +340,91 @@ export async function getNominee(categoryId: string, id: string) {
   return db.query.optionsTable.findFirst({
     where: (o, { and, eq }) => and(eq(o.categoryId, categoryId), eq(o.id, id)),
   });
+}
+
+export type NomineeRow = typeof schema.optionsTable.$inferSelect;
+export type CategoryRow = typeof schema.categoriesTable.$inferSelect;
+
+/** A category without its nominees. */
+export async function getCategory(id: string) {
+  return db.query.categoriesTable.findFirst({ where: (c, { eq }) => eq(c.id, id) });
+}
+
+/** A category's nominees as stored, in display order. */
+export async function getCategoryNominees(categoryId: string) {
+  return db.query.optionsTable.findMany({
+    where: (o, { eq }) => eq(o.categoryId, categoryId),
+    orderBy: (o, { asc }) => [asc(o.position)],
+  });
+}
+
+/** Set any of a nominee's columns, for undo. */
+export async function setNomineeFields(categoryId: string, id: string, fields: Partial<NomineeRow>) {
+  const { id: _id, categoryId: _cat, ...rest } = fields;
+  if (Object.keys(rest).length === 0) return;
+  await db
+    .update(schema.optionsTable)
+    .set(rest)
+    .where(and(eq(schema.optionsTable.categoryId, categoryId), eq(schema.optionsTable.id, id)));
+}
+
+/** Set any of a category's columns, for undo. */
+export async function setCategoryFields(id: string, fields: Partial<CategoryRow>) {
+  const { id: _id, ...rest } = fields;
+  if (Object.keys(rest).length === 0) return;
+  await db.update(schema.categoriesTable).set(rest).where(eq(schema.categoriesTable.id, id));
+}
+
+export async function nomineeHasVotes(categoryId: string, id: string) {
+  const vote = await db.query.votesTable.findFirst({
+    where: (v, { and, eq }) => and(eq(v.categoryId, categoryId), eq(v.optionId, id)),
+  });
+  return vote !== undefined;
+}
+
+export type HistoryInsert = typeof schema.historyTable.$inferInsert;
+
+export async function insertHistory(entry: HistoryInsert) {
+  const [row] = await db.insert(schema.historyTable).values(entry).returning({ id: schema.historyTable.id });
+  return row!.id;
+}
+
+export async function getHistoryEntry(id: number) {
+  return db.query.historyTable.findFirst({ where: (h, { eq }) => eq(h.id, id) });
+}
+
+/** The entry that undid `id`, if one did. */
+export async function getUndoOf(id: number) {
+  return db.query.historyTable.findFirst({ where: (h, { eq }) => eq(h.revertOf, id) });
+}
+
+/**
+ * History, newest first, 50 a page. A category filter includes its nominees'
+ * entries. `undoneBy`: the entry that undid this one.
+ */
+export async function getHistory(
+  page = 0,
+  filter: { kind?: schema.HistoryKind; categoryId?: string; nomineeId?: string; uid?: number } = {},
+) {
+  const h = schema.historyTable;
+  return db
+    .select({
+      ...getTableColumns(h),
+      // Written out in full: inside the subquery a bare "id" would mean u.id.
+      undoneBy: sql<number | null>`(select u.id from history u where u.revertOf = "history"."id" limit 1)`,
+    })
+    .from(h)
+    .where(
+      and(
+        filter.kind ? eq(h.kind, filter.kind) : undefined,
+        filter.categoryId ? eq(h.categoryId, filter.categoryId) : undefined,
+        filter.nomineeId ? eq(h.nomineeId, filter.nomineeId) : undefined,
+        filter.uid !== undefined ? eq(h.uid, filter.uid) : undefined,
+      ),
+    )
+    .orderBy(desc(h.id))
+    .limit(50)
+    .offset(page * 50);
 }
 
 /** Clip fields managed by src/server/clips.ts. */

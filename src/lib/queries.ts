@@ -1,5 +1,6 @@
 import { parseResponse } from "hono/client";
 import { client } from "@/lib/client";
+import type { HistoryKind } from "@/lib/data/schema";
 import type { StreamableVideo, YouTubeVideo } from "@/lib/types";
 
 // Reads throw on any non-2xx answer, so TanStack Query sees an error, as it
@@ -138,6 +139,42 @@ export async function saveCategoryOrder(ids: string[]) {
 
 export async function saveNomineeOrder(categoryId: string, ids: string[]) {
   await ok(await client.api.admin.nominees.order.$put({ json: { categoryId, ids } }), "Couldn't save the order");
+}
+
+export type HistoryFilter = { kind?: HistoryKind; categoryId?: string; nomineeId?: string };
+export type HistoryEntry = Awaited<ReturnType<typeof fetchHistory>>[number];
+
+/** Edit history, newest first, 50 a page. */
+export async function fetchHistory(page = 0, filter: HistoryFilter = {}) {
+  return parseResponse(
+    client.api.admin.history.$get({
+      query: {
+        page: String(page),
+        ...(filter.kind ? { kind: filter.kind } : {}),
+        ...(filter.categoryId ? { categoryId: filter.categoryId } : {}),
+        ...(filter.nomineeId ? { nomineeId: filter.nomineeId } : {}),
+      },
+    }),
+  );
+}
+
+/** Undo refused; `fields` lists what was edited again since, if that's why. */
+export class UndoRefused extends Error {
+  constructor(
+    message: string,
+    readonly fields: string[],
+  ) {
+    super(message);
+  }
+}
+
+export async function undoHistory(id: number, force = false) {
+  const res = await client.api.admin.history[":id"].undo.$post({ param: { id: String(id) }, json: { force } });
+  if (res.status === 409) {
+    const body = (await res.json()) as { message: string; fields: string[] };
+    throw new UndoRefused(body.message, body.fields);
+  }
+  await ok(res, "Couldn't undo that");
 }
 
 export async function fetchChecks() {

@@ -149,3 +149,40 @@ export const configurationTable = sqliteTable("configuration", {
   key: text().primaryKey(),
   val: text().notNull(),
 });
+
+export type HistoryKind = "category" | "nominee" | "settings" | "admin" | "order" | "import";
+export type HistoryAction = "create" | "update" | "delete";
+
+/**
+ * Every change made from the admin page, for the History tab and undo.
+ * `before` and `after` are snapshots of what changed (a nominee or category
+ * row, settings, an admin flag or an order); `before` is null for a create
+ * and `after` for a delete.
+ */
+export const historyTable = sqliteTable(
+  "history",
+  {
+    id: int().primaryKey({ autoIncrement: true }),
+    at: int({ mode: "timestamp" })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    /** Who did it; null for the server itself (a clip build finishing). */
+    uid: int(),
+    /** Their name at the time, so the entry still reads right later. */
+    name: text().notNull(),
+    kind: text().$type<HistoryKind>().notNull(),
+    action: text().$type<HistoryAction>().notNull(),
+    categoryId: text(),
+    nomineeId: text(),
+    /** What it was about, as it was then: "Zee · Ally of the Year". */
+    label: text().notNull(),
+    before: text({ mode: "json" }).$type<Record<string, unknown>>(),
+    after: text({ mode: "json" }).$type<Record<string, unknown>>(),
+    /** Set when this entry undid another one. */
+    revertOf: int(),
+  },
+  (table) => [
+    index("history_target_idx").on(table.categoryId, table.nomineeId),
+    index("history_revert_idx").on(table.revertOf),
+  ],
+);

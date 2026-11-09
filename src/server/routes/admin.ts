@@ -3,6 +3,8 @@ import {
   deleteCategory,
   deleteNominee,
   getAdmins,
+  getCategory,
+  getHistory,
   getUser,
   getVoteStats,
   getVotesPage,
@@ -23,6 +25,19 @@ import {
   setUserAdmin,
 } from "@/lib/data/driver";
 import { adminUsernames } from "@/server/routes/auth";
+import {
+  UndoConflict,
+  actorFor,
+  categoryOrder as currentCategoryOrder,
+  categorySnapshot,
+  nomineeLabel,
+  nomineeOrder as currentNomineeOrder,
+  record,
+  recordCategoryCreate,
+  recordNomineeCreate,
+  recordNomineeUpdate,
+  undo,
+} from "@/server/history";
 import { slugify, uniqueId } from "@/lib/ids";
 import { checkAwards } from "@/lib/nominee-checks";
 import { effectiveStyle, withEffectiveStyles } from "@/lib/voting";
@@ -54,10 +69,15 @@ import {
   settingsPatch,
   thumbnailAt,
   thumbnailUpload,
+  historyQuery,
+  undoBody,
   userAdminBody,
   usersQuery,
   votesQuery,
 } from "@/server/schemas";
+
+/** Who is making this request, for the history. */
+const actor = (c: { get(key: "session"): { uid: number } }) => actorFor(c.get("session").uid);
 
 // HTML form posts redirect back to the admin page, as before.
 const backToAdmin = () =>
@@ -69,7 +89,8 @@ export const adminRoutes = new Hono<SessionEnv>()
   .use(requireAdmin)
 
   .post("/import", zValidator("form", importForm, rejectInvalid), async (c) => {
-    for (const category of c.req.valid("form").data) {
+    const data = c.req.valid("form").data;
+    for (const category of data) {
       await insertCategory({
         id: category.id,
         description: category.description,
@@ -79,6 +100,17 @@ export const adminRoutes = new Hono<SessionEnv>()
       for (const option of category.options) {
         await insertNominee({ ...option, categoryId: category.id });
       }
+    }
+    if (data.length > 0) {
+      await record(await actor(c), {
+        kind: "import",
+        action: "create",
+        label: `${data.length} categories`,
+        after: {
+          categories: data.map((cat) => cat.id),
+          nominees: data.reduce((n, cat) => n + cat.options.length, 0),
+        },
+      });
     }
     return backToAdmin();
   })
@@ -91,6 +123,7 @@ export const adminRoutes = new Hono<SessionEnv>()
       description: form.category_description,
       votingStyle: form.voting_style ?? null,
     });
+    await recordCategoryCreate(await actor(c), form.category_id);
     return backToAdmin();
   })
   .patch("/category", zValidator("json", categoryPatch, rejectInvalid), async (c) => {
@@ -100,7 +133,19 @@ export const adminRoutes = new Hono<SessionEnv>()
     if (patch.votingStyle !== undefined && (await categoryHasVotes(patch.id))) {
       return c.text("This category already has votes, so its voting style can't change.", 409);
     }
+    const before = await getCategory(patch.id);
     await updateCategory(patch);
+    const after = await getCategory(patch.id);
+    if (before && after) {
+      await record(await actor(c), {
+        kind: "category",
+        action: "update",
+        label: after.title,
+        categoryId: after.id,
+        before,
+        after,
+      });
+    }
     return c.body(null, 200);
   })
 
@@ -110,6 +155,7 @@ export const adminRoutes = new Hono<SessionEnv>()
    */
   .patch("/settings", zValidator("json", settingsPatch, rejectInvalid), async (c) => {
     const { awardYear, defaultVotingStyle, startTime, endTime, viewingMode } = c.req.valid("json");
+    const before = await getConfig();
     if (awardYear !== undefined) await setSetting("awardYear", String(awardYear));
     if (startTime !== undefined) await setSetting("startTime", String(startTime));
     if (endTime !== undefined) await setSetting("endTime", String(endTime));
@@ -118,11 +164,25 @@ export const adminRoutes = new Hono<SessionEnv>()
       await pinVotedCategoryStyles(effectiveStyle(null, (await getConfig()).defaultVotingStyle));
       await setSetting("defaultVotingStyle", defaultVotingStyle);
     }
-    return c.json(await getConfig(), 200);
+    const after = await getConfig();
+    await record(await actor(c), { kind: "settings", action: "update", label: "Settings", before, after });
+    return c.json(after, 200);
   })
-  .delete("/category", zValidator("query", idQuery, rejectInvalid), async (c) =>
-    c.json(await deleteCategory(c.req.valid("query").id), 200),
-  )
+  .delete("/category", zValidator("query", idQuery, rejectInvalid), async (c) => {
+    const { id } = c.req.valid("query");
+    const snapshot = await categorySnapshot(id);
+    const result = await deleteCategory(id);
+    if (snapshot) {
+      await record(await actor(c), {
+        kind: "category",
+        action: "delete",
+        label: String(snapshot.title),
+        categoryId: id,
+        before: snapshot,
+      });
+    }
+    return c.json(result, 200);
+  })
 
   .post("/nominee", zValidator("form", nomineeForm, rejectInvalid), async (c) => {
     const form = c.req.valid("form");
@@ -140,18 +200,30 @@ export const adminRoutes = new Hono<SessionEnv>()
       clipStart: form.clip_start ?? null,
       clipEnd: form.clip_end ?? null,
     });
+    await recordNomineeCreate(await actor(c), form.category_id, form.nominee_id);
     return backToAdmin();
   })
   .patch("/nominee", zValidator("json", nomineePatch, rejectInvalid), async (c) => {
-    await updateNominee(c.req.valid("json"));
+    const patch = c.req.valid("json");
+    const before = await getNominee(patch.categoryId, patch.id);
+    await updateNominee(patch);
+    await recordNomineeUpdate(await actor(c), before);
     return c.body(null, 200);
   })
   .delete("/nominee", zValidator("query", nomineeQuery, rejectInvalid), async (c) => {
     const { categoryId, id } = c.req.valid("query");
     const nominee = await getNominee(categoryId, id);
     await deleteNominee(categoryId, id);
-    for (const key of [nominee?.clipKey, nominee?.thumbnailKey]) {
-      if (key) await storage.delete(key).catch(() => {});
+    // Its clip and thumbnail files stay, so undoing the delete brings them back.
+    if (nominee) {
+      await record(await actor(c), {
+        kind: "nominee",
+        action: "delete",
+        label: await nomineeLabel(categoryId, nominee.title),
+        categoryId,
+        nomineeId: id,
+        before: nominee,
+      });
     }
     return c.body(null, 200);
   })
@@ -169,6 +241,7 @@ export const adminRoutes = new Hono<SessionEnv>()
       description: body.description,
       votingStyle: body.votingStyle ?? null,
     });
+    await recordCategoryCreate(await actor(c), id);
     return c.json({ id }, 201);
   })
   .post("/nominees", zValidator("json", nomineeCreate, rejectInvalid), async (c) => {
@@ -188,6 +261,7 @@ export const adminRoutes = new Hono<SessionEnv>()
       videoId: null,
       renderType: "default",
     });
+    await recordNomineeCreate(await actor(c), category.id, id);
     return c.json({ id, categoryId: category.id }, 201);
   })
 
@@ -206,7 +280,9 @@ export const adminRoutes = new Hono<SessionEnv>()
   .post("/thumbnail", zValidator("json", thumbnailAt, rejectInvalid), async (c) => {
     const { categoryId, id, at } = c.req.valid("json");
     try {
+      const before = await getNominee(categoryId, id);
       const key = await thumbnailFromClip(categoryId, id, at);
+      await recordNomineeUpdate(await actor(c), before);
       return c.json({ thumbnailUrl: storage.url(key) }, 200);
     } catch (error) {
       if (error instanceof UserError) return c.text(error.message, 400);
@@ -216,7 +292,9 @@ export const adminRoutes = new Hono<SessionEnv>()
   .post("/thumbnail/upload", zValidator("form", thumbnailUpload, rejectInvalid), async (c) => {
     const { categoryId, id, file } = c.req.valid("form");
     try {
+      const before = await getNominee(categoryId, id);
       const key = await thumbnailFromUpload(categoryId, id, file);
+      await recordNomineeUpdate(await actor(c), before);
       return c.json({ thumbnailUrl: storage.url(key) }, 200);
     } catch (error) {
       if (error instanceof UserError) return c.text(error.message, 400);
@@ -270,7 +348,17 @@ export const adminRoutes = new Hono<SessionEnv>()
         return c.text(`${user.name} is in ADMIN_USERNAMES. Remove them there first.`, 409);
       }
     }
+    const user = await getUser(uid);
     await setUserAdmin(uid, admin);
+    if (user && user.admin !== admin) {
+      await record(await actor(c), {
+        kind: "admin",
+        action: "update",
+        label: user.name,
+        before: { uid, admin: user.admin },
+        after: { uid, admin },
+      });
+    }
     return c.body(null, 200);
   })
 
@@ -288,17 +376,63 @@ export const adminRoutes = new Hono<SessionEnv>()
 
   /** Drag-and-drop order from the editor. Ids not listed keep their place. */
   .put("/categories/order", zValidator("json", categoryOrder, rejectInvalid), async (c) => {
+    const before = await currentCategoryOrder();
     await reorderCategories(c.req.valid("json").ids);
+    await record(await actor(c), {
+      kind: "order",
+      action: "update",
+      label: "Categories",
+      before: { ids: before },
+      after: { ids: await currentCategoryOrder() },
+    });
     return c.body(null, 200);
   })
   .put("/nominees/order", zValidator("json", nomineeOrder, rejectInvalid), async (c) => {
     const { categoryId, ids } = c.req.valid("json");
+    const before = await currentNomineeOrder(categoryId);
     await reorderNominees(categoryId, ids);
+    await record(await actor(c), {
+      kind: "order",
+      action: "update",
+      label: `Nominees · ${(await getCategory(categoryId))?.title ?? categoryId}`,
+      categoryId,
+      before: { ids: before },
+      after: { ids: await currentNomineeOrder(categoryId) },
+    });
     return c.body(null, 200);
+  })
+
+  /** Edit history, newest first, 50 a page. A category filter includes its nominees. */
+  .get("/history", zValidator("query", historyQuery, rejectInvalid), async (c) => {
+    const { page, ...filter } = c.req.valid("query");
+    return c.json(await getHistory(page ?? 0, filter), 200);
+  })
+  /**
+   * Undo an entry. 409 with { message, fields } if it can't be undone, or if
+   * what it changed was edited again since (send force: true to undo anyway).
+   */
+  .post("/history/:id/undo", zValidator("json", undoBody, rejectInvalid), async (c) => {
+    const id = Number(c.req.param("id"));
+    if (!Number.isInteger(id)) return c.body(null, 400);
+    try {
+      const entry = await undo(id, await actor(c), c.req.valid("json").force);
+      return c.json({ id: entry }, 200);
+    } catch (error) {
+      if (error instanceof UndoConflict) return c.json({ message: error.message, fields: error.fields }, 409);
+      throw error;
+    }
   })
 
   .post("/config", zValidator("form", configForm, rejectInvalid), async (c) => {
     const form = c.req.valid("form");
+    const before = await getConfig();
     await setConfig(form.starting_time, form.ending_time, form.viewing_config);
+    await record(await actor(c), {
+      kind: "settings",
+      action: "update",
+      label: "Settings",
+      before,
+      after: await getConfig(),
+    });
     return backToAdmin();
   });

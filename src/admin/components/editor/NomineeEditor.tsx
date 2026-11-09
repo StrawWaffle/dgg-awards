@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { Section } from "@/admin/components/Section";
+import { HistoryList } from "@/admin/components/history/HistoryList";
 import { DragHandle, SortableList, useSortableRow } from "@/admin/components/Sortable";
 import { Button, ErrorText, Field, inputClass } from "@/admin/components/editor/fields";
 import { NomineeForm, useRefreshEditor } from "@/admin/components/editor/NomineeForm";
@@ -331,6 +332,12 @@ function CategoryPanel({ category, issues }: { category: AdminCategory; issues: 
             </Button>
           </div>
         </form>
+      </Section>
+
+      <Section id="category-history" title="History of this category" defaultOpen={false} boxed={false}>
+        <div className="rounded border border-neutral-200">
+          <HistoryList filter={{ categoryId: category.id }} />
+        </div>
       </Section>
 
       <section className="space-y-2 border-t border-neutral-200 pt-4">

@@ -44,7 +44,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 1. **Voting page redesign:** ranked-voting UI, one category per page with progress (like jadseya.com), cuter. The hill-climbing method applies.
 2. **Results reveal and presenter mode:** reveal-all-but-last-three, clips that stop, room for the stream camera, charts per StrawWaffle's visualization article, and the runoff rounds.
 3. **Re-check the double-count fix** against the original code, and against the real 2025 votes if they turn up.
-4. **Admin pass** (branch `worktree-admin-pass`, waiting for StrawWaffle's review, not merged; two rounds: the cleanup, then the sidebar, dark theme, drag to reorder and collapsible sections). See "Admin pass" below.
+4. **Admin pass** (branch `worktree-admin-pass`, waiting for StrawWaffle's review, not merged; three rounds: the cleanup; then the sidebar, dark theme, drag to reorder and collapsible sections; then edit history with undo). See "Admin pass" below.
 5. Smaller items:
    - Re-pull emotes from the DGG CDN.
    - Privacy page.
@@ -144,6 +144,36 @@ Tests: typecheck, 78 unit tests and 38 API tests pass, with both snapshots uncha
 - **Collapsible sections, remembered per browser:** Category settings; a nominee's Details, Clip and destiny.gg profile; and every table on the Votes tab. On wide screens the category list stays in view while the nominees scroll, with its own scrollbar.
 - `useStored` (`src/admin/useStored.ts`) is the localStorage hook behind all of this. It is wrapped so that blocked storage just means nothing is remembered.
 - Tested: typecheck, 78 unit tests and 39 API tests (a new one covers reordering) pass. Screenshots were checked in light, dark, collapsed and phone width. A real mouse drag and a keyboard drag in Playwright both saved and survived a reload.
+
+### Third round: edit history and clearer sections (StrawWaffle asked 2026-11-09)
+
+- **Sections read as toggles now.** The title is a shaded bar that says Show or Hide. Open content sits under the bar, or hangs off a line from it inside forms, so it's clear what each bar folds.
+- **Edit history** (`src/server/history.ts`, table `history`, migration 0006):
+  - **What's recorded:** every admin change, with who, when, and before and after:
+    - nominees and categories: add, edit, delete
+    - settings, including the old config form
+    - admin granted or removed
+    - drag reorders
+    - thumbnail picks and uploads
+    - finished clip builds (by "Server")
+    - imports
+  - Edits keep only the fields that changed. Deletes keep the whole row (a category with its nominees). Each entry also has a label ("Zee · Ally of the Year") that still reads right after a rename or delete.
+  - **Undo:** `POST /api/admin/history/:id/undo`. It puts the old values back, restores a delete or removes a create, and is itself an entry (`revertOf`), so it can be undone too.
+    - It refuses with 409 and the fields if they were edited again since; `force: true` undoes anyway. It also refuses a second undo of the same entry.
+    - Admin undo follows the same rules as the Admins tab: not yourself, and not anyone in ADMIN_USERNAMES.
+    - Imports can't be undone. A restored category comes back without its votes, because votes are deleted with it.
+  - **Files are kept now.** Replaced and deleted clip and thumbnail files are no longer deleted, so undo can bring them back. Their names are versioned, so nothing is overwritten. Unused files could be swept up after the awards; at ~4 MB a clip this is far inside the R2 free tier.
+  - **Where it shows:** a History section in the sidebar (filter by kind, 50 a page), "History of this category" under category settings, and History in each nominee's form. Every entry opens to a before/after table.
+  - **Not atomic.** The entry is written just after the change. A crash between the two would lose the entry but not the change.
+  - **Already true before this work:** a nominee with votes can't be deleted, because the database refuses. The editor shows the server error.
+- Tests: typecheck, 78 unit tests and 40 API tests pass, with both snapshots unchanged. A new test covers recording, undo, conflicts, forced undo, restoring a delete and settings. The clip test now checks that undoing a thumbnail pick brings the old one back. In the browser, Undo on a reorder put the old order back.
+
+### 2025 results from the wiki
+
+StrawWaffle pointed out that the wiki has the confirmed 2025 results: https://wiki.destiny.gg/view/Destiny_Awards. They are copied into `docs/2025-results-wiki.md`. It has winners and percentages, but **no vote counts**.
+- Every category read word for word adds to 100%, including those with nominees in two categories. That argues against the live site having double-counted.
+- **Except Omegalul, which adds to 125.02% on the page.** Its winner shows Godstiny's 45.98%, so it's most likely a copy slip on the wiki; the real figure would be 20.96%. Ask RiN_LuX. Details are in the doc.
+- **For the archive (feature 8):** this is enough for winners and percentages, but not counts. Whether to build the archive from it is StrawWaffle's call.
 
 **Ideas from StrawWaffle, not built.** Several need rinlux's say first, since they are in charge of these decisions:
 - **More roles** than admin, e.g. moderators or editors who can only edit nominees.

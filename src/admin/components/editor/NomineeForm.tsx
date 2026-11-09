@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { Section } from "@/admin/components/Section";
+import { HistoryList } from "@/admin/components/history/HistoryList";
 import { Button, ErrorText, Field, TimeInput, inputClass } from "@/admin/components/editor/fields";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type LinkType, classifyLink, linkAt, linkLabel, linkTypes } from "@/lib/links";
@@ -252,6 +253,11 @@ export function NomineeForm({ nominee, issues }: { nominee: AdminNominee; issues
       {type === "dgg-profile" && draft.url && (
         <ProfileSection url={draft.url} onUseBio={(bio) => set("description", bio)} />
       )}
+      <Section id="nominee-history" title="History" defaultOpen={false} boxed={false}>
+        <div className="rounded border border-neutral-200 bg-white">
+          <HistoryList filter={{ categoryId: nominee.categoryId, nomineeId: nominee.id }} showLabel={false} />
+        </div>
+      </Section>
     </form>
   );
 }
@@ -272,7 +278,7 @@ function ClipSection({ nominee, unsaved }: { nominee: AdminNominee; unsaved: boo
   const working = nominee.clipStatus === "pending" || nominee.clipStatus === "processing";
 
   return (
-    <div className="border-t border-neutral-200 pt-3">
+    <div>
       <Section id="nominee-clip" title="Clip" aside={nominee.clipStatus ?? "none"} boxed={false}>
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -361,7 +367,7 @@ function ProfileSection({ url, onUseBio }: { url: string; onUseBio: (bio: string
   });
 
   return (
-    <div className="border-t border-neutral-200 pt-3">
+    <div>
       <Section id="nominee-profile" title="destiny.gg profile" boxed={false}>
         <div className="space-y-3">
           <Button onClick={() => load.mutate()} disabled={load.isPending || !name}>

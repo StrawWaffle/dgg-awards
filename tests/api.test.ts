@@ -574,6 +574,78 @@ describe("admin", () => {
     expect((await put("/api/admin/categories/order", { ids: [] })).status).toBe(400);
   });
 
+  test("edit history records changes and undoes them", async () => {
+    const json = (method: string, body: unknown) => ({
+      method,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const history = async (query: string) => (await req(`/api/admin/history?${query}`, {}, admin)).json();
+    const undo = (id: number, force = false) => req(`/api/admin/history/${id}/undo`, json("POST", { force }), admin);
+    const zee = async () =>
+      (await (await req("/api/nominees")).json()).find((c: any) => c.id === "ally").options.find((o: any) => o.id === "zee");
+    const original = await zee();
+    expect((await req("/api/admin/history", {}, user)).status).toBe(401);
+
+    // An edit is recorded with only what changed, and by whom.
+    await req("/api/admin/nominee", json("PATCH", { categoryId: "ally", id: "zee", title: "Zee 2" }), admin);
+    const [edit] = await history("categoryId=ally&nomineeId=zee");
+    expect(edit).toMatchObject({
+      kind: "nominee",
+      action: "update",
+      name: "Tester",
+      label: "Zee 2 · Ally of the Year",
+      before: { title: original.title },
+      after: { title: "Zee 2" },
+      undoneBy: null,
+    });
+
+    // Undo puts it back, records itself, and can't be repeated.
+    expect((await undo(edit.id)).status).toBe(200);
+    expect((await zee()).title).toBe(original.title);
+    const [undid] = await history("categoryId=ally&nomineeId=zee");
+    expect(undid).toMatchObject({ revertOf: edit.id, before: { title: "Zee 2" }, after: { title: original.title } });
+    expect((await history("categoryId=ally&nomineeId=zee"))[1].undoneBy).toBe(undid.id);
+    expect((await undo(edit.id)).status).toBe(409);
+
+    // Edited again since: refused with the field, unless forced.
+    await req("/api/admin/nominee", json("PATCH", { categoryId: "ally", id: "zee", title: "A" }), admin);
+    const [first] = await history("categoryId=ally&nomineeId=zee");
+    await req("/api/admin/nominee", json("PATCH", { categoryId: "ally", id: "zee", title: "B" }), admin);
+    const refused = await undo(first.id);
+    expect(refused.status).toBe(409);
+    expect((await refused.json()).fields).toEqual(["title"]);
+    expect((await undo(first.id, true)).status).toBe(200);
+    expect((await zee()).title).toBe(original.title);
+
+    // A deleted nominee comes back where it was. (Zee has votes, which
+    // can't be deleted, so a fresh one.)
+    const ally = async () => (await (await req("/api/nominees")).json()).find((c: any) => c.id === "ally").options;
+    await req("/api/admin/nominees", json("POST", { categoryId: "ally", id: "gone", title: "Gone" }), admin);
+    await req("/api/admin/nominee", json("PATCH", { categoryId: "ally", id: "gone", description: "Back again" }), admin);
+    const before = await ally();
+    await req("/api/admin/nominee?categoryId=ally&id=gone", { method: "DELETE" }, admin);
+    expect((await ally()).map((o: any) => o.id)).not.toContain("gone");
+    const [deleted, edited, created] = await history("categoryId=ally&nomineeId=gone");
+    expect([deleted.action, edited.action, created.action]).toEqual(["delete", "update", "create"]);
+    expect(deleted.after).toBeNull();
+    expect((await undo(deleted.id)).status).toBe(200);
+    expect(await ally()).toEqual(before);
+    // Undoing the create removes it again.
+    expect((await undo(created.id)).status).toBe(200);
+    expect((await ally()).map((o: any) => o.id)).not.toContain("gone");
+    expect(await zee()).toEqual(original);
+
+    // Settings, and the kind filter.
+    const year = (await (await req("/api/config")).json()).awardYear;
+    await req("/api/admin/settings", json("PATCH", { awardYear: 2031 }), admin);
+    const [setting] = await history("kind=settings");
+    expect(setting).toMatchObject({ before: { awardYear: year }, after: { awardYear: "2031" } });
+    expect((await undo(setting.id)).status).toBe(200);
+    expect((await (await req("/api/config")).json()).awardYear).toBe(year);
+    expect((await history("kind=settings")).every((e: any) => e.kind === "settings")).toBe(true);
+  });
+
   test("make admin by uid", async () => {
     const other = await signIn("Promoted");
     const uid = (await (await req("/api/me", {}, other)).json()).uid;
@@ -838,12 +910,21 @@ describe("admin", () => {
       expect(pub.clipUrl).toBe(ready.clipUrl);
       expect((await req("/files/../data/sqlite.db")).status).toBe(404);
 
-      // Re-pick the thumbnail frame; the old file is removed.
+      // Re-pick the thumbnail frame. The old file stays, for the edit history.
       const picked = await req("/api/admin/thumbnail", json("POST", { categoryId: "ally", id: "clipok", at: 2 }), admin);
       expect(picked.status).toBe(200);
       const { thumbnailUrl } = await picked.json();
       expect(thumbnailUrl).toMatch(/clipok-2s-/);
-      expect((await req(ready.thumbnailUrl)).status).toBe(404);
+      expect((await req(ready.thumbnailUrl)).status).toBe(200);
+      // Undoing the pick brings the old thumbnail back.
+      const [pick] = await (await req("/api/admin/history?categoryId=ally&nomineeId=clipok", {}, admin)).json();
+      expect(pick.after).toMatchObject({ thumbnailAt: 2 });
+      const undone = await req(`/api/admin/history/${pick.id}/undo`, json("POST", {}), admin);
+      expect(undone.status).toBe(200);
+      const back = (await (await req("/api/admin/nominees", {}, admin)).json())
+        .find((c: any) => c.id === "ally")
+        .options.find((o: any) => o.id === "clipok");
+      expect(back.thumbnailUrl).toBe(ready.thumbnailUrl);
       const tooLate = await req("/api/admin/thumbnail", json("POST", { categoryId: "ally", id: "clipok", at: 99 }), admin);
       expect(tooLate.status).toBe(400);
 
@@ -873,13 +954,13 @@ describe("admin", () => {
       expect(failed.clipError).toContain("yt-dlp");
       expect(failed.clipUrl).toBeNull();
 
-      // Deleting a nominee deletes its files.
+      // Deleting a nominee keeps its files, so undoing the delete restores them.
       const final = await nominee("clipok");
       for (const id of ["clipok", "clipbad", "clipnorange"]) {
         await req(`/api/admin/nominee?categoryId=ally&id=${id}`, { method: "DELETE" }, admin);
       }
-      expect((await req(final.clipUrl)).status).toBe(404);
-      expect((await req(final.thumbnailUrl)).status).toBe(404);
+      expect((await req(final.clipUrl)).status).toBe(200);
+      expect((await req(final.thumbnailUrl)).status).toBe(200);
     },
     120_000,
   );
