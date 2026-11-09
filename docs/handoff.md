@@ -143,7 +143,7 @@ Order StrawWaffle gave: preview to rinlux first, then discuss, then these.
 2. ~~**Dependency upgrades.**~~ Done on `stack-upgrade`.
 3. ~~**Regression tests, then end-to-end type safety.**~~ Done on `stack-upgrade`.
 4. **Admin editing with preview**, for an allowlist of DGG accounts. It should cover editing nominees and categories, previewing how the site looks, and previewing the results reveal. StrawWaffle wants this to make setup easy for the organizers. Build it on a reworked nominee model that adds a date, a link type and clip start and end times, plus checks that reject bad links, wrong-year dates and duplicates. This is the first hill-climbing step.
-   - **Editor built in step 4**, on branch `worktree-clips` with step 3:
+   - **Editor built in step 4** (merged and deployed 2026-11-09 with step 3):
      - **Nominees tab:** `src/admin/components/editor/` has categories on the left with error and warning counts. A category shows its title, description and voting style (or the site default), then its nominees. Each nominee opens a form with an explicit Save. The old tab saved on every keystroke.
      - **Nominee form fields:** title, date, description, source link (detected type shown, with an override), clip start and end in m:ss, layout and image. That nominee's check results show in the form, and a "Viewers get: YouTube video at 1:00" preview shows the link visitors will see.
      - **Clip section in the form:** build or rebuild with live status (the list polls every 2 s while a clip builds), preview the clip and "Use this frame as the thumbnail", or upload a thumbnail.
@@ -175,7 +175,7 @@ Order StrawWaffle gave: preview to rinlux first, then discuss, then these.
      - The site plays clips in its own `<video>`: no looping, and it stops at the end.
      - **Always link the original source at the clip's start time** (e.g. `&t=83`), so viewers can get the full context.
      - The 2025 site never did this. It embedded YouTube and Streamable by id.
-     - **Built in step 3**, on branch `worktree-clips`:
+     - **Built in step 3** (merged and deployed 2026-11-09):
        - **Image:** ffmpeg and yt-dlp, which is pinned and checksum-verified in the Dockerfile. Bump `YT_DLP_VERSION`/`YT_DLP_SHA256` when sites break it. yt-dlp uses Bun as its JavaScript runtime for YouTube.
        - **`src/server/clips.ts`:** a one-at-a-time background queue. Each job downloads the section with yt-dlp, converts it with ffmpeg (≤720p, H.264/AAC, fast start) and takes a thumbnail at 1/3 of the clip. Its status lives on the nominee, and unfinished jobs resume on restart.
        - **`src/server/storage.ts`:** local storage under `MEDIA_DIR=/data/media`, served at `/files/...` with byte ranges. Setting `R2_ENDPOINT`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and `R2_PUBLIC_URL` switches to R2, which uses Bun's S3 client but hasn't been tested against a real bucket yet.
