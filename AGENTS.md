@@ -1,5 +1,9 @@
 # Repository Guidelines
 
+**Start with `docs/handoff.md`**: current state, working agreements, open questions, planned features and backlog. Keep it updated at the end of each session.
+
+The preview runs in Docker (`compose.yaml`); Bun is not installed on the host.
+
 ## Project Structure & Module Organization
 - `src/` holds the Bun + React app; entry point is `src/index.tsx`.
 - `src/routes/` contains route components; `src/admin/` contains admin UI pages.

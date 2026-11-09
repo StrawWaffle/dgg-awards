@@ -33,6 +33,7 @@ services:
       - ./dev/dgg-oauth/server.mjs:/srv/server.mjs:ro
     ports:
       - "127.0.0.1:8789:8789"
+    restart: unless-stopped
 
   # Cloudflare named tunnel. Point the public hostname at http://app:3000 in
   # the Cloudflare dashboard.
