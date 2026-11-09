@@ -27,7 +27,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 
 ### At a glance (end of session 2, 2026-11-09)
 
-**Live** (`main` at `40a6c6a` plus docs, deployed and pushed):
+**Live** (`main` at `e315085` plus docs, deployed and pushed):
 - **Infrastructure:** the Docker preview behind a Cloudflare tunnel, real destiny.gg sign-in, the stack upgrade (Bun 1.4, Hono, Zod, TS 7), and clips into Cloudflare R2 at 1080p.
 - **Admin page:**
   - a left sidebar, dark theme, drag to reorder, and collapsible sections
@@ -43,6 +43,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
   - clips, and the results reveal: drawn by hand, rows starting scrambled, and a race for the winner
   - a calmer stage cast, combos in the chat column, and the beat as a shared gust on the background emotes
   - the music button shows the volume while it changes (MMMM, OOOO at a speed that follows the volume, OverRustle at full), on a perceptual volume curve
+  - the Results tab is a summary to scroll through after the show: overview, highlights, standings and runoff rounds per award
   - the big screen fills the window and presents in scenes per award: title, a DVD-style nominee menu, the results reveal, and the winner. Clips are lowered in and the music fades out for them. Tabs slide, and background emotes show their colours on hover.
 
 **Waiting on rinlux** (StrawWaffle is asking):
@@ -75,7 +76,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 - Fast-forward `main`, run `docker compose --profile tunnel up -d --build app`, then check `/`, `/api/config`, `/lab` (200), `/api/admin/checks` and `/api/lab/emotes` (401), and `/signin` (to destiny.gg).
 - Push `main`.
 
-**Worktrees:** everything under `.claude/worktrees/` is merged (`admin-pass`, `editor-scroll`, `lab`, `lab-polish`, `lab-polish-2`, `lab-polish-3`, `lab-polish-4`, `nominee-images`, `sketchy`) and can be removed.
+**Worktrees:** everything under `.claude/worktrees/` is merged (`admin-pass`, `editor-scroll`, `lab`, `lab-polish`, `lab-polish-2`, `lab-polish-3`, `lab-polish-4`, `lab-summary`, `nominee-images`, `sketchy`) and can be removed.
 
 **Test containers**, on network `dgga-test`, all kept running:
 
@@ -330,7 +331,7 @@ StrawWaffle's notes, built:
 - **Fixed: the "Characters at most" limit.** A verified message gave its sender a character past the limit, and lowering the limit didn't send anyone off. Now both respect it, and extras leave a few at a time.
 - **Clip controls** are our own in the lab look: play, a seek bar, the time, sound and full screen. They hide 2 s after the pointer stops while playing.
 
-### The Results tab as a summary (branch `worktree-lab-summary`, 2026-11-09, not deployed)
+### The Results tab as a summary (2026-11-09, deployed)
 
 The big screen does the live reveal now, so the lab's Results tab became a page to read through after the show (`Summary.tsx`). It's built from `/api/vote/results` alone (no server change):
 - **Overview:** awards, ballots cast, the closest race and the biggest win (in points of the votes counted), and a top three of closest races, biggest wins and most votes. Each links down to its award.
