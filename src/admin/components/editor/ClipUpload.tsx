@@ -15,6 +15,12 @@ const stamp = (s: number) => `${formatTimestamp(Math.floor(s))}${s % 1 >= 0.05 ?
 
 /** Folder names and award titles compared loosely ("DANKMEMES of the Year"). */
 const simple = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+/** Is this the award's folder? Whole words, either way round ("New Emote of the Year" / "Emote of the Year"). */
+const sameAward = (folder: string, award: string | undefined) => {
+  if (!award || !folder) return false;
+  const [f, a] = [` ${simple(folder)} `, ` ${simple(award)} `];
+  return a.includes(f) || f.includes(a);
+};
 
 /**
  * Make the clip from a video you already have: one from the library on the
@@ -153,7 +159,7 @@ export function ClipUpload({
   // Library videos by folder, this award's folder first.
   const videos = (library.data ?? []).filter((v) => v.kind === "video");
   const folders = [...new Set(videos.map((v) => v.folder))].sort((a, b) => {
-    const mine = (f: string) => (award && simple(f) === simple(award) ? 0 : 1);
+    const mine = (f: string) => (sameAward(f, award) ? 0 : 1);
     return mine(a) - mine(b) || a.localeCompare(b);
   });
   const shownSrc = libraryPath ? `/api/admin/library/file?path=${encodeURIComponent(libraryPath)}` : src;
@@ -173,7 +179,7 @@ export function ClipUpload({
           >
             <option value="">From the library…</option>
             {folders.map((f) => (
-              <optgroup key={f} label={`${f || "Top level"}${award && simple(f) === simple(award) ? " (this award)" : ""}`}>
+              <optgroup key={f} label={`${f || "Top level"}${sameAward(f, award) ? " (this award)" : ""}`}>
                 {videos
                   .filter((v: LibraryItem) => v.folder === f)
                   .map((v) => (

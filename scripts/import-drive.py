@@ -12,6 +12,7 @@ Uses gdown's folder parser; Drive allows at most 50 files per folder that way.
 """
 
 import sys
+import time
 from pathlib import Path
 
 import gdown
@@ -49,15 +50,23 @@ def main(folder_id: str, out_dir: str) -> None:
             continue
         target.parent.mkdir(parents=True, exist_ok=True)
         part = target.with_name(target.name + ".part")
-        try:
-            gdown.download(id=file_id, output=str(part), quiet=True)
-            part.rename(target)
-            got += 1
-            print(f"got {rel} ({target.stat().st_size // 1024} kB)", flush=True)
-        except Exception as error:  # keep going; report at the end
-            failed += 1
-            part.unlink(missing_ok=True)
-            print(f"FAILED {rel}: {error}", flush=True)
+        # Drive refuses ("too many accesses") after a burst: pause between
+        # files, and back off and retry when it does.
+        for attempt in range(4):
+            try:
+                gdown.download(id=file_id, output=str(part), quiet=True)
+                part.rename(target)
+                got += 1
+                print(f"got {rel} ({target.stat().st_size // 1024} kB)", flush=True)
+                break
+            except Exception as error:
+                part.unlink(missing_ok=True)
+                if attempt == 3:
+                    failed += 1
+                    print(f"FAILED {rel}: {str(error).splitlines()[0]}", flush=True)
+                else:
+                    time.sleep(30 * (attempt + 1))
+        time.sleep(3)
     print(f"done: {got} downloaded, {skipped} already there, {failed} failed")
 
 
