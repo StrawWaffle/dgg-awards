@@ -27,7 +27,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 
 ### At a glance (end of session 2, 2026-11-09)
 
-**Live** (`main` at `e315085` plus docs, deployed and pushed):
+**Live** (`main` at `7068b01` plus docs, deployed and pushed):
 - **Infrastructure:** the Docker preview behind a Cloudflare tunnel, real destiny.gg sign-in, the stack upgrade (Bun 1.4, Hono, Zod, TS 7), and clips into Cloudflare R2 at 1080p.
 - **Admin page:**
   - a left sidebar, dark theme, drag to reorder, and collapsible sections
@@ -35,6 +35,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
   - one Settings form, admin management, vote stats with shared IPs
   - edit history with undo
   - hiding categories that have votes; export, and import with an automatic database backup
+  - links at the bottom left to preview voting and results, open the site, and open the lab
 - **Voting model:** single pick or ranked per category, ranked counted by instant runoff, and the 2025 double-count bug fixed.
 - **The lab** (`/lab`, admins only), where the 2026 voting page and presentation are being tried out:
   - a cozy look after a community destiny.gg skin, light and dark, a hand-drawn "drawn look" switch, and drifting emote silhouettes in the background
@@ -46,11 +47,17 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
   - the Results tab is a summary to scroll through after the show: overview, highlights, standings and runoff rounds per award
   - the big screen fills the window and presents in scenes per award: title, a DVD-style nominee menu, the results reveal, and the winner. Clips are lowered in and the music fades out for them. Tabs slide, and background emotes show their colours on hover.
 
-**Waiting on rinlux** (StrawWaffle is asking):
-- What they think of the lab. It's the candidate design for the 2026 voting page and presentation.
-- The format of their nominee data, and whether they still need an import. The old form routes `POST /api/admin/import`, `/category` and `/nominee` stay until then.
-- The real Omegalul 2025 numbers. The wiki's add up to 125%, most likely a copy slip (see "2025 results from the wiki").
-- The privacy-related decisions below.
+**Waiting on rinlux** (StrawWaffle is asking; they decide on privacy):
+- **The lab as the 2026 design.** What they think of the voting flow, the big screen's scenes (title, nominee menu, reveal, winner), the results summary, the look, the music and the chat characters. The lab moves into the real site only once they approve.
+- **What's missing** compared with the live 2025 site.
+- **Their nominee data:** the format they use now, and whether they still need an import. The old form routes `POST /api/admin/import`, `/category` and `/nominee` stay until then.
+- **The real 2025 votes:** do they have the production database, an export or the final numbers? Needed for the archive, the Omegalul numbers (the wiki's add up to 125%) and checking whether the announced winners match a correct count (the 2025 code double-counted nominees in several categories).
+- **Privacy decisions:**
+  - Whether the public results summary may show the number of unique voters and votes per day (aggregates only; the admin stats have them).
+  - Where voters are: an IP lookup, asking voters, or browser location, or none.
+  - Who else gets access: a presenter allowlist for the big screen (it uses the live chat relay), editors or moderators with fewer rights, and preview access for chosen people.
+  - Locking the site behind sign-in before voting, with a countdown.
+  - The privacy page's content, and whether the repo can ever be public (the nominee data names real people).
 
 **Ideas from StrawWaffle, not built (some need rinlux's say):**
 - **Roles:** presentation mode for an allowlist (the stream screen, admins included; the lab's chat relay is admins-only for now), moderators or editors with fewer rights, and letting chosen people preview pages.
