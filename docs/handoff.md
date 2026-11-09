@@ -27,7 +27,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 
 ### At a glance (end of session 2, 2026-11-09)
 
-**Live** (`main` at `fc5874d` plus docs, deployed and pushed):
+**Live** (`main` at `40a6c6a` plus docs, deployed and pushed):
 - **Infrastructure:** the Docker preview behind a Cloudflare tunnel, real destiny.gg sign-in, the stack upgrade (Bun 1.4, Hono, Zod, TS 7), and clips into Cloudflare R2 at 1080p.
 - **Admin page:**
   - a left sidebar, dark theme, drag to reorder, and collapsible sections
@@ -75,7 +75,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 - Fast-forward `main`, run `docker compose --profile tunnel up -d --build app`, then check `/`, `/api/config`, `/lab` (200), `/api/admin/checks` and `/api/lab/emotes` (401), and `/signin` (to destiny.gg).
 - Push `main`.
 
-**Worktrees:** everything under `.claude/worktrees/` is merged (`admin-pass`, `editor-scroll`, `lab`, `lab-polish`, `lab-polish-2`, `lab-polish-3`, `nominee-images`, `sketchy`) and can be removed.
+**Worktrees:** everything under `.claude/worktrees/` is merged (`admin-pass`, `editor-scroll`, `lab`, `lab-polish`, `lab-polish-2`, `lab-polish-3`, `lab-polish-4`, `nominee-images`, `sketchy`) and can be removed.
 
 **Test containers**, on network `dgga-test`, all kept running:
 
@@ -326,7 +326,7 @@ StrawWaffle's notes, built:
   3. **Results:** the results tab's reveal (`Board`, now exported from `Results.tsx` with `onFinished`), with Reveal next and Reveal all.
   4. **Winner:** their picture, votes, "Play it again" and "Cheer again". Everyone claps as it opens.
   - From the Nominees scene on, the cast keeps to the sides of what's in the middle, and newcomers walk straight to the sides. Back and Next step through, the numbered steps jump, and a dropdown picks the award. The data is the admin results preview joined to `/api/nominees`.
-- **Later change (branch `worktree-lab-polish-4`): the cast roams around a scene instead of parking.** Outside clips, characters keep wandering anywhere the scene's box doesn't cover: beside it, and in the rows below it. Anyone in a covered row who walks into its band turns back, and newcomers in those rows stay on the side they came in from. The box is measured each frame from layout offsets (`boxIn`, which ignores the lowering animation), so the areas follow the scene's size and the chat column opening or closing. Each character's own size (scaled, plus a hop) counts. Only a clip still sends everyone to the sides to sit still.
+- **Later change (deployed): the cast roams around a scene instead of parking.** Outside clips, characters keep wandering anywhere the scene's box doesn't cover: beside it, and in the rows below it. Anyone in a covered row who walks into its band turns back, and newcomers in those rows stay on the side they came in from. The box is measured each frame from layout offsets (`boxIn`, which ignores the lowering animation), so the areas follow the scene's size and the chat column opening or closing. Each character's own size (scaled, plus a hop) counts. Only a clip still sends everyone to the sides to sit still.
 - **Fixed: the "Characters at most" limit.** A verified message gave its sender a character past the limit, and lowering the limit didn't send anyone off. Now both respect it, and extras leave a few at a time.
 - **Clip controls** are our own in the lab look: play, a seek bar, the time, sound and full screen. They hide 2 s after the pointer stops while playing.
 
