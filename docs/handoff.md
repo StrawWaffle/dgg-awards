@@ -27,7 +27,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 
 ### At a glance (end of session 2, 2026-11-09)
 
-**Live** (`main` at `ff69dc6` plus docs, deployed and pushed):
+**Live** (`main` at `b4c7f05` plus docs, deployed and pushed):
 - **Infrastructure:** the Docker preview behind a Cloudflare tunnel, real destiny.gg sign-in, the stack upgrade (Bun 1.4, Hono, Zod, TS 7), and clips into Cloudflare R2 at 1080p.
 - **Admin page:**
   - a left sidebar, dark theme, drag to reorder, and collapsible sections
@@ -71,9 +71,9 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 - bing: added to `ADMIN_USERNAMES` as `bing` (an admin from their next sign-in).
 - Voting end: 26 December 2026 23:59:59 UTC ("for now", StrawWaffle).
 - How DGGer's groups and wildcards should vote.
-- **Simulated results for admins** (StrawWaffle asked): a switch in the admin results previews (summary and big screen) that makes up ballots in memory, never saved. Not built yet.
-- **The new voting page** (next, see the front page section). Until then "Vote now" goes to the old page at `/vote`.
-- The public tally (voters, votes per day) on the results page.
+- **Simulated results:** done on `/results` for admins. The big screen's reveal doesn't have it yet.
+- ~~The new voting page~~: done, the site is one page now (see "One site").
+- ~~The public tally~~: done, on the results page.
 
 **Ideas from StrawWaffle, not built (some need rinlux's say):**
 - **Roles:** presentation mode for an allowlist (the stream screen, admins included; the lab's chat relay is admins-only for now), moderators or editors with fewer rights, and letting chosen people preview pages.
@@ -99,7 +99,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 - Fast-forward `main`, run `docker compose --profile tunnel up -d --build app`, then check `/`, `/api/config`, `/lab`, `/admin` (200), `/api/admin/checks` and `/api/lab/emotes` (401), and `/signin` (to destiny.gg).
 - Push `main`.
 
-**Worktrees:** everything under `.claude/worktrees/` is merged (`admin-pass`, `editor-scroll`, `lab`, `lab-polish`, `lab-polish-2`, `lab-polish-3`, `lab-polish-4`, `lab-summary`, `admin-lab-link`, `duel-reveal`, `plain-admin`, `clip-preview`, `library-pictures`, `backups`, `frontpage`, `no-ip`, `privacy-flags`, `nominee-images`, `sketchy`) and can be removed.
+**Worktrees:** everything under `.claude/worktrees/` is merged (`admin-pass`, `editor-scroll`, `lab`, `lab-polish`, `lab-polish-2`, `lab-polish-3`, `lab-polish-4`, `lab-summary`, `admin-lab-link`, `duel-reveal`, `plain-admin`, `clip-preview`, `library-pictures`, `backups`, `frontpage`, `no-ip`, `privacy-flags`, `hover-pass`, `one-site`, `nominee-images`, `sketchy`) and can be removed.
 
 **Test containers**, on network `dgga-test`, all kept running:
 
@@ -481,7 +481,7 @@ StrawWaffle downloaded the original `dgga25.zip` again (7.9 MB, 167 files, code 
 - **Compared with the import commit `6b884f8`:** 166 files are byte-for-byte identical. The only file not imported is `scripts/data-to-json.out.json`, the output of `scripts/data-to-json.ts` (the nominees as JSON). It's an **older** export than the zip's `src/data.ts`, despite its later file date (2 January against 31 December): `data.ts` has the typo fixes ("podcast", "continuously", "malicious"…) and JohnHentai's link that the JSON lacks. So nothing is missing.
 - **Archived** on Google Drive as `DGG Awards backups/archive/dgga25-original-source.zip`, uploaded with rclone and checked by MD5 against the original. Not encrypted (code only).
 
-### Hover pass and the results side list (branch `worktree-hover-pass`, 2026-11-09)
+### Hover pass and the results side list (2026-11-09, deployed)
 
 StrawWaffle noticed missing hover effects and a side list that didn't follow the page.
 - **Hover:**
@@ -490,7 +490,7 @@ StrawWaffle noticed missing hover effects and a side list that didn't follow the
   - Checked in the browser: all 10 sampled elements change on hover.
 - **Results / 2025 side list:** the highlighted award is now worked out on scroll: the last one whose heading has passed the upper third, the last one at the very bottom (the short final awards never reached the old observer's band), and none above the first. The list scrolls itself to keep it in view: a third of the way down when it nears an edge, back to the top at the overview.
 
-### One site: the real voting and results pages (branch `worktree-one-site`, 2026-11-09)
+### One site: the real voting and results pages (2026-11-09, deployed)
 
 StrawWaffle: `/vote?preview=voting` and `?preview=results` should show the new look, and "lab and non-lab should not be two different web pages; the lab is a slightly more experimental place, without touching what's agreed upon".
 - **One page, `site.html` → `src/site/Site.tsx`**, at `/`, `/vote`, `/results`, `/2025` and `/lab`, with one header.
