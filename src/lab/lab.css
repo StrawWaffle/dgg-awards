@@ -1,4 +1,6 @@
 @import "@fontsource-variable/nunito";
+@import "@fontsource/gaegu/400.css";
+@import "@fontsource/gaegu/700.css";
 
 /*
  * The lab's cozy look, inspired by a community-made destiny.gg skin (StrawWaffle's
@@ -101,6 +103,11 @@
 .lab-silhouette,
 .lab-silhouette * {
   animation: none !important;
+}
+
+/* Handwriting, for numbers and notes in the drawn look (Gaegu, OFL). */
+.hand {
+  font-family: "Gaegu", "Nunito Variable", cursive;
 }
 
 /* A soft panel. */

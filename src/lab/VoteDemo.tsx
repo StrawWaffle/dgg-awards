@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { originOf, useBursts } from "@/lab/Bursts";
 import { Emote } from "@/lab/Emote";
+import { cssVar, useDrawnLook } from "@/lab/sketch";
+import { annotate } from "rough-notation";
 
 type Nominee = { id: string; title: string; image: string | null };
 type Award = { id: string; title: string; description: string; nominees: Nominee[] };
@@ -23,6 +25,18 @@ export function VoteDemo() {
   const [choices, setChoices] = useState<Choice[]>([]);
   const [picked, setPicked] = useState<string | null>(null);
   const [answer, setAnswer] = useState("");
+  const drawn = useDrawnLook();
+  const grid = useRef<HTMLDivElement>(null);
+
+  // In the drawn look, your pick gets a box drawn round it by hand.
+  useEffect(() => {
+    if (!drawn || !picked || !grid.current) return;
+    const card = grid.current.querySelector<HTMLElement>(`[data-nominee="${CSS.escape(picked)}"]`);
+    if (!card) return;
+    const a = annotate(card, { type: "box", color: cssVar("--primary-shadow"), strokeWidth: 3, padding: 4, animationDuration: 500 });
+    a.show();
+    return () => a.remove();
+  }, [picked, drawn, step]);
 
   useEffect(() => {
     fetch("/api/nominees")
@@ -110,12 +124,13 @@ export function VoteDemo() {
                 {award.description}
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+            <div ref={grid} className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
               {award.nominees.map((n) => {
                 const mine = picked === n.id;
                 return (
                   <button
                     key={n.id}
+                    data-nominee={n.id}
                     type="button"
                     onClick={(e) => {
                       setPicked(n.id);

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Emote } from "@/lab/Emote";
+import { Sketch, useDrawnLook } from "@/lab/sketch";
 import { type FeedStatus, liveFeed, simulatedFeed } from "@/lab/chatFeed";
 import { type Levels, type Source, useFrame } from "@/lab/music";
 import type { ChatSummary } from "@/server/lab/chat-aggregator";
@@ -55,6 +56,7 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
   const [winner, setWinner] = useState<string | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const drawn = useDrawnLook();
   const settings = useRef({ rate, emoteShare, max, names, showSaid });
   settings.current = { rate, emoteShare, max, names, showSaid };
   const fps = useRef({ frames: 0, since: performance.now(), value: 0 });
@@ -231,8 +233,9 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
       <div className="space-y-5">
-        {/* The stage, framed like a stream embed. */}
-        <div className="cozy-panel p-2">
+        {/* The stage, framed like a stream embed; in the drawn look, by hand. */}
+        <Sketch pad={4} radius={24} strokeWidth={3} boil roughness={1.6}>
+        <div className={drawn ? "rounded-[22px] p-2" : "cozy-panel p-2"} style={drawn ? { background: "var(--panel)" } : undefined}>
           <div
             className="relative aspect-video w-full overflow-hidden rounded-[16px]"
             style={{ background: "linear-gradient(to bottom, var(--sky-top), var(--sky-bottom))" }}
@@ -242,15 +245,20 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
               style={{ background: "var(--ground)", borderTop: "6px solid var(--ground-edge)", borderRadius: "50% 50% 0 0 / 28px 28px 0 0" }}
             />
             <div className="absolute inset-x-0 top-[7%] z-[200] text-center">
-              <div className="cozy-panel inline-block px-7 py-3 text-2xl font-black sm:text-4xl">
-                {winner ? (
-                  <span className="flex items-center gap-3">
-                    <Emote name="CHEERSTINY" size={1.1} title="" /> {winner}
-                  </span>
-                ) : (
-                  "Omegalul of the Year"
-                )}
-              </div>
+              <Sketch className="inline-block" pad={3} radius={20} boil={!!winner} drawOn>
+                <div
+                  className={`${drawn ? "rounded-[20px]" : "cozy-panel"} inline-block px-7 py-3 text-2xl font-black sm:text-4xl`}
+                  style={drawn ? { background: "var(--panel)" } : undefined}
+                >
+                  {winner ? (
+                    <span className="flex items-center gap-3">
+                      <Emote name="CHEERSTINY" size={1.1} title="" /> {winner}
+                    </span>
+                  ) : (
+                    "Omegalul of the Year"
+                  )}
+                </div>
+              </Sketch>
             </div>
             <div ref={floor} className="absolute inset-0" />
             <div className="cozy-chip absolute top-3 left-3 z-[200] font-mono text-[11px]!">
@@ -258,6 +266,7 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
             </div>
           </div>
         </div>
+        </Sketch>
 
         {/* Under the stage: what's on, and the controls. */}
         <div className="cozy-panel space-y-4 p-5">

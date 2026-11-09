@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { DesktopIcon, MoonIcon, SunIcon } from "@radix-ui/react-icons";
+import { DesktopIcon, MoonIcon, Pencil1Icon, SunIcon } from "@radix-ui/react-icons";
 import { Emote } from "@/lab/Emote";
 import { EmoteBackdrop } from "@/lab/EmoteBackdrop";
 import { MusicBar } from "@/lab/MusicBar";
@@ -7,11 +7,14 @@ import { useSourceChoice, useStartOnFirstGesture } from "@/lab/music";
 import { Stage } from "@/lab/Stage";
 import { type Theme, useLabTheme } from "@/lab/theme";
 import { Visualizer } from "@/lab/Visualizer";
+import { Results } from "@/lab/Results";
+import { setDrawnLook, useDrawnLook } from "@/lab/sketch";
 import { VoteDemo } from "@/lab/VoteDemo";
 
 const views = [
   { id: "voting", label: "Voting" },
   { id: "stage", label: "Big screen" },
+  { id: "results", label: "Results" },
   { id: "sound", label: "Sound check" },
 ] as const;
 type View = (typeof views)[number]["id"];
@@ -35,6 +38,7 @@ export function Lab() {
     return views.some((v) => v.id === hash) ? (hash as View) : "voting";
   });
   const { theme, setTheme } = useLabTheme();
+  const drawn = useDrawnLook();
   useStartOnFirstGesture();
 
   useEffect(() => {
@@ -84,6 +88,16 @@ export function Lab() {
           <MusicBar />
           <button
             type="button"
+            className={`cozy-btn round h-10 w-10 ${drawn ? "primary" : ""}`}
+            onClick={() => setDrawnLook(!drawn)}
+            aria-pressed={drawn}
+            aria-label="Drawn look"
+            title={drawn ? "Drawn look on: hand-drawn frames, bars and notes" : "Drawn look off: plain cozy panels"}
+          >
+            <Pencil1Icon />
+          </button>
+          <button
+            type="button"
             className="cozy-btn round h-10 w-10"
             onClick={() => setTheme(cycle.next)}
             aria-label={`${cycle.label}. Click for ${cycle.next}.`}
@@ -111,6 +125,7 @@ export function Lab() {
         <main className="mx-auto max-w-7xl space-y-5 px-4 py-6">
           {view === "voting" && <VoteDemo />}
           {view === "stage" && <Stage source={source} emotes={emotes} />}
+          {view === "results" && <Results />}
           {view === "sound" && <Visualizer source={source} setSource={setSource} />}
           <p className="text-center text-xs" style={{ color: "var(--muted)" }}>
             The lab: ideas being tried out, separate from the real site. Look inspired by a community destiny.gg skin.

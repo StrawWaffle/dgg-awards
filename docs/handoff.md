@@ -189,7 +189,7 @@ StrawWaffle pointed out that the wiki has the confirmed 2025 results: https://wi
 - **Archive: wait for the full 2025 data** (StrawWaffle). Don't build it from the wiki percentages.
 - Tests: 42 API tests pass, with both snapshots unchanged. New ones cover hiding, the delete guards, and an export → import → undo → redo round trip.
 
-### Nominee pictures (branch `worktree-nominee-images`, 2026-11-09, not deployed)
+### Nominee pictures (deployed 2026-11-09)
 
 StrawWaffle asked for image uploads where relevant, kept at full size, with optional cropping and resizing in the browser.
 - **One picture per nominee:** `thumbnailKey`, shown on the card and as the clip's thumbnail.
@@ -210,6 +210,28 @@ StrawWaffle asked for image uploads where relevant, kept at full size, with opti
   - New API checks: a fake PNG is refused, a GIF is stored byte for byte with the right type, and remove plus undo work.
   - In Chromium and Firefox, a dragged and zoomed square crop was stored at exactly the size the dialog showed, and a GIF went up without the dialog.
   - 42 API tests pass, with both snapshots unchanged.
+
+### The drawn look (lab, deployed 2026-11-09)
+
+StrawWaffle: part of what makes the skin cute is its drawn buttons and details. Could the presentation get a scribbly look (results, drawn frames around videos)? Researched, then prototyped in the lab.
+- **Research: what exists.**
+  - **Rough.js** 4.6.6 (MIT, under 9 kB) draws sketchy shapes and paths in SVG or canvas, with hatched fills and a seed for repeatable wobble. Excalidraw's look comes from it.
+  - **Rough Notation** 0.5.1 (MIT, about 3 kB) draws animated hand-drawn underlines, circles, boxes and highlights around page elements, and can sequence them.
+  - **roughViz** and **chart.xkcd** are complete sketchy chart libraries. They're quicker to start with but less control; roughViz's author says they're "not for absolute precision". Drawing bars ourselves with Rough.js keeps the article's rules (sorted, from zero, labelled).
+  - **perfect-freehand** gives pen-pressure strokes. It's for real drawing, so not needed here.
+  - **SVG filters** (`feTurbulence` plus `feDisplacementMap`) make anything wobble, and shuffling the filter's seed gives "boiling" lines. The lab does the boil with Rough.js seeds instead, so only the frame wobbles, never the video or text inside.
+  - **Handwriting fonts** (OFL, through Fontsource): Gaegu (chosen), Patrick Hand, Kalam.
+- **Prototype** (`src/lab/sketch.tsx`, `Results.tsx`):
+  - A pencil button in the header switches the drawn look on and off (remembered), so it can be compared with the plain cozy look.
+  - `Sketch` draws a wobbly, doubled, rounded hand-drawn frame around anything. It can boil (redrawn at 8 fps with 3 seeds; off for reduced motion) and draw itself in. It's used round the big-screen stage and its award sign.
+  - **The Results tab** (new) uses the admin results preview.
+    - The bars are hatched by hand, sorted, from zero, labelled with name, count and share, with the total shown. The winner is cross-hatched in coral.
+    - Revealing goes from last place up ("Reveal next", **"Reveal all but the last three"**, "Reveal everything"). Each bar draws itself in, its numbers count up in Gaegu, and unrevealed rows are pencilled dashes.
+    - The winner's name gets circled by hand, with a CHEERSTINY and Klappa burst. The title is underlined by hand.
+    - With the drawn look off, the bars are plain and the winner is highlighted.
+  - **Voting:** the picked nominee gets a box drawn round it.
+  - Checked in light and dark with no console errors.
+- **Ideas not built yet:** drawn outlines on buttons (the skin's own detail); scribbled hand-drawn icons in place of the radix ones; a drawn arrow pointing at the winner; "boiling" only at moments (the winner) and still otherwise, if the constant boil is too busy.
 
 ### Next: the lab page (StrawWaffle's answers, 2026-11-09)
 
