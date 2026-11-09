@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { decryptBackup, encryptBackup, isEncryptedBackup, isSqlite } from "@/lib/backup-crypto";
 import { backupName, backupsToDelete } from "@/lib/backup-names";
 
+// Off-site backups were encrypted until 2026-11-09; those still restore.
 describe("encrypted backups", () => {
   const sqlite = new TextEncoder().encode("SQLite format 3\u0000" + "x".repeat(5000));
 
@@ -34,7 +35,7 @@ describe("which backups are kept", () => {
   const hoursAgo = (h: number) => backupName(new Date(now - h * 3600_000));
 
   test("names sort by time", () => {
-    expect(backupName(new Date("2026-11-09T19:42:31Z"))).toBe("dgg-awards-2026-11-09T19-42Z.db.enc");
+    expect(backupName(new Date("2026-11-09T19:42:31Z"))).toBe("dgg-awards-2026-11-09T19-42Z.db");
   });
 
   test("every copy for 2 days, then one a day for 60 days", () => {
@@ -50,6 +51,9 @@ describe("which backups are kept", () => {
     // The newest of each day is the one kept.
     expect(older[0]).toBe(hoursAgo(48));
     expect(removed.has("notes.txt")).toBe(false);
+    // The older, encrypted backups are kept by the same rule.
+    expect(backupsToDelete(["dgg-awards-2026-08-01T10-00Z.db.enc"], now)).toEqual(["dgg-awards-2026-08-01T10-00Z.db.enc"]);
+    expect(backupsToDelete(["dgg-awards-2026-11-09T10-00Z.db.enc"], now)).toEqual([]);
     expect(removed.has(hoursAgo(24 * 65))).toBe(true);
   });
 });

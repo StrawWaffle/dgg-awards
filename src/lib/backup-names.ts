@@ -7,13 +7,13 @@ const KEEP_ALL_FOR = 2 * DAY;
 /** …then the newest of each day, this long. */
 const KEEP_DAILY_FOR = 60 * DAY;
 
-/** "dgg-awards-2026-11-09T19-42Z.db.enc", in UTC so names sort by time. */
+/** "dgg-awards-2026-11-09T19-42Z.db", in UTC so names sort by time. */
 export function backupName(at: Date) {
-  return `dgg-awards-${at.toISOString().slice(0, 16).replace(":", "-")}Z.db.enc`;
+  return `dgg-awards-${at.toISOString().slice(0, 16).replace(":", "-")}Z.db`;
 }
 
 function timeOf(name: string): number | null {
-  const m = /^dgg-awards-(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})Z\.db\.enc$/.exec(name);
+  const m = /^dgg-awards-(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})Z\.db(\.enc)?$/.exec(name);
   return m ? Date.parse(`${m[1]}T${m[2]}:${m[3]}:00Z`) : null;
 }
 

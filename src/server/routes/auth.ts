@@ -161,11 +161,9 @@ export const authRoutes = new Hono()
       await setUserAdmin(userInfo.userId, true);
     }
 
-    // Cloudflare's header; "Unknown" when not behind the tunnel.
-    const ip = c.req.header("CF-Connecting-IP") ?? "Unknown";
     const agent = c.req.header("User-Agent") ?? "Unknown device";
 
-    const session = await createSession(userInfo.userId, ip, agent);
+    const session = await createSession(userInfo.userId, agent);
     setCookie(c, SESSION_COOKIE, session, { ...sessionCookie, maxAge: 604800 });
     const next = safeNext(getCookie(c, NEXT_COOKIE));
     deleteCookie(c, NEXT_COOKIE, { path: "/" });

@@ -457,6 +457,13 @@ StrawWaffle got approval for the lab's look ("the lab is the official version no
 
 **Next (StrawWaffle's order): the lab's voting page as the real one.** `VoteDemo` saves nothing and shows 3 awards. It needs real ballots (`/api/vote`), sign-in, the voter's existing picks, every award, ranked awards, and the voting window. Then `VOTE_PATH` in `Home.tsx` points at it and the old page can go.
 
+### No IP addresses, and plain backups (branch `worktree-no-ip`, 2026-11-09)
+
+StrawWaffle: "remove the ip tracking, and we don't need the encryption thing anymore".
+- **IPs:** sign-ins no longer store the visitor's address (it came from Cloudflare's `CF-Connecting-IP`). Migration `0008_no_ip` drops `sessions.ip` and strips `ip` from every vote's `sessionSnapshot`. Tested on a copy of live's pre-2026 backup: 9,328 votes, all stripped, all kept. The admin Votes tab lost its IP column, IP filter and "addresses shared by several voters" table. That table was the only bot signal; there's none now. `/api/me` and the votes list no longer return `ip`. The user agent is still kept with each session and vote.
+- **Backups:** off-site backups are plain `.db` files now (they show who voted for what, so share the Drive folder only with organisers). They need only the rclone token. The older encrypted `.db.enc` files still restore with `BACKUP_PASSWORD` (kept in `.env` for that) and are deleted by the keeping rule within 60 days.
+- **Still holding IPs, until they age out:** the local backups in `/data/backups/` from before this (they keep the newest 20) and the encrypted Drive backups (60 days). They hold the test voters' fake "seed" addresses and the admins' sign-in addresses.
+
 ### Next: the lab page (StrawWaffle's answers, 2026-11-09)
 
 StrawWaffle wants the front page and the presentation to feel fun, quirky and wholesome. It gets built on an experimental page first (`/lab`, admins only) until rinlux approves. Order: the follow-ups above, merge and deploy, then the lab.

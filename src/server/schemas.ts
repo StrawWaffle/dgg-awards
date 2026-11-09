@@ -186,7 +186,6 @@ export const restoreForm = z.object({
 });
 
 export const votesQuery = z.object({
-  filter_ip: z.string().optional(),
   filter_uid: z.string().regex(/^-?\d+$/).optional(),
   filter_name: z.string().trim().min(1).optional(),
   page: z.string().optional(),

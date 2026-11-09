@@ -29,7 +29,6 @@ export const sessionsTable = sqliteTable(
     uid: int()
       .references(() => usersTable.uid, { onDelete: "cascade" })
       .notNull(),
-    ip: text().notNull(),
     agent: text().notNull(),
   },
   (table) => [

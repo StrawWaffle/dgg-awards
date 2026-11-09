@@ -165,7 +165,7 @@ function BackupSection() {
         </a>
         <span className="text-sm text-neutral-600">
           The whole database as one file: awards, nominees, votes, users, settings and history (not sign-ins). It holds
-          voters' IP addresses, so keep it private.
+          who voted for what, so keep it private.
         </span>
       </div>
 
@@ -177,7 +177,7 @@ function BackupSection() {
         {status.data?.enabled && (
           <>
             <p className="text-neutral-600">
-              Every hour, encrypted, to <span className="font-mono">{status.data.remote}</span>. Kept: every copy for 2
+              Every hour to <span className="font-mono">{status.data.remote}</span>. Kept: every copy for 2
               days, then one a day for 60 days. Clips and thumbnails are copied there once a day.
             </p>
             <p className={db && !db.ok ? "text-red-700" : "text-neutral-800"}>
@@ -203,7 +203,7 @@ function BackupSection() {
       <div className="space-y-2 text-sm">
         <p className="font-medium">Restore from a backup</p>
         <p className="text-neutral-600">
-          A downloaded .db file, or an encrypted .db.enc from Google Drive. Replaces the whole database; the current one
+          A .db file, downloaded here or from Google Drive (an older encrypted .db.enc needs its password). Replaces the whole database; the current one
           is saved on the server first. The backup must be from this version of the site.
         </p>
         <div className="flex flex-wrap items-center gap-3">

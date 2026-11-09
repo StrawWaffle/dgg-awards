@@ -92,7 +92,7 @@ describe("static and public routes", () => {
       ["/", "DGG Awards"],
       ["/2025", "DGG Awards"],
       ["/vote", "Destiny Awards 2025"],
-    ]) {
+    ] as const) {
       const res = await req(path);
       expect(res.status).toBe(200);
       expect(res.headers.get("content-type")).toContain("text/html");
@@ -179,7 +179,8 @@ describe("sign-in", () => {
     expect(body.name).toBe("Alice");
     expect(body.admin).toBe(false);
     expect(Object.keys(body).sort()).toEqual(
-      ["admin", "agent", "createdAt", "expiresAt", "id", "ip", "name", "uid"].sort(),
+      // No IP address is kept.
+      ["admin", "agent", "createdAt", "expiresAt", "id", "name", "uid"].sort(),
     );
   });
 
@@ -283,11 +284,9 @@ describe("admin", () => {
     const all = await (await req("/api/admin/votes", {}, admin)).json();
     expect(all).toHaveLength(100);
     expect(Object.keys(all[0]).sort()).toEqual(
-      ["at", "categoryId", "categoryTitle", "ip", "name", "optionId", "optionTitle", "rank", "uid"].sort(),
+      ["at", "categoryId", "categoryTitle", "name", "optionId", "optionTitle", "rank", "uid"].sort(),
     );
     expect(all.every((v: any) => v.name && v.categoryTitle && v.optionTitle)).toBe(true);
-    const byIp = await (await req("/api/admin/votes?filter_ip=seed", {}, admin)).json();
-    expect(byIp).toHaveLength(100);
     const byUid = await (await req("/api/admin/votes?filter_uid=-1", {}, admin)).json();
     expect(byUid.every((v: any) => v.uid === -1)).toBe(true);
     expect(byUid.length).toBeGreaterThan(0);
@@ -305,7 +304,7 @@ describe("admin", () => {
     expect(stats.voters).toBe(501);
     expect(stats.categories.reduce((n: number, c: any) => n + c.ballots, 0)).toBe(stats.ballots);
     expect(stats.days.reduce((n: number, d: any) => n + d.ballots, 0)).toBe(stats.ballots);
-    expect(stats.sharedIps).toEqual([{ ip: "seed", voters: 500 }]);
+    expect(stats.sharedIps).toBeUndefined();
     expect((await req("/api/admin/stats", {}, user)).status).toBe(401);
   });
 

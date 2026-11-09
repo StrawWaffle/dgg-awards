@@ -534,10 +534,9 @@ export const adminRoutes = new Hono<SessionEnv>()
   })
 
   .get("/votes", zValidator("query", votesQuery, rejectInvalid), async (c) => {
-    const { filter_ip, filter_uid, filter_name, page } = c.req.valid("query");
+    const { filter_uid, filter_name, page } = c.req.valid("query");
     const offset = page ? parseInt(page) * 100 : 0;
     const votes = await getVotesPage(offset, {
-      ip: filter_ip,
       uid: filter_uid === undefined ? undefined : parseInt(filter_uid),
       name: filter_name,
     });

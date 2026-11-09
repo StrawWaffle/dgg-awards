@@ -5,7 +5,7 @@
 //   bun scripts/seed.ts --mode reviewing --fake-votes 500 --ranked emote,moment
 //
 // Re-running replaces all categories, nominees and votes. --fake-votes adds
-// that many invented voters (negative uids, ip "seed") so the results reveal
+// that many invented voters (negative uids) so the results reveal
 // has something to show. They are not last year's real numbers. --ranked makes
 // those categories ranked, and their fake voters rank 1–4 nominees.
 import { Database } from "bun:sqlite";
@@ -114,7 +114,6 @@ db.transaction(() => {
         uid,
         createdAt: now,
         expiresAt: now,
-        ip: "seed",
         agent: "seed",
       });
       Data.forEach((c, ci) => {

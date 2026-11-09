@@ -2,10 +2,10 @@
 
 Everything the site needs to come back, on another machine or with another maintainer, is in the Google Drive folder **DGG Awards backups**:
 
-- `database/`: the database, encrypted, one file an hour (`dgg-awards-2026-11-09T19-42Z.db.enc`). Every copy is kept for 2 days, then one a day for 60 days.
-- `media/`: clips and thumbnails, copied once a day. Not encrypted: they're public on the site anyway.
+- `database/`: the database, one plain SQLite file an hour (`dgg-awards-2026-11-09T19-42Z.db`). Every copy is kept for 2 days, then one a day for 60 days. They show who voted for what, so share the folder only with the organisers.
+- `media/`: clips and thumbnails, copied once a day.
 
-The backup password is needed to open a database backup. It's in the current maintainer's password manager, not in the folder.
+Until 2026-11-09 the database backups were encrypted (`.db.enc`) with a password, which StrawWaffle has. Those are deleted by the keeping rule within 60 days. Until then, they need that password to open (see Restoring).
 
 What isn't in the folder, and where it is instead:
 
@@ -16,9 +16,9 @@ What isn't in the folder, and where it is instead:
 
 ## Backups while the site runs
 
-- **Off-site, every hour**: `src/server/backups.ts`, when `BACKUP_PASSWORD` and the `RCLONE_CONFIG_GDRIVE_*` settings are in `.env`. The admin page's Settings → Backups shows the last run and has "Back up now".
+- **Off-site, every hour**: `src/server/backups.ts`, when the `RCLONE_CONFIG_GDRIVE_*` settings are in `.env`. The admin page's Settings → Backups shows the last run and has "Back up now".
 - **On the server**: a copy in `/data/backups/` before every import, restore and deploy (the newest 20 are kept).
-- **By hand**: Settings → Backups → "Download a full backup" gives the database as a plain `.db` file. It holds voters' IP addresses, so keep it private.
+- **By hand**: Settings → Backups → "Download a full backup" gives the database as a plain `.db` file. It shows who voted for what, so keep it private. (No IP addresses are kept, since 2026-11-09.)
 
 ### Setting up the off-site backups (once per maintainer)
 
@@ -35,19 +35,16 @@ What isn't in the folder, and where it is instead:
    RCLONE_CONFIG_GDRIVE_TYPE=drive
    RCLONE_CONFIG_GDRIVE_SCOPE=drive.file
    RCLONE_CONFIG_GDRIVE_TOKEN='{"access_token":"…","token_type":"Bearer","refresh_token":"…","expiry":"…"}'
-   BACKUP_PASSWORD="a long passphrase"
    ```
 
    Optionally set `BACKUP_REMOTE` (default `gdrive:DGG Awards backups`).
 3. Restart the app. The first backup runs a few minutes later.
-4. To share the backups, share the folder from Google Drive. Send the password separately.
-
-Backups made with the old password still need the old password. Note it down before changing it.
+4. To share the backups, share the folder from Google Drive.
 
 ## Restoring
 
-- **On a running site:** Settings → Backups → "Restore from a backup". Choose a `.db` or `.db.enc` file. An encrypted one uses the site's own password unless you enter another. Everything is replaced except sign-ins, and the current database is saved to `/data/backups/` first.
-- **Without the site:** decrypt with `bun scripts/backup-decrypt.ts <file.db.enc> sqlite.db` (asks for the password, or reads `BACKUP_PASSWORD`). The result is a normal SQLite file.
+- **On a running site:** Settings → Backups → "Restore from a backup". Choose a `.db` file (or an older encrypted `.db.enc`: it uses `BACKUP_PASSWORD` from `.env` unless you enter its password). Everything is replaced except sign-ins, and the current database is saved to `/data/backups/` first.
+- **Without the site:** a `.db` backup is a normal SQLite file. An older `.db.enc` decrypts with `bun scripts/backup-decrypt.ts <file.db.enc> sqlite.db` (asks for the password, or reads `BACKUP_PASSWORD`).
 
 A backup only restores onto the same version of the site: the same database updates (migrations) applied. To restore an older backup on newer code, start the older code (`git log` → the commit from the backup's date) with the backup as its database. Its migrations then run forward on the next start of the newer code.
 
@@ -55,14 +52,7 @@ A backup only restores onto the same version of the site: the same database upda
 
 1. **Code:** clone the repository and install Docker.
 2. **Settings:** copy `.env.example` to `.env` and fill it in (see the next section).
-3. **Database:** take the newest file from `database/` and decrypt it:
-
-   ```sh
-   docker run --rm -v "$PWD:/w" -w /w -e BACKUP_PASSWORD oven/bun:1.4 \
-     sh -c "bun install --frozen-lockfile >/dev/null && bun scripts/backup-decrypt.ts dgg-awards-….db.enc sqlite.db"
-   ```
-
-   Put it in the data volume before the first start:
+3. **Database:** take the newest file from `database/` and save it as `sqlite.db`. Put it in the data volume before the first start:
 
    ```sh
    docker volume create dgg-awards_awards_data
@@ -85,4 +75,5 @@ A backup only restores onto the same version of the site: the same database upda
 | `ADMIN_USERNAMES` | Comma-separated destiny.gg names that become admins on sign-in |
 | `R2_*` | Optional: your bucket for clips (see Media above) |
 | `CLOUDFLARE_TUNNEL_TOKEN` | Optional: to publish through a Cloudflare tunnel |
-| `BACKUP_PASSWORD`, `RCLONE_CONFIG_GDRIVE_*` | Off-site backups (above) |
+| `RCLONE_CONFIG_GDRIVE_*` | Off-site backups (above) |
+| `BACKUP_PASSWORD` | Only to open the older encrypted backups (until about January 2027) |

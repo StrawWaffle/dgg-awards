@@ -1,20 +1,20 @@
 // Off-site backups to Google Drive (or any rclone remote), so a dead disk or
 // a new maintainer loses nothing. Set up in docs/migration.md.
 //
-// - Every hour: the database (without sessions), encrypted with
-//   BACKUP_PASSWORD (src/lib/backup-crypto.ts), to <remote>/database/.
+// - Every hour: the database (without sessions), as a plain SQLite file, to
+//   <remote>/database/. (Until 2026-11-09 they were encrypted with
+//   BACKUP_PASSWORD; those .db.enc files still restore with it.)
 //   Kept: every copy from the last 2 days, then one a day for 60 days.
 // - Once a day: clips and thumbnails (R2 or the local media folder) copied to
-//   <remote>/media/, not encrypted (they're public on the site anyway).
+//   <remote>/media/.
 //
 // rclone does the transfers. Its Drive remote "gdrive" comes from the
 // RCLONE_CONFIG_GDRIVE_* settings in .env; the job is off without them or
-// without BACKUP_PASSWORD.
+// without them.
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { encryptBackup } from "@/lib/backup-crypto";
 import { backupName, backupsToDelete } from "@/lib/backup-names";
 import { snapshotDatabase } from "@/lib/data/driver";
 
@@ -31,7 +31,7 @@ export type OffsiteStatus = {
 };
 
 export function offsiteEnabled() {
-  return !!process.env.BACKUP_PASSWORD && !!process.env.RCLONE_CONFIG_GDRIVE_TOKEN;
+  return !!process.env.RCLONE_CONFIG_GDRIVE_TOKEN;
 }
 
 export async function offsiteStatus(): Promise<OffsiteStatus> {
@@ -71,7 +71,7 @@ export async function backupDatabaseOffsite(): Promise<string> {
   const name = backupName(at);
   const dir = await mkdtemp(join(tmpdir(), "offsite-"));
   try {
-    const sealed = await encryptBackup(await snapshotDatabase(), process.env.BACKUP_PASSWORD!);
+    const sealed = await snapshotDatabase();
     const file = join(dir, name);
     await Bun.write(file, sealed);
     await rclone(["copyto", file, `${REMOTE}/database/${name}`]);
@@ -123,7 +123,7 @@ export async function backupMediaOffsite() {
  */
 export function startOffsiteBackups() {
   if (!offsiteEnabled()) {
-    console.log("Off-site backups are off (no BACKUP_PASSWORD or RCLONE_CONFIG_GDRIVE_TOKEN).");
+    console.log("Off-site backups are off (no RCLONE_CONFIG_GDRIVE_TOKEN).");
     return;
   }
   let running = false;

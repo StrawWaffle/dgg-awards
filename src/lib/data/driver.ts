@@ -254,15 +254,13 @@ export async function setSetting(key: string, val: string) {
     .onConflictDoUpdate({ target: schema.configurationTable.key, set: { val } });
 }
 
-const voteIp = sql<string>`json_extract(${schema.votesTable.sessionSnapshot}, '$.ip')`;
-
 /**
  * One page of votes (100 rows), newest first, with the voter's name and the
  * category and nominee titles. A ranked ballot is one row per choice.
  */
 export async function getVotesPage(
   offset = 0,
-  filter: { ip?: string; uid?: number; name?: string } = {},
+  filter: { uid?: number; name?: string } = {},
 ) {
   const v = schema.votesTable;
   return await db
@@ -275,7 +273,6 @@ export async function getVotesPage(
       optionId: v.optionId,
       optionTitle: schema.optionsTable.title,
       rank: v.rank,
-      ip: voteIp,
     })
     .from(v)
     .innerJoin(schema.usersTable, eq(schema.usersTable.uid, v.uid))
@@ -287,7 +284,6 @@ export async function getVotesPage(
     .where(
       and(
         filter.uid !== undefined ? eq(v.uid, filter.uid) : undefined,
-        filter.ip ? eq(voteIp, filter.ip) : undefined,
         filter.name ? sql`lower(${schema.usersTable.name}) = lower(${filter.name})` : undefined,
       ),
     )
@@ -326,15 +322,7 @@ export async function getVoteStats() {
     .where(eq(v.rank, 1))
     .groupBy(day)
     .orderBy(asc(day));
-  // Several accounts voting from one address is the plainest bot signal.
-  const sharedIps = await db
-    .select({ ip: voteIp, voters: sql<number>`count(distinct ${v.uid})` })
-    .from(v)
-    .groupBy(voteIp)
-    .having(sql`count(distinct ${v.uid}) > 1`)
-    .orderBy(desc(sql`count(distinct ${v.uid})`))
-    .limit(10);
-  return { ...totals!, categories, days, sharedIps };
+  return { ...totals!, categories, days };
 }
 
 export async function getNominee(categoryId: string, id: string) {

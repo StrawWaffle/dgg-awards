@@ -11,13 +11,13 @@ export function VotesTab() {
   const [filter, setFilter] = useState<VoteFilter>({});
   return (
     <div className="space-y-6">
-      <Stats onFilterIp={(ip) => setFilter({ ip })} />
+      <Stats />
       <VoteList filter={filter} setFilter={setFilter} />
     </div>
   );
 }
 
-function Stats({ onFilterIp }: { onFilterIp: (ip: string) => void }) {
+function Stats() {
   const stats = useQuery({ queryKey: ["vote-stats"], queryFn: fetchVoteStats, refetchInterval: 30000 });
   if (stats.isPending) return <p className="text-sm">Loading…</p>;
   if (stats.isError) return <ErrorText>Couldn't load the totals: {stats.error.message}</ErrorText>;
@@ -51,23 +51,6 @@ function Stats({ onFilterIp }: { onFilterIp: (ip: string) => void }) {
                 <td className="px-3 py-1.5">{d.day}</td>
                 <td className="px-3 py-1.5 text-right tabular-nums">{number.format(d.voters)}</td>
                 <td className="px-3 py-1.5 text-right tabular-nums">{number.format(d.ballots)}</td>
-              </tr>
-            ))}
-          </Table>
-          <Table
-            id="shared-ips"
-            title="Addresses shared by several voters"
-            head={["IP", "Voters"]}
-            empty="No address has more than one voter."
-          >
-            {s.sharedIps.map((r) => (
-              <tr key={r.ip}>
-                <td className="px-3 py-1.5">
-                  <button type="button" className="underline" onClick={() => onFilterIp(r.ip)}>
-                    {r.ip}
-                  </button>
-                </td>
-                <td className="px-3 py-1.5 text-right tabular-nums">{number.format(r.voters)}</td>
               </tr>
             ))}
           </Table>
@@ -115,13 +98,11 @@ function Table({
 function VoteList({ filter, setFilter }: { filter: VoteFilter; setFilter: (f: VoteFilter) => void }) {
   const [page, setPage] = useState(0);
   const [user, setUser] = useState("");
-  const [ip, setIp] = useState("");
   const [shown, setShown] = useState(filter);
-  // A click in the totals (an IP) replaces the filter; keep the inputs in step.
+  // A click on a voter replaces the filter; keep the input in step.
   if (shown !== filter) {
     setShown(filter);
     setUser(filter.name ?? filter.uid?.toString() ?? "");
-    setIp(filter.ip ?? "");
     setPage(0);
   }
 
@@ -139,7 +120,6 @@ function VoteList({ filter, setFilter }: { filter: VoteFilter; setFilter: (f: Vo
     const u = user.trim();
     apply({
       ...(u ? (/^-?\d+$/.test(u) ? { uid: Number(u) } : { name: u }) : {}),
-      ...(ip.trim() ? { ip: ip.trim() } : {}),
     });
   };
 
@@ -161,13 +141,6 @@ function VoteList({ filter, setFilter }: { filter: VoteFilter; setFilter: (f: Vo
             value={user}
             onChange={(e) => setUser(e.currentTarget.value)}
           />
-          <input
-            className={`${inputClass} w-48!`}
-            placeholder="IP address"
-            aria-label="IP address"
-            value={ip}
-            onChange={(e) => setIp(e.currentTarget.value)}
-          />
           <Button type="submit">Filter</Button>
           {filtered && <Button onClick={() => apply({})}>Clear</Button>}
         </form>
@@ -180,7 +153,6 @@ function VoteList({ filter, setFilter }: { filter: VoteFilter; setFilter: (f: Vo
               <tr className="border-b border-neutral-200 text-left text-xs text-neutral-600">
                 <th className="px-3 py-2 font-medium">When</th>
                 <th className="px-3 py-2 font-medium">Voter</th>
-                <th className="px-3 py-2 font-medium">IP</th>
                 <th className="px-3 py-2 font-medium">Category</th>
                 <th className="px-3 py-2 font-medium">Nominee</th>
               </tr>
@@ -192,11 +164,6 @@ function VoteList({ filter, setFilter }: { filter: VoteFilter; setFilter: (f: Vo
                   <td className="px-3 py-1.5">
                     <button type="button" className="hover:underline" onClick={() => apply({ uid: v.uid })}>
                       {v.name}
-                    </button>
-                  </td>
-                  <td className="px-3 py-1.5">
-                    <button type="button" className="hover:underline" onClick={() => apply({ ip: v.ip })}>
-                      {v.ip}
                     </button>
                   </td>
                   <td className="px-3 py-1.5">{v.categoryTitle}</td>
