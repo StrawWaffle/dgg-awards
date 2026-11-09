@@ -27,7 +27,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 
 ### At a glance (end of session 2, 2026-11-09)
 
-**Live** (`main` at `bac7396`, deployed and pushed):
+**Live** (`main` at `fc5874d` plus docs, deployed and pushed):
 - **Infrastructure:** the Docker preview behind a Cloudflare tunnel, real destiny.gg sign-in, the stack upgrade (Bun 1.4, Hono, Zod, TS 7), and clips into Cloudflare R2 at 1080p.
 - **Admin page:**
   - a left sidebar, dark theme, drag to reorder, and collapsible sections
@@ -42,7 +42,8 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
   - emote reactions, and the big screen with chat characters (a live relay or the simulator)
   - clips, and the results reveal: drawn by hand, rows starting scrambled, and a race for the winner
   - a calmer stage cast, combos in the chat column, and the beat as a shared gust on the background emotes
-  - the music button shows the volume while it changes (MMMM, or OOOO at a speed that follows the volume), on a perceptual volume curve
+  - the music button shows the volume while it changes (MMMM, OOOO at a speed that follows the volume, OverRustle at full), on a perceptual volume curve
+  - the big screen fills the window and presents in scenes per award: title, a DVD-style nominee menu, the results reveal, and the winner. Clips are lowered in and the music fades out for them. Tabs slide, and background emotes show their colours on hover.
 
 **Waiting on rinlux** (StrawWaffle is asking):
 - What they think of the lab. It's the candidate design for the 2026 voting page and presentation.
@@ -74,7 +75,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 - Fast-forward `main`, run `docker compose --profile tunnel up -d --build app`, then check `/`, `/api/config`, `/lab` (200), `/api/admin/checks` and `/api/lab/emotes` (401), and `/signin` (to destiny.gg).
 - Push `main`.
 
-**Worktrees:** everything under `.claude/worktrees/` is merged (`admin-pass`, `editor-scroll`, `lab`, `lab-polish`, `lab-polish-2`, `nominee-images`, `sketchy`) and can be removed.
+**Worktrees:** everything under `.claude/worktrees/` is merged (`admin-pass`, `editor-scroll`, `lab`, `lab-polish`, `lab-polish-2`, `lab-polish-3`, `nominee-images`, `sketchy`) and can be removed.
 
 **Test containers**, on network `dgga-test`, all kept running:
 
@@ -306,7 +307,7 @@ StrawWaffle's notes after the last deploy, built:
 - **Volume:** while the volume changes (held slider, and 1.2 s after), the music button shows MMMM under 10%, otherwise OOOO animating at 0–150% speed with the slider (`Emote` takes a `rate`). The slider is now loudness as heard: gain = slider³ (−18 dB at half, −60 dB at 10%; sources suggested powers of 3–4, a square was too gentle at the low end). Saved volumes from before are moved so the music stays as loud (`curve` in the saved prefs).
 - **Background emotes:** the beat is now one shared gust in screen directions (right and a little up, harder on the one) with a spring back, applied before each emote's own turn. Each one keeps a gentle sway of its own.
 
-### Lab polish, round 3 (branch `worktree-lab-polish-3`, 2026-11-09, not deployed)
+### Lab polish, round 3 (2026-11-09, deployed)
 
 StrawWaffle's notes, built:
 - **Music button:** OverRustle at full volume, OOOO at 0–200% speed. The emotes slide up in and out as they change (`SwapEmote` in `MusicBar.tsx`).
