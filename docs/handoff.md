@@ -16,7 +16,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 
 - **Check with StrawWaffle before any fix or feature.** Infrastructure needed to run the site is fine to do. Changes to how the site behaves or looks are not, until he agrees.
 - **Remote:** private repo https://github.com/StrawWaffle/dgg-awards (created 2026-11-09). Push `main` there. Keep it private and push nowhere else until privacy questions are settled with rinlux.
-- **Test containers** `dgga-base` (original code, port 3100), `dgga-new` (port 3200) and `dgga-mock` (port 8790), on network `dgga-test`, stay running until StrawWaffle says otherwise. `dgga-base` runs the original code as the before baseline for screenshot comparisons.
+- **Test containers** on network `dgga-test` stay running until StrawWaffle says otherwise (the list is under "At a glance"). `dgga-base` runs the original code as the before baseline for screenshot comparisons.
 - **Privacy is deferred.** The site is shared only as a private link for now. Don't spend time on it until StrawWaffle says so.
 - **Old data doesn't need to keep working** (StrawWaffle, 2026-11-09). 2025 only needs to survive as the static archive. Keep using migrations for schema changes, since that's how the live database updates, but don't spend effort on compatibility with old data or import files. 2026 setup can start from a fresh database.
 - **Writing:** apply the `unslop` skill to prose. **UI:** apply the `uncodixify` skill (installed at `~/.claude/skills/uncodixify`, from StrawWaffle's private skills repo).
@@ -25,32 +25,79 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 
 ## Current state
 
-### At a glance (end of session 1, 2026-11-09)
+### At a glance (end of session 2, 2026-11-09)
 
-**Done and live:**
-- Docker preview behind a Cloudflare tunnel, with real destiny.gg sign-in.
-- Stack upgrade (Bun 1.4, Hono, Zod, TS 7).
-- Fixes: admin import auth, vote paging, emote names, results banner and the **double-count bug**.
-- Nominee model and data checks, DGG profile cards, ranked voting with instant runoff, the clip pipeline into **Cloudflare R2** (1080p, single encode), and the admin editor with add, edit, clips, thumbnails and previews.
+**Live** (`main` at `eebe32f`, deployed and pushed):
+- **Infrastructure:** the Docker preview behind a Cloudflare tunnel, real destiny.gg sign-in, the stack upgrade (Bun 1.4, Hono, Zod, TS 7), and clips into Cloudflare R2 at 1080p.
+- **Admin page:**
+  - a left sidebar, dark theme, drag to reorder, and collapsible sections
+  - the nominee editor with picture uploads (crop and resize in the browser), clips, data checks and DGG profile cards
+  - one Settings form, admin management, vote stats with shared IPs
+  - edit history with undo
+  - hiding categories that have votes; export, and import with an automatic database backup
+- **Voting model:** single pick or ranked per category, ranked counted by instant runoff, and the 2025 double-count bug fixed.
+- **The lab** (`/lab`, admins only), where the 2026 voting page and presentation are being tried out:
+  - a cozy look after a community destiny.gg skin, light and dark, a hand-drawn "drawn look" switch, and drifting emote silhouettes in the background
+  - music ("black lover", with permission) and a beat map
+  - emote reactions, and the big screen with chat characters (a live relay or the simulator)
+  - clips, and the results reveal
 
-**Repo:** `main` = deployed, pushed to the private repo. The tests and pitfalls are documented in `AGENTS.md`.
+**Built, waiting for StrawWaffle's go-ahead to deploy:** branch `worktree-lab-polish-2` (`dc57d56`, one commit on top of `main`):
+- the results reveal drawn like a person would, with rows starting scrambled and a race for the winner
+- a calmer stage cast
+- combos in the chat column
+- the beat as a shared gust on the background emotes
 
-**Waiting on others:**
-- rinlux's feedback on the preview.
-- The voting-style decision for 2026 is made (per category, instant runoff), but the UI waits for the redesign.
-- The real 2025 votes, for the archive and the double-count re-check.
+It's tested: 83 unit tests and 42 API tests pass, with both snapshots unchanged, and it was checked in the browser. To deploy it, fast-forward `main` to it, after the usual backup (see "Deploying" below).
 
-**Next, in StrawWaffle's order** (see "Planned features" and "Backlog"):
-1. **Voting page redesign:** ranked-voting UI, one category per page with progress (like jadseya.com), cuter. The hill-climbing method applies.
-2. **Results reveal and presenter mode:** reveal-all-but-last-three, clips that stop, room for the stream camera, charts per StrawWaffle's visualization article, and the runoff rounds.
-3. **Re-check the double-count fix** against the original code, and against the real 2025 votes if they turn up.
-4. **Admin pass** (branch `worktree-admin-pass`, waiting for StrawWaffle's review, not merged; three rounds: the cleanup; then the sidebar, dark theme, drag to reorder and collapsible sections; then edit history with undo). See "Admin pass" below.
-5. Smaller items:
-   - Re-pull emotes from the DGG CDN.
-   - Privacy page.
-   - Bot-vote comparison.
-   - Precompute results when voting closes (scale).
-   - A "Remove clip" button: there's no way to remove a clip in the editor yet.
+**Waiting on rinlux** (StrawWaffle is asking):
+- What they think of the lab. It's the candidate design for the 2026 voting page and presentation.
+- The format of their nominee data, and whether they still need an import. The old form routes `POST /api/admin/import`, `/category` and `/nominee` stay until then.
+- The real Omegalul 2025 numbers. The wiki's add up to 125%, most likely a copy slip (see "2025 results from the wiki").
+- The privacy-related decisions below.
+
+**Ideas from StrawWaffle, not built (some need rinlux's say):**
+- **Roles:** presentation mode for an allowlist (the stream screen, admins included; the lab's chat relay is admins-only for now), moderators or editors with fewer rights, and letting chosen people preview pages.
+- **Site lock:** the site behind sign-in, with a countdown to voting.
+- **Where voters are:** an IP lookup, asking, or browser location. A privacy question for rinlux.
+- **The drawn look:** drawn outlines on buttons, scribbled icons, an arrow at the winner, and "boiling" only at moments if the constant boil is too busy.
+- **Archive:** wait for the full 2025 votes; the wiki has only percentages.
+
+**Next, roughly in StrawWaffle's order:**
+1. Deploy `worktree-lab-polish-2` when StrawWaffle says so.
+2. Bring the lab's voting page and presentation into the real site, once rinlux approves.
+   - Voting: the one-award-at-a-time flow with ballot progress, and a ranked-voting interface.
+   - Presentation: the big screen and the results reveal. Room for the stream camera, and showing the instant-runoff rounds, are still open.
+3. Re-check the double-count fix against the original code (`dgga-base`), and against the real 2025 votes if they turn up.
+4. Smaller items:
+   - re-pull emotes from the DGG CDN
+   - a privacy page (deferred until StrawWaffle lifts it)
+   - a bot-vote comparison
+   - precompute results when voting closes (scale)
+   - a "Remove clip" button in the editor (pictures can be removed; clips can't yet)
+
+**Deploying (what was done each time):**
+- Back up the live database first: `VACUUM INTO /data/backups/<time>-before-deploy.db` inside `dgg-awards-app-1`. Imports also make their own backups there, and the newest 20 are kept.
+- Fast-forward `main`, run `docker compose --profile tunnel up -d --build app`, then check `/`, `/api/config`, `/lab` (200), `/api/admin/checks` and `/api/lab/emotes` (401), and `/signin` (to destiny.gg).
+- Push `main`.
+
+**Worktrees:** everything under `.claude/worktrees/` is merged except `lab-polish-2`. The others (`admin-pass`, `editor-scroll`, `lab`, `lab-polish`, `nominee-images`, `sketchy`) can be removed.
+
+**Test containers**, on network `dgga-test`, all kept running:
+
+| Name | Port | What it is |
+|---|---|---|
+| `dgga-mock` | 8790 | the destiny.gg login stand-in |
+| `dgga-files` | – | nginx serving `tests/fixtures` (`sample.mp4` for clip builds) |
+| `dgga-base` | 3100 | the original 2025 code |
+| `dgga-new` | 3200 | an older build under test |
+| `dgga-main` | 3400 | an old live image, from before the editor. Rebuild it, or ignore it. |
+| `dgga-review` | 3500 | used for the admin work (`dgga:review`) |
+| `dgga-lab` | 3600 | the latest lab build (`dgga:lab`, currently `lab-polish-2`) |
+
+**Browser testing without the T3 preview** (it hung this session): Playwright in Docker (`mcr.microsoft.com/playwright:v1.56.1-noble`) on network `dgga-test`, signing in through the mock as in `tests/visual/capture.mjs`.
+- Plain Chromium there has no H.264, so test clip playback in Playwright's Firefox.
+- To build a test clip, PATCH a nominee to `url: http://dgga-files/sample.mp4`, `linkType: video-file`, `clipStart: 0`, `clipEnd: 3`, then POST `/api/admin/clip`.
 
 ### Running preview
 
@@ -69,7 +116,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 - It currently shows the **results** page with 500 fake voters (negative uids, ip `seed`). Admins can switch to voting under Settings in `/admin`.
 - `ADMIN_USERNAMES=StrawWaffle,RiN_LuX` in `.env`. Anyone on that list becomes admin when they sign in.
 - Crawlers and AI indexing are blocked through `robots.txt` (with 25 AI bots named), a meta robots tag and an `X-Robots-Tag` header on images. Cloudflare's "Block AI bots" toggle was suggested but not confirmed as turned on.
-- The first version is being sent to rinlux for review. **Wait for their feedback before doing the backlog.**
+- The live site is shared with rinlux for review (the lab included).
 
 ### Commands
 
@@ -109,7 +156,7 @@ These were the first changes. The routes have since moved to `src/server/` (Hono
 - `PossibleLink` (`src/components/util.tsx`) already sets `target="_blank"`, yet on stream the ↗ arrow didn't open a new tab on left click. Not investigated.
 - Results bars are drawn at `percentage / 1.6` height, which doesn't match the visualization principles below.
 
-## Admin pass (branch `worktree-admin-pass`, 2026-11-09)
+## Admin pass (2026-11-09, deployed)
 
 StrawWaffle asked for a visual pass over the admin page and whether everything there was needed, then approved steps 1–5:
 
@@ -175,7 +222,7 @@ StrawWaffle pointed out that the wiki has the confirmed 2025 results: https://wi
 - **Except Omegalul, which adds to 125.02% on the page.** Its winner shows Godstiny's 45.98%, so it's most likely a copy slip on the wiki; the real figure would be 20.96%. Ask RiN_LuX. Details are in the doc.
 - **For the archive (feature 8):** this is enough for winners and percentages, but not counts. Whether to build the archive from it is StrawWaffle's call.
 
-### Fourth round: StrawWaffle's follow-ups on the history (2026-11-09, built)
+### Fourth round: StrawWaffle's follow-ups on the history (2026-11-09, deployed)
 
 - **Hiding categories** (migration 0007, `categories.hidden`):
   - A category with votes can't be deleted (409). Hide it instead. Hidden categories leave the public site, the results and the nominee checks, and votes for them are refused. Their nominees and votes are kept.
@@ -233,7 +280,7 @@ StrawWaffle: part of what makes the skin cute is its drawn buttons and details. 
   - Checked in light and dark with no console errors.
 - **Ideas not built yet:** drawn outlines on buttons (the skin's own detail); scribbled hand-drawn icons in place of the radix ones; a drawn arrow pointing at the winner; "boiling" only at moments (the winner) and still otherwise, if the constant boil is too busy.
 
-### Lab polish (branch `worktree-lab-polish`, 2026-11-09, not deployed)
+### Lab polish (2026-11-09, deployed)
 
 StrawWaffle's notes after trying the lab:
 - **Bars draw like a pen, slowly.** Each draws its outline first (0.9 s), then scribbles its hatching in from left to right; Rough.js draws the fill as one path of strokes in order. Longer bars take longer (up to 3.2 s). Bars revealed together draw one after another from the bottom, 1.6 s apart. Numbers count up as their bar starts, the rows still waiting keep their pencilled dashes, and the winner's circle and cheer wait for their bar.
@@ -245,6 +292,25 @@ StrawWaffle's notes after trying the lab:
   - The big screen has "Play a clip", which shows a random built clip on the stage with the characters in front. It closes itself after the clip ends.
 - **Checked:** clips play in Firefox. Plain Chromium (the test browser) has no H.264 (error 4), unlike real Chrome and Edge.
 - **Drifting silhouettes.** The backdrop emotes float slowly right and up like leaves on a breeze, swaying and turning, and wrap round at the edges. They sway up to half again more with the bass, and stay still for reduced motion. Also fixed: they were bunched on the right, because the `.emote` base rule (`position: relative`, later in the file) overrode their `position: absolute`. Measured: evenly spread across the window, and 38 of 40 moved within 3 s.
+
+### Lab polish, round 2 (branch `worktree-lab-polish-2`, 2026-11-09, not deployed)
+
+StrawWaffle's notes after the last deploy, built:
+- **Results drawn like a person would** (`Results.tsx`, rewritten).
+  - Each bar's hatching is scribbled in from left to right through a growing clip; the hatching is drawn once at full width. Then the box is drawn round it with a pen stroke.
+  - **The longest bar so far fills the width**, so earlier bars squish as bigger ones arrive, live, while the bigger one is still being drawn. The box follows its bar.
+  - **The winner's race:** it shoots to 90% of the runner-up (1.1 s), creeps to 104% (2.8 s), then finishes quickly (0.9 s). Measured on the sample: 73, 91 … 98, 103 (the runner-up starts shrinking), 105, 108, 134, 135.
+  - **Scrambled start:** the rows begin in a shuffled order, seeded by the award id, so the preview and the stream match. Reveals still go from last place up. A finished row slides (0.7 s) into its ranked place among the finished ones at the top, ending fully sorted.
+  - Reveals queue one at a time: about 1.1–2 s of scribble, 0.65 s of box, 0.9 s pause. "Start over" replaces the board.
+- **Stage cast changes gently.**
+  - Arrivals are paced at 2 a second (a token bucket). Each new character walks from an edge to a random spot, then wanders.
+  - Nobody is sent off within 12 s of arriving. If the stage is full and nobody has been there long enough, a new chatter isn't shown.
+  - Measured: 7 of 49 characters near an edge, instead of most of them.
+- **Combos in the chat column**, as destiny.gg shows them: the emote, "N×", and "HITS", or "C-C-C-COMBO" from 5. A running combo counts up in place.
+  - The aggregator now also reports combos that ended within a window (`ended`), which were lost before.
+  - The simulator makes combos real runs of back-to-back messages.
+  - The column shows 2 character lines per quarter second (8 a second) and keeps 60 lines, so it can be read.
+- **Background emotes:** the beat is now one shared gust in screen directions (right and a little up, harder on the one) with a spring back, applied before each emote's own turn. Each one keeps a gentle sway of its own.
 
 ### Next: the lab page (StrawWaffle's answers, 2026-11-09)
 
@@ -265,7 +331,7 @@ StrawWaffle wants the front page and the presentation to feel fun, quirky and wh
   - **Built for a flood:** chat gets extremely busy during the awards. The server holds one connection to `wss://chat.destiny.gg/ws` (browsers are refused, so it's a relay, as in dgg-radio's `src/server/dgg-socket.ts` and `dgg-chat.ts`) and sends the page a small summary a few times a second. The page draws a capped number of characters on a canvas. Stress test it by replaying recorded chat at many times the speed.
 - **Music-reactive animation** from the analysis: things on the page move to the track.
 
-### The lab, first version (branch `worktree-lab`, 2026-11-09, not merged)
+### The lab, first version (2026-11-09, deployed)
 
 `/lab`, admins only: the page checks `/api/me`, and the chat socket and emote list check the session on the server. Test container `dgga-lab` (port 3600, image `dgga:lab`).
 - **Music** (`src/lab/music.ts`, `MusicBar.tsx`):
@@ -289,7 +355,7 @@ StrawWaffle wants the front page and the presentation to feel fun, quirky and wh
 - **Measured:** the aggregator handles 100,000 messages in 171 ms (`tests/lab-chat.test.ts`, about 580k a second). In Chromium the stage holds **60 fps at 3,000 messages a second** with 150 characters, and the aggregator takes about 1 ms per quarter second. The live relay connected to the real chat.
 - **Still to do:** presentation mode for an allowlist (not just admins); deciding which emotes go where on the real pages; the real front page and presentation design (rinlux).
 
-### The lab, cozy redesign (2026-11-09, same branch)
+### The lab, cozy redesign (2026-11-09, deployed)
 
 StrawWaffle's visual reference: screenshots of destiny.gg with a **community-made skin** (not the official design; StrawWaffle asked to treat it as a skin). Only the admin page keeps its own look.
 - **Look** (`src/lab/lab.css`): cream (light) or navy (dark), colours sampled from the screenshots. Soft panels have 22 px corners, a 2 px border and a solid 5 px shadow underneath. Chunky rounded buttons sit on a 4 px shadow and press down when clicked; the primary is teal. Small rounded chips (coral, green, cream), and the bundled Nunito font (`@fontsource-variable/nunito`, no Google request).

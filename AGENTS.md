@@ -72,12 +72,15 @@ The live `.env` holds the real DGG OAuth app, `AUTH_SECRET`, the tunnel token, `
   | `dgga-mock` | 8790 | `dev/dgg-oauth/server.mjs`, a destiny.gg login stand-in |
   | `dgga-files` | – | nginx serving the main repo's `tests/fixtures`; needs byte ranges |
   | `dgga-base` | 3100 | the original 2025 code |
-  | `dgga-main` | 3400 | the current live image |
-  | `dgga-new` | 3200 | the build under test |
+  | `dgga-main` | 3400 | an old live image (from before the editor) |
+  | `dgga-new` | 3200 | an older build under test |
+  | `dgga-review` | 3500 | used for the admin work |
+  | `dgga-lab` | 3600 | the latest lab build |
 
   App containers need `ADMIN_USERNAMES=Tester`, `DGG_CLIENT_ID=dev-client`, `DGG_CLIENT_SECRET=dev-secret`, `DGG_ORIGIN=http://dgga-mock:8789`, `DGG_AUTHORIZE_ORIGIN=http://localhost:8790`, `DGG_REDIRECT=http://localhost:<port>/oauth` and an `AUTH_SECRET`. The exact `docker run` lines are in `docs/handoff.md` ("Stack upgrade" section).
 - Snapshots change only on purpose. When one changes, check the diff is exactly what you expected before `--update-snapshots`.
-- In the browser (T3 preview tools), sign in as an admin at `http://localhost:<port>/signin` with username `Tester`.
+- In the browser (T3 preview tools), sign in as an admin at `http://localhost:<port>/signin` with username `Tester`. If the preview hangs, use Playwright in Docker on `dgga-test` (see the handoff's "At a glance"). Its Chromium has no H.264, so check clip playback in its Firefox.
+- **Before every deploy**, back up the live database (`VACUUM INTO` under `/data/backups/`, see the handoff).
 
 ## Pitfalls already hit
 
