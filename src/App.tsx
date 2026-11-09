@@ -32,7 +32,7 @@ export function App() {
     queryClient,
   );
 
-  // Admins can open /?preview=voting or /?preview=results to see either
+  // Admins can open /vote?preview=voting or /vote?preview=results to see either
   // page whatever mode the site is in. Everyone else gets the real mode.
   const requested = new URLSearchParams(window.location.search).get("preview");
   const preview =
@@ -54,7 +54,7 @@ export function App() {
             Admin preview of the {preview === "results" ? "results" : "voting"} page.
             Visitors see the site in {config.data?.viewingMode ?? "?"} mode.
           </span>
-          <a className="text-orange-1 underline" href="/">
+          <a className="text-orange-1 underline" href="/vote">
             Leave preview
           </a>
         </div>

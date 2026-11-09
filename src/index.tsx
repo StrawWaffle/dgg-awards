@@ -1,5 +1,6 @@
 import { serve } from "bun";
 import admin from "@/admin.html";
+import home from "@/home.html";
 import index from "@/index.html";
 import lab from "@/lab.html";
 import { createApp } from "@/server/app";
@@ -15,7 +16,11 @@ const server = serve({
   idleTimeout: 120,
   // Bun bundles and serves the HTML pages; everything else is Hono.
   routes: {
-    "/": index,
+    // The front page (a countdown to voting) and last year's results.
+    "/": home,
+    "/2025": home,
+    // The voting and results page, until the lab's voting page replaces it.
+    "/vote": index,
     // Anyone can load the page; it checks for an admin itself, and every
     // /api/admin request is refused to anyone else.
     "/admin": admin,

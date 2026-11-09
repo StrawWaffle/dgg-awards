@@ -66,7 +66,7 @@ const browser = await chromium.launch({
   args: [`--host-resolver-rules=MAP app.test ${new URL(BASE).hostname}`],
 });
 
-async function shot(name, { path = "/", token, viewport = { width: 1440, height: 900 }, before } = {}) {
+async function shot(name, { path = "/vote", token, viewport = { width: 1440, height: 900 }, before } = {}) {
   const context = await browser.newContext({ viewport, deviceScaleFactor: 1 });
   if (token) {
     await context.addCookies([{ name: "session", value: token, url: PAGE }]);

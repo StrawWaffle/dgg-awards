@@ -120,7 +120,7 @@ export function Status() {
       return (
         <p className="text-red-400">
           You may vote on each category below after{" "}
-          <a href="/signin" className="text-blue-1">
+          <a href="/signin?next=/vote" className="text-blue-1">
             signing in
           </a>{" "}
           with your{" "}

@@ -1,29 +1,66 @@
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { PlayIcon } from "@radix-ui/react-icons";
 import { Dialog } from "radix-ui";
 import { type Clip, ClipPlayer, nomineeClip } from "@/lab/ClipPlayer";
 import { Emote } from "@/lab/Emote";
+import archive2025 from "@/archive/2025.json";
 
 type Standing = {
   id: string;
   title: string;
-  count: number;
+  /** Null when only percentages are known (2025, from the wiki). */
+  count: number | null;
   percentage: number;
   isWinner: boolean;
   image: string | null;
+  /** An emote to show in place of a picture (New Emote of the Year). */
+  emote?: string;
   clip: Clip | null;
 };
 type Round = { counts: Record<string, number>; exhausted: number; eliminated: string[] };
-type AwardResult = {
+export type AwardResult = {
   id: string;
   title: string;
   description: string;
-  ranked: boolean;
-  total: number;
+  /** Null when not known. */
+  ranked: boolean | null;
+  /** Voters in the award; null when only percentages are known. */
+  total: number | null;
+  /** Shown under the title, e.g. where the numbers are off. */
+  note?: string;
+  /** The stream at this award's reveal. */
+  stream?: string | null;
   /** Best first. */
   standings: Standing[];
   rounds: Round[] | null;
 };
+
+/**
+ * 2025's results, from the wiki (src/archive/2025.json): winners and
+ * percentages, no counts. Replace the file with real numbers when they turn up.
+ */
+export async function loadArchive2025(): Promise<AwardResult[]> {
+  return archive2025.awards.map((a) => ({
+    id: a.id,
+    title: a.title,
+    description: a.description,
+    ranked: null,
+    total: a.count,
+    note: "note" in a ? (a.note as string) : undefined,
+    stream: a.stream,
+    standings: a.nominees.map((n, i) => ({
+      id: `${a.id}-${i}`,
+      title: n.title,
+      count: null,
+      percentage: n.percentage,
+      isWinner: n.winner,
+      image: n.image,
+      emote: a.id === "emote" ? n.title : undefined,
+      clip: n.url ? nomineeClip({ url: n.url }, `${n.title} · ${a.title}`) : null,
+    })),
+    rounds: null,
+  }));
+}
 
 async function loadSummary(): Promise<AwardResult[]> {
   const data: any[] = await fetch("/api/vote/results?preview=1").then((r) => (r.ok ? r.json() : []));
@@ -51,14 +88,19 @@ async function loadSummary(): Promise<AwardResult[]> {
  * How decisively an award was won. For ranked awards that's the final
  * runoff round; otherwise first choices. In points of the votes counted.
  */
-function margin(a: AwardResult) {
+function margin(a: AwardResult): { winner: Standing; runnerUp: Standing; votes: number | null; points: number } | null {
   const winner = a.standings.find((s) => s.isWinner) ?? a.standings[0];
   if (!winner || a.total === 0) return null;
+  // Only percentages: the margin is the gap between them.
+  if (a.total === null || winner.count === null) {
+    const runnerUp = [...a.standings].filter((s) => s !== winner).sort((x, y) => y.percentage - x.percentage)[0];
+    return runnerUp ? { winner, runnerUp, votes: null, points: winner.percentage - runnerUp.percentage } : null;
+  }
   let counts: [string, number][];
   if (a.ranked && a.rounds?.length) {
     const last = a.rounds[a.rounds.length - 1]!;
     counts = Object.entries(last.counts);
-  } else counts = a.standings.map((s) => [s.id, s.count]);
+  } else counts = a.standings.map((s) => [s.id, s.count ?? 0]);
   const sorted = counts.sort((x, y) => y[1] - x[1]);
   const top = sorted.find(([id]) => id === winner.id)?.[1] ?? 0;
   const next = sorted.find(([id]) => id !== winner.id);
@@ -69,22 +111,35 @@ function margin(a: AwardResult) {
 }
 
 const votes = (n: number) => `${n.toLocaleString()} vote${n === 1 ? "" : "s"}`;
+/** "by 34 votes", or "by 8.1 points" when there are no counts. */
+const by = (m: { votes: number | null; points: number }) => (m.votes === null ? `${m.points.toFixed(1)} points` : votes(m.votes));
 
 /**
  * The results to look over after the show: an overview with the closest
  * races and the biggest wins, then every award in turn with its winner,
  * full standings and, for ranked awards, the runoff round by round.
  * The live reveal is on the big screen.
+ *
+ * `load` gives the awards (by default this year's, from the admin preview);
+ * with only percentages known (2025), counts and ballots are left out.
  */
-export function Summary() {
+export function Summary({
+  load = loadSummary,
+  title = "The results",
+  footer,
+}: {
+  load?: () => Promise<AwardResult[]>;
+  title?: string;
+  footer?: ReactNode;
+} = {}) {
   const [awards, setAwards] = useState<AwardResult[] | null>(null);
   const [watching, setWatching] = useState<Clip | null>(null);
   const [current, setCurrent] = useState<string | null>(null);
   useEffect(() => {
-    loadSummary()
+    load()
       .then(setAwards)
       .catch(() => setAwards([]));
-  }, []);
+  }, [load]);
 
   // Which award is on screen, for the list on the side.
   useEffect(() => {
@@ -109,8 +164,12 @@ export function Summary() {
   const decided = awards.map((a) => ({ a, m: margin(a) })).filter((x) => x.m !== null) as { a: AwardResult; m: NonNullable<ReturnType<typeof margin>> }[];
   const closest = [...decided].sort((x, y) => x.m.points - y.m.points).slice(0, 3);
   const biggest = [...decided].sort((x, y) => y.m.points - x.m.points).slice(0, 3);
-  const busiest = [...awards].sort((x, y) => y.total - x.total).slice(0, 3);
-  const ballots = awards.reduce((n, a) => n + a.total, 0);
+  const counted = awards.every((a) => a.total !== null);
+  const busiest = counted
+    ? [...awards].sort((x, y) => y.total! - x.total!).slice(0, 3)
+    : [...awards].sort((x, y) => y.standings.length - x.standings.length).slice(0, 3);
+  const ballots = awards.reduce((n, a) => n + (a.total ?? 0), 0);
+  const nominees = awards.reduce((n, a) => n + a.standings.length, 0);
   const jump = (id: string) => document.getElementById(`award-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   return (
@@ -168,18 +227,26 @@ export function Summary() {
         {/* The overview. */}
         <section className="cozy-panel space-y-5 p-6">
           <h2 className="flex items-center gap-3 text-3xl font-black">
-            <Emote name="PepoG" size={1.2} title="" /> The results
+            <Emote name="PepoG" size={1.2} title="" /> {title}
           </h2>
           <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Figure label="Awards" value={awards.length.toLocaleString()} />
-            <Figure label="Ballots cast" value={ballots.toLocaleString()} />
+            {counted ? (
+              <Figure label="Ballots cast" value={ballots.toLocaleString()} />
+            ) : (
+              <Figure label="Nominees" value={nominees.toLocaleString()} />
+            )}
             <Figure label="Closest race" value={closest[0] ? `${closest[0].m.points.toFixed(1)} pts` : "–"} note={closest[0]?.a.title} />
             <Figure label="Biggest win" value={biggest[0] ? `${biggest[0].m.points.toFixed(1)} pts` : "–"} note={biggest[0]?.a.title} />
           </dl>
           <div className="grid gap-4 md:grid-cols-3">
-            <Highlights title="Closest races" items={closest.map(({ a, m }) => ({ a, text: `${m.winner.title} over ${m.runnerUp.title} by ${votes(m.votes)}` }))} onJump={jump} />
+            <Highlights title="Closest races" items={closest.map(({ a, m }) => ({ a, text: `${m.winner.title} over ${m.runnerUp.title} by ${by(m)}` }))} onJump={jump} />
             <Highlights title="Biggest wins" items={biggest.map(({ a, m }) => ({ a, text: `${m.winner.title}, ${m.points.toFixed(1)} points clear` }))} onJump={jump} />
-            <Highlights title="Most votes" items={busiest.map((a) => ({ a, text: votes(a.total) }))} onJump={jump} />
+            {counted ? (
+              <Highlights title="Most votes" items={busiest.map((a) => ({ a, text: votes(a.total!) }))} onJump={jump} />
+            ) : (
+              <Highlights title="Most nominees" items={busiest.map((a) => ({ a, text: `${a.standings.length} nominees` }))} onJump={jump} />
+            )}
           </div>
         </section>
 
@@ -187,7 +254,7 @@ export function Summary() {
           <AwardSection key={a.id} award={a} onWatch={setWatching} />
         ))}
         <p className="text-center text-xs" style={{ color: "var(--muted)" }}>
-          Percentages are of first choices. For ranked awards, the winner is decided by the runoff below each one.
+          {footer ?? "Percentages are of first choices. For ranked awards, the winner is decided by the runoff below each one."}
         </p>
       </div>
     </div>
@@ -252,38 +319,61 @@ function AwardSection({ award, onWatch }: { award: AwardResult; onWatch: (clip: 
   const m = margin(award);
   const winners = award.standings.filter((s) => s.isWinner);
   const winner = winners[0];
-  const most = Math.max(1, ...award.standings.map((s) => s.count));
+  // Bars by count, or by percentage when there are no counts.
+  const value = (s: Standing) => s.count ?? s.percentage;
+  const most = Math.max(1, ...award.standings.map(value));
 
   return (
     <section ref={el} id={`award-${award.id}`} className="cozy-panel scroll-mt-[calc(var(--lab-header,64px)+1rem)] space-y-5 p-6">
       <header className="space-y-1">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="mr-2 text-2xl font-black">{award.title}</h2>
-          <span className="cozy-chip">{votes(award.total)}</span>
-          <span className="cozy-chip">{award.ranked ? "Ranked choice" : "Single pick"}</span>
+          {award.total !== null && <span className="cozy-chip">{votes(award.total)}</span>}
+          {award.ranked !== null && <span className="cozy-chip">{award.ranked ? "Ranked choice" : "Single pick"}</span>}
+          {award.stream && (
+            <a className="cozy-chip" href={award.stream} target="_blank" rel="noopener noreferrer">
+              ↗ The reveal on stream
+            </a>
+          )}
         </div>
         {award.description && (
           <p className="font-semibold" style={{ color: "var(--muted)" }}>
             {award.description}
           </p>
         )}
+        {award.note && (
+          <p className="text-sm font-semibold" style={{ color: "var(--coral)" }}>
+            {award.note}
+          </p>
+        )}
       </header>
 
       {winner && (
         <div className="flex flex-wrap items-center gap-5 rounded-[20px] border-2 p-3" style={{ background: "var(--highlight)", borderColor: "var(--panel-border)" }}>
-          {winner.image && (
+          {winner.image ? (
             <img src={winner.image} alt="" className="aspect-video w-56 rounded-[14px] object-cover" loading="lazy" />
+          ) : (
+            winner.emote && (
+              <span className="flex aspect-video w-56 items-center justify-center rounded-[14px]" style={{ background: "var(--cream)" }}>
+                <Emote name={winner.emote} size={2.4} />
+              </span>
+            )
           )}
           <div className="min-w-0 flex-1 space-y-1">
             <span className="cozy-chip coral">{winners.length > 1 ? "Tied winners" : "Winner"}</span>
             <p className="text-2xl font-black">{winners.map((w) => w.title).join(" & ")}</p>
             <p className="font-semibold">
-              {votes(winner.count)} · {winner.percentage}% of first choices
+              {winner.count === null
+                ? `${winner.percentage}% of the vote`
+                : `${votes(winner.count)} · ${winner.percentage}% of first choices`}
             </p>
             {m && winners.length === 1 && (
               <p className="text-sm font-semibold" style={{ color: "var(--muted)" }}>
-                Won by {votes(m.votes)} over {m.runnerUp.title} ({m.points.toFixed(1)} points
-                {award.ranked && award.rounds && award.rounds.length > 1 ? ` in the final round of ${award.rounds.length}` : ""}).
+                {m.votes === null
+                  ? `Won by ${m.points.toFixed(1)} points over ${m.runnerUp.title}.`
+                  : `Won by ${votes(m.votes)} over ${m.runnerUp.title} (${m.points.toFixed(1)} points${
+                      award.ranked && award.rounds && award.rounds.length > 1 ? ` in the final round of ${award.rounds.length}` : ""
+                    }).`}
               </p>
             )}
           </div>
@@ -302,7 +392,15 @@ function AwardSection({ award, onWatch }: { award: AwardResult; onWatch: (clip: 
               {i + 1}
             </span>
             <span className="block h-7 w-11 overflow-hidden rounded-md" style={{ background: "var(--panel-border)" }}>
-              {s.image && <img src={s.image} alt="" className="h-full w-full object-cover" loading="lazy" />}
+              {s.image ? (
+                <img src={s.image} alt="" className="h-full w-full object-cover" loading="lazy" />
+              ) : (
+                s.emote && (
+                  <span className="flex h-full w-full items-center justify-center" style={{ background: "var(--cream)" }}>
+                    <Emote name={s.emote} size={0.85} />
+                  </span>
+                )
+              )}
             </span>
             <span className="flex min-w-0 items-center gap-1.5 font-bold">
               <span className="truncate">{s.title}</span>
@@ -323,14 +421,14 @@ function AwardSection({ award, onWatch }: { award: AwardResult; onWatch: (clip: 
               <span
                 className="block h-full rounded-full"
                 style={{
-                  width: seen ? `${(s.count / most) * 100}%` : "0%",
+                  width: seen ? `${(value(s) / most) * 100}%` : "0%",
                   background: s.isWinner ? "var(--coral)" : "var(--primary)",
                   transition: `width 900ms cubic-bezier(0.3, 0.7, 0.3, 1) ${i * 60}ms`,
                 }}
               />
             </span>
             <span className="hand w-28 text-right text-lg font-bold tabular-nums">
-              {s.count.toLocaleString()} · {s.percentage}%
+              {s.count === null ? `${s.percentage}%` : `${s.count.toLocaleString()} · ${s.percentage}%`}
             </span>
           </li>
         ))}

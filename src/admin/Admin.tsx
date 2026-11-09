@@ -149,10 +149,10 @@ function AdminPage() {
         </Tabs.List>
 
         <div className="flex flex-wrap items-center gap-1 border-t border-neutral-200 pt-2 md:mt-auto md:flex-col md:items-stretch">
-          <SideLink href="/?preview=voting" icon={<EyeOpenIcon />} collapsed={collapsed}>
+          <SideLink href="/vote?preview=voting" icon={<EyeOpenIcon />} collapsed={collapsed}>
             Preview voting
           </SideLink>
-          <SideLink href="/?preview=results" icon={<BarChartIcon />} collapsed={collapsed}>
+          <SideLink href="/vote?preview=results" icon={<BarChartIcon />} collapsed={collapsed}>
             Preview results
           </SideLink>
           <SideLink href="/" icon={<HomeIcon />} collapsed={collapsed}>

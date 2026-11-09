@@ -1,14 +1,12 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { ChatBubbleIcon, DesktopIcon, MoonIcon, Pencil1Icon, SunIcon } from "@radix-ui/react-icons";
+import { ChatBubbleIcon } from "@radix-ui/react-icons";
 import { Emote } from "@/lab/Emote";
 import { EmoteBackdrop } from "@/lab/EmoteBackdrop";
-import { MusicBar } from "@/lab/MusicBar";
+import { HeaderTools } from "@/lab/HeaderTools";
 import { useSourceChoice, useStartOnFirstGesture } from "@/lab/music";
 import { Stage } from "@/lab/Stage";
-import { type Theme, useLabTheme } from "@/lab/theme";
 import { Visualizer } from "@/lab/Visualizer";
 import { Summary } from "@/lab/Summary";
-import { setDrawnLook, useDrawnLook } from "@/lab/sketch";
 import { VoteDemo } from "@/lab/VoteDemo";
 
 const views = [
@@ -19,11 +17,6 @@ const views = [
 ] as const;
 type View = (typeof views)[number]["id"];
 
-const themeCycle: Record<Theme, { next: Theme; icon: React.ReactNode; label: string }> = {
-  system: { next: "light", icon: <DesktopIcon />, label: "Theme: system" },
-  light: { next: "dark", icon: <SunIcon />, label: "Theme: light" },
-  dark: { next: "system", icon: <MoonIcon />, label: "Theme: dark" },
-};
 
 /**
  * The lab: a cozier voting page and presentation, tried out here before they
@@ -63,8 +56,6 @@ export function Lab() {
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
-  const { theme, setTheme } = useLabTheme();
-  const drawn = useDrawnLook();
   useStartOnFirstGesture();
 
   useEffect(() => {
@@ -115,7 +106,6 @@ export function Lab() {
       </main>
     );
   };
-  const cycle = themeCycle[theme];
 
   return (
     <>
@@ -154,26 +144,7 @@ export function Lab() {
               <ChatBubbleIcon />
             </button>
           )}
-          <MusicBar />
-          <button
-            type="button"
-            className={`cozy-btn round h-10 w-10 ${drawn ? "primary" : ""}`}
-            onClick={() => setDrawnLook(!drawn)}
-            aria-pressed={drawn}
-            aria-label="Drawn look"
-            title={drawn ? "Drawn look on: hand-drawn frames, bars and notes" : "Drawn look off: plain cozy panels"}
-          >
-            <Pencil1Icon />
-          </button>
-          <button
-            type="button"
-            className="cozy-btn round h-10 w-10"
-            onClick={() => setTheme(cycle.next)}
-            aria-label={`${cycle.label}. Click for ${cycle.next}.`}
-            title={`${cycle.label}. Click for ${cycle.next}.`}
-          >
-            {cycle.icon}
-          </button>
+          <HeaderTools />
         </div>
       </header>
 

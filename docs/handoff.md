@@ -434,6 +434,19 @@ StrawWaffle wanted the live database safe, a proper full export and import, and 
   - an API test (download, restore plain and encrypted, refusals)
   - end to end against Drive in a test folder, since deleted: the backup uploaded, then was fetched back, decrypted with the script and opened (22 awards, 174 nominees, 9,328 votes, 501 users, 0 sessions)
 
+### The new front page and 2025's results (branch `worktree-frontpage`, 2026-11-09)
+
+StrawWaffle got approval for the lab's look ("the lab is the official version now"). In that look:
+- **`/`: the front page** (`src/home/Home.tsx`, `home.html`, `react-home.tsx`). A countdown to the voting start set in Settings (`startTime`), titled with `awardYear`, then "Voting is open!" with a Vote button and a countdown to the close, then "Voting has closed". With no start set, "Voting dates are coming soon". It switches by itself at the start, with a cheer. "Meanwhile, check out last year's results" goes to `/2025`. It has the lab's extras: music (starts only from its button, not on any first click as in the lab), drawn look, theme, and the drifting emotes. The lab's header controls are now `src/lab/HeaderTools.tsx`, shared.
+- **`/2025`: last year's results**, the lab's results summary (`Summary`) fed from `src/archive/2025.json`. `Summary` takes a `load` now, and works without counts: percentages, margins in points, "Nominees" in place of ballots, a link to each award's reveal on stream, a note where a category doesn't add to 100%, and emotes as pictures for New Emote.
+  - **The data**: the wiki's percentages for all 22 awards, parsed from the page source (all 22 verbatim now; the 7 "from the summary" categories matched exactly). Joined to `src/data.ts` for pictures and links (91 of 173 nominees have a picture). gpt71 and "MISSING SEGMENT" aren't in the site's data; Ukrainian Ana and Andrew Wilson matched under their spellings there.
+  - **The wiki itself is off for two awards**, shown as printed with a note: Omegalul 125.02% and DGG Chatter 101.57%. To use real data later, replace the file (the same shape with counts filled in; `count` per award is there for that).
+- **`/vote`: the old voting and results page**, until the lab's voting page replaces it (next). The admin's preview links, "Leave preview" and its sign-in now go there.
+- Tests: the API test checks `/`, `/2025` and `/vote` (46 pass). The screenshot tests open `/vote`. In the browser: the countdown in light and dark, the switch at zero, the 2025 page, back and forward.
+- The `dgga-mock` container had been mounting `server.mjs` from the deleted `stack-upgrade` worktree, so it couldn't start. It's recreated from the main checkout.
+
+**Next (StrawWaffle's order): the lab's voting page as the real one.** `VoteDemo` saves nothing and shows 3 awards. It needs real ballots (`/api/vote`), sign-in, the voter's existing picks, every award, ranked awards, and the voting window. Then `VOTE_PATH` in `Home.tsx` points at it and the old page can go.
+
 ### Next: the lab page (StrawWaffle's answers, 2026-11-09)
 
 StrawWaffle wants the front page and the presentation to feel fun, quirky and wholesome. It gets built on an experimental page first (`/lab`, admins only) until rinlux approves. Order: the follow-ups above, merge and deploy, then the lab.

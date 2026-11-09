@@ -87,13 +87,19 @@ async function setMode(admin: Jar, mode: string) {
 }
 
 describe("static and public routes", () => {
-  test("index page is served with robots meta", async () => {
-    const res = await req("/");
-    expect(res.status).toBe(200);
-    expect(res.headers.get("content-type")).toContain("text/html");
-    const html = await res.text();
-    expect(html).toContain("<title>Destiny Awards 2025</title>");
-    expect(html).toContain('<meta name="robots" content="noindex');
+  test("pages are served with robots meta: the front page, 2025's results and the voting page", async () => {
+    for (const [path, title] of [
+      ["/", "DGG Awards"],
+      ["/2025", "DGG Awards"],
+      ["/vote", "Destiny Awards 2025"],
+    ]) {
+      const res = await req(path);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toContain("text/html");
+      const html = await res.text();
+      expect(html).toContain(`<title>${title}</title>`);
+      expect(html).toContain('<meta name="robots" content="noindex');
+    }
   });
 
   test("robots.txt disallows everyone", async () => {

@@ -12,7 +12,7 @@ export function AuthButton() {
   if (!query.data) {
     return (
       <a
-        href="/signin"
+        href="/signin?next=/vote"
         className="text-orange-1 bg-orange-1/15 hover:bg-orange-1/25 fixed top-2 right-2 z-99 flex w-18 items-center gap-x-1 rounded-sm p-0.5 backdrop-blur-xs transition-colors"
       >
         Sign in

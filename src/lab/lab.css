@@ -180,7 +180,8 @@
   font-weight: 800;
   color: var(--header-text);
 }
-.cozy-tab[aria-selected="true"] {
+.cozy-tab[aria-selected="true"],
+.cozy-tab[aria-current="page"] {
   background: var(--cream);
   color: var(--text);
   box-shadow: 0 3px 0 rgb(0 0 0 / 0.12);
