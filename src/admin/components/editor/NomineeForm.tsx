@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Section } from "@/admin/components/Section";
 import { Button, ErrorText, Field, TimeInput, inputClass } from "@/admin/components/editor/fields";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type LinkType, classifyLink, linkAt, linkLabel, linkTypes } from "@/lib/links";
 import {
   type AdminNominee,
@@ -92,130 +93,160 @@ export function NomineeForm({ nominee, issues }: { nominee: AdminNominee; issues
       {issues.length > 0 && (
         <ul className="space-y-1 rounded border border-neutral-200 bg-neutral-50 p-2 text-sm">
           {issues.map((issue) => (
-            <li key={issue.code + issue.message} className={issue.severity === "error" ? "text-red-700" : "text-amber-800"}>
+            <li
+              key={issue.code + issue.message}
+              className={issue.severity === "error" ? "text-red-700" : "text-amber-800"}
+            >
               {issue.severity === "error" ? "Error" : "Warning"}: {issue.message}
             </li>
           ))}
         </ul>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Title">
-          <input className={inputClass} value={draft.title} required onChange={(e) => set("title", e.currentTarget.value)} />
-        </Field>
-        <Field label="Date" hint="When it happened. Checked against the award year.">
-          <input type="date" className={inputClass} value={draft.date} onChange={(e) => set("date", e.currentTarget.value)} />
-        </Field>
-      </div>
+      <Section id="nominee-details" title="Details" boxed={false}>
+        <div className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label="Title">
+              <input
+                className={inputClass}
+                value={draft.title}
+                required
+                onChange={(e) => set("title", e.currentTarget.value)}
+              />
+            </Field>
+            <Field label="Date" hint="When it happened. Checked against the award year.">
+              <input
+                type="date"
+                className={inputClass}
+                value={draft.date}
+                onChange={(e) => set("date", e.currentTarget.value)}
+              />
+            </Field>
+          </div>
 
-      <Field label="Description" hint="What this is and why it's nominated.">
-        <textarea
-          className={inputClass}
-          rows={3}
-          value={draft.description}
-          onChange={(e) => set("description", e.currentTarget.value)}
-        />
-      </Field>
+          <Field label="Description" hint="What this is and why it's nominated.">
+            <textarea
+              className={inputClass}
+              rows={3}
+              value={draft.description}
+              onChange={(e) => set("description", e.currentTarget.value)}
+            />
+          </Field>
 
-      <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
-        <Field
-          label="Source link"
-          hint={
-            detected
-              ? `Detected: ${linkLabel(detected.type, detected.start)}`
-              : "Link to the moment itself, not a channel or profile."
-          }
-        >
-          <input
-            className={inputClass}
-            type="url"
-            value={draft.url}
-            placeholder="https://"
-            onChange={(e) => set("url", e.currentTarget.value)}
-          />
-        </Field>
-        <Field label="Link type">
-          <select
-            className={inputClass}
-            value={draft.linkType}
-            onChange={(e) => set("linkType", e.currentTarget.value as LinkType | "")}
-          >
-            <option value="">Detect from the link</option>
-            {linkTypes.map((t) => (
-              <option key={t} value={t}>
-                {linkLabel(t)}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
+          <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
+            <Field
+              label="Source link"
+              hint={
+                detected
+                  ? `Detected: ${linkLabel(detected.type, detected.start)}`
+                  : "Link to the moment itself, not a channel or profile."
+              }
+            >
+              <input
+                className={inputClass}
+                type="url"
+                value={draft.url}
+                placeholder="https://"
+                onChange={(e) => set("url", e.currentTarget.value)}
+              />
+            </Field>
+            <Field label="Link type">
+              <select
+                className={inputClass}
+                value={draft.linkType}
+                onChange={(e) => set("linkType", e.currentTarget.value as LinkType | "")}
+              >
+                <option value="">Detect from the link</option>
+                {linkTypes.map((t) => (
+                  <option key={t} value={t}>
+                    {linkLabel(t)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Field label="Clip start" hint="m:ss into the source">
-          <TimeInput
-            value={draft.clipStart}
-            onChange={(s, valid) => {
-              set("clipStart", s);
-              setTimesValid((v) => ({ ...v, start: valid }));
-            }}
-          />
-        </Field>
-        <Field label="Clip end">
-          <TimeInput
-            value={draft.clipEnd}
-            onChange={(s, valid) => {
-              set("clipEnd", s);
-              setTimesValid((v) => ({ ...v, end: valid }));
-            }}
-          />
-        </Field>
-        <Field label="Layout">
-          <select
-            className={inputClass}
-            value={draft.renderType}
-            onChange={(e) => set("renderType", e.currentTarget.value as Draft["renderType"])}
-          >
-            <option value="default">Default</option>
-            <option value="compact">Compact (emotes)</option>
-          </select>
-        </Field>
-      </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Field label="Clip start" hint="m:ss into the source">
+              <TimeInput
+                value={draft.clipStart}
+                onChange={(s, valid) => {
+                  set("clipStart", s);
+                  setTimesValid((v) => ({ ...v, start: valid }));
+                }}
+              />
+            </Field>
+            <Field label="Clip end">
+              <TimeInput
+                value={draft.clipEnd}
+                onChange={(s, valid) => {
+                  set("clipEnd", s);
+                  setTimesValid((v) => ({ ...v, end: valid }));
+                }}
+              />
+            </Field>
+            <Field label="Layout">
+              <select
+                className={inputClass}
+                value={draft.renderType}
+                onChange={(e) => set("renderType", e.currentTarget.value as Draft["renderType"])}
+              >
+                <option value="default">Default</option>
+                <option value="compact">Compact (emotes)</option>
+              </select>
+            </Field>
+          </div>
 
-      <Field label="Image file" hint="A file in src/media, e.g. zee.jpg. A clip's thumbnail takes its place.">
-        <input className={inputClass} value={draft.imageId} onChange={(e) => set("imageId", e.currentTarget.value)} />
-      </Field>
+          <Field label="Image file" hint="A file in src/media, e.g. zee.jpg. A clip's thumbnail takes its place.">
+            <input
+              className={inputClass}
+              value={draft.imageId}
+              onChange={(e) => set("imageId", e.currentTarget.value)}
+            />
+          </Field>
 
-      {draft.url && type && draft.clipStart != null && (
-        <p className="text-sm text-neutral-600">
-          Viewers get:{" "}
-          <a className="text-emerald-800 underline" href={linkAt(draft.url, draft.clipStart)} target="_blank" rel="noopener noreferrer">
-            {linkLabel(type, draft.clipStart)}
-          </a>
-        </p>
-      )}
+          {draft.url && type && draft.clipStart != null && (
+            <p className="text-sm text-neutral-600">
+              Viewers get:{" "}
+              <a
+                className="text-emerald-800 underline"
+                href={linkAt(draft.url, draft.clipStart)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {linkLabel(type, draft.clipStart)}
+              </a>
+            </p>
+          )}
 
-      <div className="flex items-center gap-3">
-        <Button type="submit" variant="primary" disabled={!dirty || save.isPending || !timesValid.start || !timesValid.end}>
-          {save.isPending ? "Saving…" : "Save"}
-        </Button>
-        {dirty && (
-          <Button onClick={() => setDraft(saved)} disabled={save.isPending}>
-            Discard changes
-          </Button>
-        )}
-        {!dirty && save.isSuccess && <span className="text-sm text-neutral-600">Saved.</span>}
-        <ErrorText>{save.error?.message ?? remove.error?.message}</ErrorText>
-        <span className="grow" />
-        <Button
-          variant="danger"
-          disabled={remove.isPending}
-          onClick={() => {
-            if (confirm(`Delete "${nominee.title}"?`)) remove.mutate();
-          }}
-        >
-          Delete nominee
-        </Button>
-      </div>
+          <div className="flex items-center gap-3">
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={!dirty || save.isPending || !timesValid.start || !timesValid.end}
+            >
+              {save.isPending ? "Saving…" : "Save"}
+            </Button>
+            {dirty && (
+              <Button onClick={() => setDraft(saved)} disabled={save.isPending}>
+                Discard changes
+              </Button>
+            )}
+            {!dirty && save.isSuccess && <span className="text-sm text-neutral-600">Saved.</span>}
+            <ErrorText>{save.error?.message ?? remove.error?.message}</ErrorText>
+            <span className="grow" />
+            <Button
+              variant="danger"
+              disabled={remove.isPending}
+              onClick={() => {
+                if (confirm(`Delete "${nominee.title}"?`)) remove.mutate();
+              }}
+            >
+              Delete nominee
+            </Button>
+          </div>
+        </div>
+      </Section>
 
       <ClipSection nominee={nominee} unsaved={dirty} />
       {type === "dgg-profile" && draft.url && (
@@ -241,68 +272,83 @@ function ClipSection({ nominee, unsaved }: { nominee: AdminNominee; unsaved: boo
   const working = nominee.clipStatus === "pending" || nominee.clipStatus === "processing";
 
   return (
-    <section className="space-y-3 border-t border-neutral-200 pt-4">
-      <h4 className="text-sm font-bold">Clip</h4>
-      <div className="flex flex-wrap items-center gap-3 text-sm">
-        <Button
-          onClick={() => build.mutate()}
-          disabled={unsaved || working || build.isPending}
-          title={unsaved ? "Save the clip start and end first" : undefined}
-        >
-          {nominee.clipStatus === "ready" ? "Rebuild clip" : "Build clip"}
-        </Button>
-        <span className="text-neutral-700">
-          {nominee.clipStatus === "pending" && "Waiting to download…"}
-          {nominee.clipStatus === "processing" && "Downloading and converting…"}
-          {nominee.clipStatus === "ready" && "Ready."}
-          {nominee.clipStatus === "failed" && <span className="text-red-700">Failed: {nominee.clipError}</span>}
-          {!nominee.clipStatus && "No clip yet. Set the start and end, save, then build."}
-        </span>
-        {unsaved && <span className="text-neutral-500">Save first.</span>}
-      </div>
-      <ErrorText>{build.error?.message}</ErrorText>
-
-      {nominee.clipUrl && (
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <video ref={video} className="aspect-video w-full rounded bg-black" src={nominee.clipUrl} controls preload="metadata" />
+    <div className="border-t border-neutral-200 pt-3">
+      <Section id="nominee-clip" title="Clip" aside={nominee.clipStatus ?? "none"} boxed={false}>
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
             <Button
-              onClick={() => frame.mutate(Math.floor(video.current?.currentTime ?? 0))}
-              disabled={frame.isPending}
+              onClick={() => build.mutate()}
+              disabled={unsaved || working || build.isPending}
+              title={unsaved ? "Save the clip start and end first" : undefined}
             >
-              Use this frame as the thumbnail
+              {nominee.clipStatus === "ready" ? "Rebuild clip" : "Build clip"}
             </Button>
-            <ErrorText>{frame.error?.message}</ErrorText>
+            <span className="text-neutral-700">
+              {nominee.clipStatus === "pending" && "Waiting to download…"}
+              {nominee.clipStatus === "processing" && "Downloading and converting…"}
+              {nominee.clipStatus === "ready" && "Ready."}
+              {nominee.clipStatus === "failed" && <span className="text-red-700">Failed: {nominee.clipError}</span>}
+              {!nominee.clipStatus && "No clip yet. Set the start and end, save, then build."}
+            </span>
+            {unsaved && <span className="text-neutral-500">Save first.</span>}
           </div>
-          <div className="space-y-2">
-            {nominee.thumbnailUrl && (
-              <img className="aspect-video w-full rounded object-cover" src={nominee.thumbnailUrl} alt="Current thumbnail" />
-            )}
-            <p className="text-sm text-neutral-600">
-              {nominee.thumbnailAt != null ? `Thumbnail from ${nominee.thumbnailAt}s into the clip.` : "Uploaded thumbnail."}
-            </p>
+          <ErrorText>{build.error?.message}</ErrorText>
+
+          {nominee.clipUrl && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <video
+                  ref={video}
+                  className="aspect-video w-full rounded bg-black"
+                  src={nominee.clipUrl}
+                  controls
+                  preload="metadata"
+                />
+                <Button
+                  onClick={() => frame.mutate(Math.floor(video.current?.currentTime ?? 0))}
+                  disabled={frame.isPending}
+                >
+                  Use this frame as the thumbnail
+                </Button>
+                <ErrorText>{frame.error?.message}</ErrorText>
+              </div>
+              <div className="space-y-2">
+                {nominee.thumbnailUrl && (
+                  <img
+                    className="aspect-video w-full rounded object-cover"
+                    src={nominee.thumbnailUrl}
+                    alt="Current thumbnail"
+                  />
+                )}
+                <p className="text-sm text-neutral-600">
+                  {nominee.thumbnailAt != null
+                    ? `Thumbnail from ${nominee.thumbnailAt}s into the clip.`
+                    : "Uploaded thumbnail."}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <input
+              ref={fileInput}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.currentTarget.files?.[0];
+                if (file) upload.mutate(file, { onSettled: () => fileInput.current && (fileInput.current.value = "") });
+              }}
+            />
+            <Button onClick={() => fileInput.current?.click()} disabled={upload.isPending}>
+              {upload.isPending ? "Uploading…" : "Upload a thumbnail"}
+            </Button>
+            <span className="text-neutral-600">PNG, JPEG, WebP or GIF. Replaces the current thumbnail.</span>
+            <ErrorText>{upload.error?.message}</ErrorText>
           </div>
         </div>
-      )}
-
-      <div className="flex flex-wrap items-center gap-3 text-sm">
-        <input
-          ref={fileInput}
-          type="file"
-          accept="image/png,image/jpeg,image/webp,image/gif"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.currentTarget.files?.[0];
-            if (file) upload.mutate(file, { onSettled: () => fileInput.current && (fileInput.current.value = "") });
-          }}
-        />
-        <Button onClick={() => fileInput.current?.click()} disabled={upload.isPending}>
-          {upload.isPending ? "Uploading…" : "Upload a thumbnail"}
-        </Button>
-        <span className="text-neutral-600">PNG, JPEG, WebP or GIF. Replaces the current thumbnail.</span>
-        <ErrorText>{upload.error?.message}</ErrorText>
-      </div>
-    </section>
+      </Section>
+    </div>
   );
 }
 
@@ -315,38 +361,39 @@ function ProfileSection({ url, onUseBio }: { url: string; onUseBio: (bio: string
   });
 
   return (
-    <section className="space-y-3 border-t border-neutral-200 pt-4">
-      <h4 className="text-sm font-bold">destiny.gg profile</h4>
-      <Button onClick={() => load.mutate()} disabled={load.isPending || !name}>
-        {load.isPending ? "Loading…" : `Load ${name}'s card`}
-      </Button>
-      <ErrorText>{load.error?.message}</ErrorText>
-      {profile === null && <p className="text-sm text-neutral-600">No destiny.gg user with that name.</p>}
-      {profile && (
-        <div className="flex gap-4 rounded border border-neutral-200 bg-white p-3 text-sm">
-          {profile.photoUrl && <img src={profile.photoUrl} alt="" className="h-20 w-20 rounded" />}
-          <div className="min-w-0 flex-1 space-y-1">
-            <p className="font-bold">{profile.name}</p>
-            <p className="text-neutral-600">
-              {[profile.tier, profile.team, profile.memberSince && `member since ${profile.memberSince}`]
-                .filter(Boolean)
-                .join(" · ")}
-            </p>
-            {profile.bio && <p>{profile.bio}</p>}
-            {profile.signatureSvg && (
-              // Rebuilt server-side from path data only (src/server/dgg-profile.ts).
-              <div
-                className="h-12 max-w-xs text-neutral-900 [&>svg]:h-full [&>svg]:w-full"
-                aria-label="Signature"
-                dangerouslySetInnerHTML={{ __html: profile.signatureSvg }}
-              />
-            )}
-            {profile.bio && (
-              <Button onClick={() => onUseBio(profile.bio!)}>Use bio as the description</Button>
-            )}
-          </div>
+    <div className="border-t border-neutral-200 pt-3">
+      <Section id="nominee-profile" title="destiny.gg profile" boxed={false}>
+        <div className="space-y-3">
+          <Button onClick={() => load.mutate()} disabled={load.isPending || !name}>
+            {load.isPending ? "Loading…" : `Load ${name}'s card`}
+          </Button>
+          <ErrorText>{load.error?.message}</ErrorText>
+          {profile === null && <p className="text-sm text-neutral-600">No destiny.gg user with that name.</p>}
+          {profile && (
+            <div className="flex gap-4 rounded border border-neutral-200 bg-white p-3 text-sm">
+              {profile.photoUrl && <img src={profile.photoUrl} alt="" className="h-20 w-20 rounded" />}
+              <div className="min-w-0 flex-1 space-y-1">
+                <p className="font-bold">{profile.name}</p>
+                <p className="text-neutral-600">
+                  {[profile.tier, profile.team, profile.memberSince && `member since ${profile.memberSince}`]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+                {profile.bio && <p>{profile.bio}</p>}
+                {profile.signatureSvg && (
+                  // Rebuilt server-side from path data only (src/server/dgg-profile.ts).
+                  <div
+                    className="h-12 max-w-xs text-neutral-900 [&>svg]:h-full [&>svg]:w-full"
+                    aria-label="Signature"
+                    dangerouslySetInnerHTML={{ __html: profile.signatureSvg }}
+                  />
+                )}
+                {profile.bio && <Button onClick={() => onUseBio(profile.bio!)}>Use bio as the description</Button>}
+              </div>
+            </div>
+          )}
         </div>
-      )}
-    </section>
+      </Section>
+    </div>
   );
 }

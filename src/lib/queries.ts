@@ -132,6 +132,14 @@ export async function createNominee(data: NomineeCreate) {
   return (await res.json()) as { id: string; categoryId: string };
 }
 
+export async function saveCategoryOrder(ids: string[]) {
+  await ok(await client.api.admin.categories.order.$put({ json: { ids } }), "Couldn't save the order");
+}
+
+export async function saveNomineeOrder(categoryId: string, ids: string[]) {
+  await ok(await client.api.admin.nominees.order.$put({ json: { categoryId, ids } }), "Couldn't save the order");
+}
+
 export async function fetchChecks() {
   return parseResponse(client.api.admin.checks.$get());
 }

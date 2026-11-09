@@ -20,8 +20,9 @@ export namespace API {
 export type User = InferSelectModel<typeof usersTable>;
 export type Session = InferSelectModel<typeof sessionsTable>;
 export type PublicSession = Pick<Session, "id" | "uid">;
-export type Option = InferSelectModel<typeof optionsTable>;
-export type Category = InferSelectModel<typeof categoriesTable>;
+// As the API sends them: `position` only decides the order they come in.
+export type Option = Omit<InferSelectModel<typeof optionsTable>, "position">;
+export type Category = Omit<InferSelectModel<typeof categoriesTable>, "position">;
 /** Nominee fields added after 2025; optional in data files and imports. */
 export type NomineeDetails =
   | "date"
@@ -132,8 +133,8 @@ export type Vote = InferSelectModel<typeof votesTable>;
 
 
 /** A nominee with its category and votes, as the results query loads it. */
-export type VoteEntry = Option & {
-  category: Category;
+export type VoteEntry = InferSelectModel<typeof optionsTable> & {
+  category: InferSelectModel<typeof categoriesTable>;
   votes: Vote[];
 };
 
@@ -153,7 +154,7 @@ export type ResultsData = {
     count: number;
     percentage: number;
     isWinner: boolean;
-    payload: Omit<VoteEntry, "category" | "votes">;
+    payload: Option;
   }[];
 }[];
 

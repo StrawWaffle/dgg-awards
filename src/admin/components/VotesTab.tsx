@@ -1,6 +1,7 @@
 import { type ReactNode, useState } from "react";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { Section } from "@/admin/components/Section";
 import { Button, ErrorText, inputClass } from "@/admin/components/editor/fields";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { type VoteFilter, fetchAllVotes, fetchVoteStats } from "@/lib/queries";
 
 const number = new Intl.NumberFormat();
@@ -29,8 +30,8 @@ function Stats({ onFilterIp }: { onFilterIp: (ip: string) => void }) {
         <b>{number.format(s.voters)}</b> voters cast <b>{number.format(s.ballots)}</b> ballots.{" "}
         <span className="text-neutral-600">{number.format(s.users)} people have signed in.</span>
       </p>
-      <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">
-        <Table title="Ballots per category" head={["Category", "Ballots"]}>
+      <div className="grid items-start gap-6 lg:grid-cols-[3fr_2fr]">
+        <Table id="categories" title="Ballots per category" head={["Category", "Ballots"]}>
           {s.categories.map((c) => (
             <tr key={c.id}>
               <td className="px-3 py-1.5">{c.title}</td>
@@ -44,7 +45,7 @@ function Stats({ onFilterIp }: { onFilterIp: (ip: string) => void }) {
           ))}
         </Table>
         <div className="space-y-6">
-          <Table title="Ballots per day (UTC)" head={["Day", "Voters", "Ballots"]}>
+          <Table id="days" title="Ballots per day (UTC)" head={["Day", "Voters", "Ballots"]}>
             {s.days.map((d) => (
               <tr key={d.day}>
                 <td className="px-3 py-1.5">{d.day}</td>
@@ -54,6 +55,7 @@ function Stats({ onFilterIp }: { onFilterIp: (ip: string) => void }) {
             ))}
           </Table>
           <Table
+            id="shared-ips"
             title="Addresses shared by several voters"
             head={["IP", "Voters"]}
             empty="No address has more than one voter."
@@ -76,19 +78,20 @@ function Stats({ onFilterIp }: { onFilterIp: (ip: string) => void }) {
 }
 
 function Table({
+  id,
   title,
   head,
   children,
   empty = "Nothing yet.",
 }: {
+  id: string;
   title: string;
   head: string[];
   children: ReactNode[];
   empty?: string;
 }) {
   return (
-    <section className="rounded border border-neutral-200 bg-white">
-      <h2 className="border-b border-neutral-200 px-3 py-2 text-sm font-bold">{title}</h2>
+    <Section id={`votes-${id}`} title={title} aside={children.length}>
       {children.length === 0 ? (
         <p className="px-3 py-3 text-sm text-neutral-600">{empty}</p>
       ) : (
@@ -105,7 +108,7 @@ function Table({
           <tbody className="divide-y divide-neutral-100">{children}</tbody>
         </table>
       )}
-    </section>
+    </Section>
   );
 }
 
@@ -141,86 +144,88 @@ function VoteList({ filter, setFilter }: { filter: VoteFilter; setFilter: (f: Vo
   };
 
   return (
-    <section className="space-y-3">
-      <form
-        className="flex flex-wrap items-end gap-3"
-        onSubmit={(e) => {
-          e.preventDefault();
-          submit();
-        }}
-      >
-        <h2 className="mr-auto self-center text-sm font-bold">Votes</h2>
-        <input
-          className={`${inputClass} w-48!`}
-          placeholder="Voter name or uid"
-          aria-label="Voter name or uid"
-          value={user}
-          onChange={(e) => setUser(e.currentTarget.value)}
-        />
-        <input
-          className={`${inputClass} w-48!`}
-          placeholder="IP address"
-          aria-label="IP address"
-          value={ip}
-          onChange={(e) => setIp(e.currentTarget.value)}
-        />
-        <Button type="submit">Filter</Button>
-        {filtered && <Button onClick={() => apply({})}>Clear</Button>}
-      </form>
+    <Section id="votes-list" title="All votes" aside={`page ${page + 1}`}>
+      <div className="space-y-3 p-3">
+        <form
+          className="flex flex-wrap items-end gap-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            submit();
+          }}
+        >
+          <span className="mr-auto" />
+          <input
+            className={`${inputClass} w-48!`}
+            placeholder="Voter name or uid"
+            aria-label="Voter name or uid"
+            value={user}
+            onChange={(e) => setUser(e.currentTarget.value)}
+          />
+          <input
+            className={`${inputClass} w-48!`}
+            placeholder="IP address"
+            aria-label="IP address"
+            value={ip}
+            onChange={(e) => setIp(e.currentTarget.value)}
+          />
+          <Button type="submit">Filter</Button>
+          {filtered && <Button onClick={() => apply({})}>Clear</Button>}
+        </form>
 
-      {votes.isError && <ErrorText>Couldn't load the votes: {votes.error.message}</ErrorText>}
+        {votes.isError && <ErrorText>Couldn't load the votes: {votes.error.message}</ErrorText>}
 
-      <div className="overflow-x-auto rounded border border-neutral-200 bg-white">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-neutral-200 text-left text-xs text-neutral-600">
-              <th className="px-3 py-2 font-medium">When</th>
-              <th className="px-3 py-2 font-medium">Voter</th>
-              <th className="px-3 py-2 font-medium">IP</th>
-              <th className="px-3 py-2 font-medium">Category</th>
-              <th className="px-3 py-2 font-medium">Nominee</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-neutral-100">
-            {votes.data?.map((v) => (
-              <tr key={`${v.uid}-${v.categoryId}-${v.optionId}`} className="hover:bg-neutral-50">
-                <td className="px-3 py-1.5 whitespace-nowrap text-neutral-600">{dateTime.format(new Date(v.at))}</td>
-                <td className="px-3 py-1.5">
-                  <button type="button" className="hover:underline" onClick={() => apply({ uid: v.uid })}>
-                    {v.name}
-                  </button>
-                </td>
-                <td className="px-3 py-1.5">
-                  <button type="button" className="hover:underline" onClick={() => apply({ ip: v.ip })}>
-                    {v.ip}
-                  </button>
-                </td>
-                <td className="px-3 py-1.5">{v.categoryTitle}</td>
-                <td className="px-3 py-1.5">
-                  {v.optionTitle ?? v.optionId}
-                  {v.rank > 1 && <span className="text-neutral-500"> (choice {v.rank})</span>}
-                </td>
+        <div className="overflow-x-auto rounded border border-neutral-200 bg-white">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-neutral-200 text-left text-xs text-neutral-600">
+                <th className="px-3 py-2 font-medium">When</th>
+                <th className="px-3 py-2 font-medium">Voter</th>
+                <th className="px-3 py-2 font-medium">IP</th>
+                <th className="px-3 py-2 font-medium">Category</th>
+                <th className="px-3 py-2 font-medium">Nominee</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {votes.data?.length === 0 && <p className="p-6 text-center text-sm text-neutral-600">No votes found.</p>}
-      </div>
+            </thead>
+            <tbody className="divide-y divide-neutral-100">
+              {votes.data?.map((v) => (
+                <tr key={`${v.uid}-${v.categoryId}-${v.optionId}`} className="hover:bg-neutral-50">
+                  <td className="px-3 py-1.5 whitespace-nowrap text-neutral-600">{dateTime.format(new Date(v.at))}</td>
+                  <td className="px-3 py-1.5">
+                    <button type="button" className="hover:underline" onClick={() => apply({ uid: v.uid })}>
+                      {v.name}
+                    </button>
+                  </td>
+                  <td className="px-3 py-1.5">
+                    <button type="button" className="hover:underline" onClick={() => apply({ ip: v.ip })}>
+                      {v.ip}
+                    </button>
+                  </td>
+                  <td className="px-3 py-1.5">{v.categoryTitle}</td>
+                  <td className="px-3 py-1.5">
+                    {v.optionTitle ?? v.optionId}
+                    {v.rank > 1 && <span className="text-neutral-500"> (choice {v.rank})</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {votes.data?.length === 0 && <p className="p-6 text-center text-sm text-neutral-600">No votes found.</p>}
+        </div>
 
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-neutral-600">
-          Page {page + 1}
-          {votes.isPlaceholderData && " (loading…)"}
-        </span>
-        <div className="flex gap-2">
-          <Button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0}>
-            Previous
-          </Button>
-          <Button onClick={() => setPage((p) => p + 1)} disabled={!hasNext || votes.isPlaceholderData}>
-            Next
-          </Button>
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-neutral-600">
+            Page {page + 1}
+            {votes.isPlaceholderData && " (loading…)"}
+          </span>
+          <div className="flex gap-2">
+            <Button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0}>
+              Previous
+            </Button>
+            <Button onClick={() => setPage((p) => p + 1)} disabled={!hasNext || votes.isPlaceholderData}>
+              Next
+            </Button>
+          </div>
         </div>
       </div>
-    </section>
+    </Section>
   );
 }

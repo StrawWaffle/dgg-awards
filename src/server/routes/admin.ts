@@ -6,6 +6,8 @@ import {
   getUser,
   getVoteStats,
   getVotesPage,
+  reorderCategories,
+  reorderNominees,
   searchUsers,
   categoryHasVotes,
   pinVotedCategoryStyles,
@@ -38,6 +40,8 @@ import { type SessionEnv, rejectInvalid, requireAdmin, zValidator } from "@/serv
 import {
   categoryCreate,
   categoryForm,
+  categoryOrder,
+  nomineeOrder,
   categoryPatch,
   nomineeCreate,
   configForm,
@@ -281,6 +285,17 @@ export const adminRoutes = new Hono<SessionEnv>()
     return c.json(votes, 200);
   })
   .get("/stats", async (c) => c.json(await getVoteStats(), 200))
+
+  /** Drag-and-drop order from the editor. Ids not listed keep their place. */
+  .put("/categories/order", zValidator("json", categoryOrder, rejectInvalid), async (c) => {
+    await reorderCategories(c.req.valid("json").ids);
+    return c.body(null, 200);
+  })
+  .put("/nominees/order", zValidator("json", nomineeOrder, rejectInvalid), async (c) => {
+    const { categoryId, ids } = c.req.valid("json");
+    await reorderNominees(categoryId, ids);
+    return c.body(null, 200);
+  })
 
   .post("/config", zValidator("form", configForm, rejectInvalid), async (c) => {
     const form = c.req.valid("form");

@@ -1,0 +1,31 @@
+/*
+ * The admin page's dark theme. The admin is built from Tailwind's neutral
+ * scale on white, so instead of a dark: variant on every class, the scale is
+ * turned around here: white becomes the dark surface, neutral-50 the page
+ * behind it, and the dark text shades light. The accents move to lighter
+ * shades that read on dark. Tailwind's utilities read these variables, so
+ * this is all it takes. Applied by the `admin-dark` class on <html>.
+ */
+.admin-dark {
+  color-scheme: dark;
+  --color-white: oklch(21% 0 0);
+  --color-neutral-50: oklch(16% 0 0);
+  --color-neutral-100: oklch(27% 0 0);
+  --color-neutral-200: oklch(31% 0 0);
+  --color-neutral-300: oklch(40% 0 0);
+  --color-neutral-400: oklch(56% 0 0);
+  --color-neutral-500: oklch(70% 0 0);
+  --color-neutral-600: oklch(75% 0 0);
+  --color-neutral-700: oklch(83% 0 0);
+  --color-neutral-800: oklch(90% 0 0);
+  --color-neutral-900: oklch(95% 0 0);
+  /* Primary buttons are emerald-700 with text-white (now dark), links emerald-800. */
+  --color-emerald-600: oklch(69.6% 0.17 162.48);
+  --color-emerald-700: oklch(69.6% 0.17 162.48);
+  --color-emerald-800: oklch(76.5% 0.177 163.223);
+  --color-red-50: oklch(25.8% 0.092 26.042);
+  --color-red-300: oklch(44.4% 0.177 26.899);
+  --color-red-700: oklch(70.4% 0.191 22.216);
+  --color-amber-800: oklch(87.9% 0.169 91.605);
+  background-color: var(--color-neutral-50);
+}

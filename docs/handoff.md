@@ -44,7 +44,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 1. **Voting page redesign:** ranked-voting UI, one category per page with progress (like jadseya.com), cuter. The hill-climbing method applies.
 2. **Results reveal and presenter mode:** reveal-all-but-last-three, clips that stop, room for the stream camera, charts per StrawWaffle's visualization article, and the runoff rounds.
 3. **Re-check the double-count fix** against the original code, and against the real 2025 votes if they turn up.
-4. **Admin pass** (branch `worktree-admin-pass`, waiting for StrawWaffle's review, not merged). See "Admin pass" below.
+4. **Admin pass** (branch `worktree-admin-pass`, waiting for StrawWaffle's review, not merged; two rounds: the cleanup, then the sidebar, dark theme, drag to reorder and collapsible sections). See "Admin pass" below.
 5. Smaller items:
    - Re-pull emotes from the DGG CDN.
    - Privacy page.
@@ -131,6 +131,19 @@ StrawWaffle asked for a visual pass over the admin page and whether everything t
    - `GET /api/admin/users` returns the admins, or with `?q=` up to 20 name matches. Each comes with `fromEnv`. `PATCH /api/admin/user` takes `{uid, admin}`; a bare uid still makes someone admin.
 
 Tests: typecheck, 78 unit tests and 38 API tests pass, with both snapshots unchanged. New API tests cover user search, vote names and filters, the stats and the settings window. Screenshots were checked at 1440, 1024 and 390 px wide. Built and running as `dgga-review` (port 3500, image `dgga:review`), a container just for this branch.
+
+### Second round: quality-of-life (StrawWaffle asked for these after the first round)
+
+- **Sidebar instead of the header and tabs.** The page sections, the preview links, the theme switch and the signed-in name are all in a left sidebar that collapses to an icon rail (remembered). On narrow screens it turns into a bar at the top. The open section is kept in the address (`#votes`), so a reload stays on it.
+- **Dark theme:** system, light or dark, switched in the sidebar and remembered per browser. `src/admin/admin.css` turns Tailwind's neutral scale around under the `admin-dark` class on `<html>` and moves the accents to lighter shades, so the components need no `dark:` classes. This affects the admin page only.
+- **Drag to reorder** categories and nominees, by the dotted handle (or from the keyboard: focus the handle, Space, arrow keys, Space). It uses `@dnd-kit`.
+  - Migration 0005 adds `position` to categories and options, backfilled from the old insertion order. It was checked on a copy of an existing database, and the order was unchanged.
+  - New items go last. The public site, the results and the editor all follow the order.
+  - `PUT /api/admin/categories/order` and `/nominees/order`.
+  - `position` isn't sent in the API, so the public JSON and both snapshots are unchanged.
+- **Collapsible sections, remembered per browser:** Category settings; a nominee's Details, Clip and destiny.gg profile; and every table on the Votes tab. On wide screens the category list stays in view while the nominees scroll, with its own scrollbar.
+- `useStored` (`src/admin/useStored.ts`) is the localStorage hook behind all of this. It is wrapped so that blocked storage just means nothing is remembered.
+- Tested: typecheck, 78 unit tests and 39 API tests (a new one covers reordering) pass. Screenshots were checked in light, dark, collapsed and phone width. A real mouse drag and a keyboard drag in Playwright both saved and survived a reload.
 
 **Ideas from StrawWaffle, not built.** Several need rinlux's say first, since they are in charge of these decisions:
 - **More roles** than admin, e.g. moderators or editors who can only edit nominees.

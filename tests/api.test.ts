@@ -540,6 +540,40 @@ describe("admin", () => {
     }
   });
 
+  test("categories and nominees reorder; new ones go last", async () => {
+    const put = (path: string, body: unknown, jar = admin) =>
+      req(path, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }, jar);
+    const order = async () => {
+      const data = await (await req("/api/nominees")).json();
+      return { cats: data.map((c: any) => c.id), ally: data.find((c: any) => c.id === "ally").options.map((o: any) => o.id) };
+    };
+    const before = await order();
+    expect((await put("/api/admin/categories/order", { ids: [...before.cats].reverse() }, user)).status).toBe(401);
+
+    expect((await put("/api/admin/categories/order", { ids: [...before.cats].reverse() })).status).toBe(200);
+    expect((await put("/api/admin/nominees/order", { categoryId: "ally", ids: [...before.ally].reverse() })).status).toBe(200);
+    const reversed = await order();
+    expect(reversed.cats).toEqual([...before.cats].reverse());
+    expect(reversed.ally).toEqual([...before.ally].reverse());
+    // The admin editor and the results follow the same order.
+    const adminCats = (await (await req("/api/admin/nominees", {}, admin)).json()).map((c: any) => c.id);
+    expect(adminCats).toEqual(reversed.cats);
+
+    const created = await req(
+      "/api/admin/categories",
+      { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: "Last One" }) },
+      admin,
+    );
+    expect(created.status).toBe(201);
+    expect((await order()).cats.at(-1)).toBe("last_one");
+    await req("/api/admin/category?id=last_one", { method: "DELETE" }, admin);
+
+    await put("/api/admin/categories/order", { ids: before.cats });
+    await put("/api/admin/nominees/order", { categoryId: "ally", ids: before.ally });
+    expect(await order()).toEqual(before);
+    expect((await put("/api/admin/categories/order", { ids: [] })).status).toBe(400);
+  });
+
   test("make admin by uid", async () => {
     const other = await signIn("Promoted");
     const uid = (await (await req("/api/me", {}, other)).json()).uid;

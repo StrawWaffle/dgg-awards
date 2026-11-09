@@ -131,6 +131,10 @@ export const usersQuery = z.object({ q: z.string().trim().min(1).max(40).optiona
 
 export const idQuery = z.object({ id: required });
 
+/** A new display order: every id, first to last. */
+export const categoryOrder = z.object({ ids: z.array(required).min(1) });
+export const nomineeOrder = z.object({ categoryId: required, ids: z.array(required).min(1) });
+
 export const nomineeQuery = z.object({ categoryId: required, id: required });
 
 /** Which nominee (in a JSON body). */

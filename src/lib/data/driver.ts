@@ -316,8 +316,7 @@ export async function getVoteStats() {
     .from(schema.categoriesTable)
     .leftJoin(v, and(eq(v.categoryId, schema.categoriesTable.id), eq(v.rank, 1)))
     .groupBy(schema.categoriesTable.id)
-    // Insertion order, as everywhere else categories are listed.
-    .orderBy(sql`${schema.categoriesTable}.rowid`);
+    .orderBy(asc(schema.categoriesTable.position));
   const day = sql<string>`date(${v.at}, 'unixepoch')`;
   const days = await db
     .select({ day, ballots: sql<number>`count(*)`, voters: sql<number>`count(distinct ${v.uid})` })
@@ -367,8 +366,40 @@ export async function listUnfinishedClips() {
   });
 }
 
+/** Every category with its nominees, in display order. */
 export async function getNominees() {
-  return await db.query.categoriesTable.findMany({ with: { options: true } });
+  return await db.query.categoriesTable.findMany({
+    columns: { position: false },
+    orderBy: (c, { asc }) => [asc(c.position)],
+    with: {
+      options: {
+        columns: { position: false },
+        orderBy: (o, { asc }) => [asc(o.position)],
+      },
+    },
+  });
+}
+
+/** Set the display order of all categories: `ids` first to last. */
+export async function reorderCategories(ids: string[]) {
+  db.transaction((tx) => {
+    ids.forEach((id, i) =>
+      tx.update(schema.categoriesTable).set({ position: i }).where(eq(schema.categoriesTable.id, id)).run(),
+    );
+  });
+}
+
+/** Set the display order of one category's nominees. */
+export async function reorderNominees(categoryId: string, ids: string[]) {
+  db.transaction((tx) => {
+    ids.forEach((id, i) =>
+      tx
+        .update(schema.optionsTable)
+        .set({ position: i })
+        .where(and(eq(schema.optionsTable.categoryId, categoryId), eq(schema.optionsTable.id, id)))
+        .run(),
+    );
+  });
 }
 
 export async function deleteNominee(categoryId: string, id: string) {
@@ -385,7 +416,11 @@ export async function deleteNominee(categoryId: string, id: string) {
 export async function insertCategory(
   category: InferInsertModel<typeof schema.categoriesTable>,
 ) {
-  return await db.insert(schema.categoriesTable).values(category);
+  // New categories go last.
+  return await db.insert(schema.categoriesTable).values({
+    position: sql`(select coalesce(max("position"), -1) + 1 from "categories")`,
+    ...category,
+  });
 }
 
 export async function updateCategory({
@@ -434,7 +469,11 @@ export async function deleteCategory(id: string) {
 export async function insertNominee(
   nominee: InferInsertModel<typeof schema.optionsTable>,
 ) {
-  return await db.insert(schema.optionsTable).values(nominee);
+  // New nominees go last in their category.
+  return await db.insert(schema.optionsTable).values({
+    position: sql`(select coalesce(max("position"), -1) + 1 from "options" where "categoryId" = ${nominee.categoryId})`,
+    ...nominee,
+  });
 }
 
 /**
@@ -570,7 +609,7 @@ export function processVoteResults(
       totalVotes,
       options: ordered.map((opt) => {
         const count = firstChoices(opt);
-        const { category, votes, ...payload } = opt;
+        const { category, votes, position, ...payload } = opt;
         return {
           id: opt.id,
           title: opt.title,
@@ -590,6 +629,8 @@ export async function getVotingResults(): Promise<ResultsData> {
   const allResults = await db.query.optionsTable.findMany({
     with: { votes: true, category: true },
   });
+  // Display order: categories, then nominees within each.
+  allResults.sort((a, b) => a.category.position - b.category.position || a.position - b.position);
   const config = await getConfig();
   return processVoteResults(allResults, config.defaultVotingStyle);
 }

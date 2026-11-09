@@ -49,6 +49,8 @@ export const categoriesTable = sqliteTable("categories", {
   description: text().notNull(),
   /** Null: use the site default (config defaultVotingStyle). Fixed once voted on. */
   votingStyle: text().$type<VotingStyle>(),
+  /** Display order, set by dragging in the admin editor. Lowest first. */
+  position: int().notNull().default(0),
 });
 
 export const optionsTable = sqliteTable(
@@ -84,6 +86,8 @@ export const optionsTable = sqliteTable(
     thumbnailKey: text(),
     /** Seconds into the clip the thumbnail frame was taken at. */
     thumbnailAt: int(),
+    /** Display order within the category. Lowest first. */
+    position: int().notNull().default(0),
   },
   (table) => [primaryKey({ columns: [table.id, table.categoryId] })],
 );
