@@ -34,7 +34,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
   - the nominee editor with picture uploads (crop and resize in the browser), clips, data checks and DGG profile cards
   - one Settings form, admin management, vote stats with shared IPs
   - edit history with undo
-  - Settings → Backups: download a full backup, restore one, and the status of the hourly encrypted backups to Google Drive (see `docs/migration.md`)
+  - Settings → Backups: download a full backup, restore one, and the status of the hourly backups to Google Drive (see `docs/migration.md`)
   - hiding categories that have votes; export, and import with an automatic database backup
   - links at the bottom left to preview voting and results, open the site, and open the lab
   - at plain `/admin` (the page checks for an admin; the API refuses everyone else), and signing in returns you to the page you came from
@@ -53,7 +53,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
   - the big screen fills the window and presents in scenes per award: title, a DVD-style nominee menu, the results reveal, and the winner. Clips are lowered in and the music fades out for them. Tabs slide, and background emotes show their colours on hover.
 
 **The live site is set up for the 2026 awards** (2026-11-09). The 2025 test setup was cleared after a backup (Drive `dgg-awards-2026-11-09T20-37Z.db.enc`, and `/data/backups/…-before-2026-setup.db`): its 22 awards, 174 nominees, 9,328 generated votes and 500 generated voters.
-- Settings: award year 2026, mode **locked** (the public sees only the front page's countdown and `/2025`; admins preview), voting from **15 December 2026 00:00 UTC** ("for now", StrawWaffle), no end date yet.
+- Settings: award year 2026, mode **locked** (the public sees only the front page's countdown and `/2025`; admins preview), voting from **15 December 2026 00:00 UTC** to **26 December 2026 23:59:59 UTC** (both "for now", StrawWaffle).
 - **The 22 awards** are 2025's, with their descriptions, in the same order. **159 draft nominees** came from rinlux's per-award Google Docs in the Drive folder: Ally 4, Antagonist 5, Brainlet 3, Buddy 4, DGGer 123, Drama 6, Employee 5, Frenemy 4, Meme Phrase 3, Yikestiny 2. Each is described as "Draft from rinlux's list". It's in the history as one import, which can be undone.
 - **DGGer** is planned in groups: "5 groups of 12, 5 wildcard spots" (Groups A–E, plus "Wildcards, 67 to choose from, top 5 advance"). Each draft's description names its group. The site has no grouped or multi-round voting yet: ask rinlux how it should work.
 - The Drive folder's top-level "new links" doc holds two links; not used yet.
@@ -63,13 +63,11 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 - They keep nominees in assorted docs and as clips. They want an import "for backup and restoration": the full backup and restore covers that.
 - **No 2025 production data.** Their 2025 recap is a compilation video. The 2025 page stays on the wiki's percentages.
 - **The public results may show a tally:** voters and votes per day. No location lookup. Idea: check the results against the DGG census for inconsistencies.
-- **Access:** JaydrVernanda (an admin since 2026-11-09) and "bing". Get bing's exact destiny.gg name from StrawWaffle.
+- **Access:** JaydrVernanda and `bing` (StrawWaffle confirmed the name), both in `ADMIN_USERNAMES` since 2026-11-09.
 - **Locking the site before voting:** yes, so they can test, touch up and preview. Done with "locked" plus the countdown.
 - **The code is never to be public.**
 
 **Still open:**
-- bing: added to `ADMIN_USERNAMES` as `bing` (an admin from their next sign-in).
-- Voting end: 26 December 2026 23:59:59 UTC ("for now", StrawWaffle).
 - How DGGer's groups and wildcards should vote.
 - **Simulated results:** done on `/results` for admins. The big screen's reveal doesn't have it yet.
 - ~~The new voting page~~: done, the site is one page now (see "One site").
@@ -131,8 +129,8 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 - **Sign-in is real destiny.gg OAuth** (switched 2026-11-09, verified by StrawWaffle signing in and reaching `/admin`). The app is registered on the DGG account StrawWaffle set up for this, with the redirect `https://dgg-awards.strawwaffle.dev/oauth`. The credentials are only in `.env` (gitignored). `DGG_CLIENT_SECRET` contains `$`, so it's wrapped in single quotes there, which stops Compose from expanding it.
 - Docker Compose runs `app` (Bun, with SQLite in the `awards_data` volume) and `tunnel` (cloudflared, profile `tunnel`). The `dgg-oauth` stand-in (profile `mock-auth`) is no longer run on the live stack. It's kept for local and test use, see `tests/`. Its `dgg-awards-login` Cloudflare route has been deleted.
 - Cloudflare dashboard route: `dgg-awards` → `http://app:3000`.
-- It currently shows the **results** page with 500 fake voters (negative uids, ip `seed`). Admins can switch to voting under Settings in `/admin`.
-- `ADMIN_USERNAMES=StrawWaffle,RiN_LuX` in `.env`. Anyone on that list becomes admin when they sign in.
+- It's set up for 2026 and **locked** (see "At a glance"). Admins switch modes under Settings in `/admin`.
+- `ADMIN_USERNAMES` in `.env` has StrawWaffle, RiN_LuX, JaydrVernanda and bing. Anyone on that list becomes admin when they sign in.
 - Crawlers and AI indexing are blocked through `robots.txt` (with 25 AI bots named), a meta robots tag and an `X-Robots-Tag` header on images. Cloudflare's "Block AI bots" toggle was suggested but not confirmed as turned on.
 - The live site is shared with rinlux for review (the lab included).
 
@@ -149,7 +147,7 @@ In Git Bash, `MSYS_NO_PATHCONV=1` is needed or `/data/...` gets rewritten into a
 
 ### Git history
 
-- The first commit after "Initial commit" is `Imported dgga25 source from recovered zip`: the original code, unchanged. Diff against it to see everything we changed. The source zip was deleted at StrawWaffle's request, so that commit is the only copy.
+- The first commit after "Initial commit" is `Imported dgga25 source from recovered zip`: the original code, unchanged. Diff against it to see everything we changed. The zip itself is archived on Google Drive (`DGG Awards backups/archive/dgga25-original-source.zip`, see "The original 2025 zip").
 - Everything since is on `main` (`git log --oneline`). Each feature step is one or a few commits with detailed messages.
 
 ### First infrastructure changes to the original
