@@ -36,7 +36,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
   - edit history with undo
   - Settings → Backups: download a full backup, restore one, and the status of the hourly backups to Google Drive (see `docs/migration.md`)
   - hiding categories that have votes; export, and import with an automatic database backup
-  - links at the bottom left to preview voting and results, open the site, and open the lab
+  - links at the bottom left to preview the site (`/preview`), voting and results, and to open the site and the lab
   - at plain `/admin` (the page checks for an admin; the API refuses everyone else), and signing in returns you to the page you came from
   - in the clip section: a preview of the picked window, uploading a video and marking the part to keep, and the library for clips and pictures (rinlux's Drive folder: 46 videos and 11 pictures, 1.5 GB in `/data/library` on the live volume)
 - **Voting model:** single pick or ranked per category, ranked counted by instant runoff, and the 2025 double-count bug fixed.
@@ -56,20 +56,20 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 - Settings: award year 2026, mode **locked** (the public sees only the front page's countdown and `/2025`; admins preview), voting from **15 December 2026 00:00 UTC** to **26 December 2026 23:59:59 UTC** (both "for now", StrawWaffle).
 - **The 22 awards** are 2025's, with their descriptions, in the same order. **159 draft nominees** came from rinlux's per-award Google Docs in the Drive folder: Ally 4, Antagonist 5, Brainlet 3, Buddy 4, DGGer 123, Drama 6, Employee 5, Frenemy 4, Meme Phrase 3, Yikestiny 2. Each is described as "Draft from rinlux's list". It's in the history as one import, which can be undone.
 - **DGGer** is planned in groups: "5 groups of 12, 5 wildcard spots" (Groups A–E, plus "Wildcards, 67 to choose from, top 5 advance"). Each draft's description names its group. The site has no grouped or multi-round voting yet: ask rinlux how it should work.
-- The Drive folder's top-level "new links" doc holds two links; not used yet.
+- The Drive folder's top-level "new links" doc holds two links, not used yet: an r/LivestreamFail post, "Destiny summarizes pro-AI guy's argument" (`reddit.com/r/LivestreamFail/comments/1trj92f/…`), and "Aura edits", a gofile.io folder (`gofile.io/d/kAolxa6X`). Most likely candidates for a meme or clip award, and edits like the "fraze aura edit" already in the library. Ask rinlux what they're for.
 
 **rinlux's answers (2026-11-09):**
 - The lab is the direction for 2026. Not much is missing compared with 2025.
 - They keep nominees in assorted docs and as clips. They want an import "for backup and restoration": the full backup and restore covers that.
 - **No 2025 production data.** Their 2025 recap is a compilation video. The 2025 page stays on the wiki's percentages.
-- **The public results may show a tally:** voters and votes per day. No location lookup. Idea: check the results against the DGG census for inconsistencies.
+- **The public results may show a tally:** voters and votes per day. No location lookup. Idea: check the results against the DGG census for inconsistencies (backlogged by StrawWaffle, 2026-11-09).
 - **Access:** JaydrVernanda and `bing` (StrawWaffle confirmed the name), both in `ADMIN_USERNAMES` since 2026-11-09.
 - **Locking the site before voting:** yes, so they can test, touch up and preview. Done with "locked" plus the countdown.
 - **The code is never to be public.**
 
 **Still open:**
 - How DGGer's groups and wildcards should vote.
-- **Simulated results:** done on `/results` for admins. The big screen's reveal doesn't have it yet.
+- ~~**Simulated results**~~: on the results preview and the big screen (see "Previews by stage").
 - ~~The new voting page~~: done, the site is one page now (see "One site").
 - ~~The public tally~~: done, on the results page.
 
@@ -97,7 +97,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 - Fast-forward `main`, run `docker compose --profile tunnel up -d --build app`, then check `/`, `/api/config`, `/lab`, `/admin` (200), `/api/admin/checks` and `/api/lab/emotes` (401), and `/signin` (to destiny.gg).
 - Push `main`.
 
-**Worktrees:** everything under `.claude/worktrees/` is merged (`admin-pass`, `editor-scroll`, `lab`, `lab-polish`, `lab-polish-2`, `lab-polish-3`, `lab-polish-4`, `lab-summary`, `admin-lab-link`, `duel-reveal`, `plain-admin`, `clip-preview`, `library-pictures`, `backups`, `frontpage`, `no-ip`, `privacy-flags`, `hover-pass`, `one-site`, `user-menu`, `nominee-images`, `sketchy`) and can be removed.
+**Worktrees:** the merged ones were removed on 2026-11-09. Only `preview-stages` is left (see "Previews by stage").
 
 **Test containers**, on network `dgga-test`, all kept running:
 
@@ -524,6 +524,28 @@ StrawWaffle, after the one-site deploy:
   - Tester's menu (no destiny.gg profile: a letter, plus Admin and the admin page).
   - Destiny's menu (picture, member since, team, profile link).
   - Hover open and close, signing out, and the Sign in button returning to the page. 49 API tests pass.
+
+### Previews by stage, simulated votes on the big screen, and the music start (branch `worktree-preview-stages`, 2026-11-09)
+
+StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, and the previews should all live under `/preview/<stage>/<page>`, with a stage per part of the year, and the front page previewable too.
+- **Addresses:** `/preview/<stage>` is the front page, then `/vote`, `/results`, `/2025` and `/lab` under it. The stages are `before` (Before voting), `voting` (Voting open), `closed` (Voting closed) and `results` (Results out).
+  - `/preview` alone, and `/lab`, go to the stage the site is in now.
+  - The old `/vote?preview=voting`, `/vote?preview=results` and `/results?preview=1` lead to their new addresses. The address bar is updated to the full one.
+- **In a preview** the header has a second row: a Preview chip, the four stages (switching keeps the page) and "Leave preview" (back to the same page as visitors have it; from the lab, to the front page).
+  - The pages get the settings as visitors would have them at that stage (`stageConfig()` in `Site.tsx`). The real dates are kept where they fit, otherwise made-up ones that do: before voting, a start a week out; voting open, a close 11 days out; closed, an hour ago; results out, reviewing mode.
+  - The tabs are the visitors' at that stage, plus Lab.
+  - **Voting open → Vote** is the voting preview (nothing saved). **Results out → Results** is the results preview with the simulated-votes switch. At other stages these pages show the notices visitors would see.
+  - Non-admins on a preview address get "Previews are for admins" and a sign-in.
+- **Outside a preview, admins see the site as visitors do:** no Lab tab and no preview rows.
+- **The admin sidebar** links to Preview the site (`/preview`), Preview voting (`/preview/voting/vote`), Preview results (`/preview/results/results`), Open the site, and Open the lab (`/lab`).
+- **Simulated votes on the big screen:** the settings (gear) have "Votes: Real / Simulated". It starts on simulated when there are no real votes, using the same made-up numbers as the results preview (`loadSimulated()`), and a "Simulated votes" chip shows in the controls. The big screen's nominees now come from `/api/admin/nominees`, so pictures and clips show while the site is locked.
+- **The music started slowly.** The track opens with 2 s of silence and a 4 s fade-in (measured: silent to 2 s, −62 dB rising to −17 dB at 6 s). Loading wasn't the cause: the file is 2.5 MB with its index up front. Now:
+  - The first start jumps to 6.02 s (a bar line on the beat map's grid), where the music is in fully, with a 0.4 s fade-in of our own.
+  - Looping is by hand: at the end it goes back to 2 s, skipping the silence, and keeps the song's own fade-out and fade-in as the way round. The loop doesn't count as a pause, so the music button stays as it is (not tested in a browser: a full loop takes two minutes).
+- **Housekeeping:** the 23 merged worktrees were removed. The screenshot script now also captures the four stage previews. Its pictures aren't in git: two runs of this build match pixel for pixel, except the admin Votes tab (vote times).
+- Tested:
+  - typecheck and 92 unit tests; 49 API tests, with the preview addresses added
+  - in the browser: every stage and page, a preview vote not saved, the old addresses rewritten, `/lab#sound` kept, non-admin and signed-out refusals, the big screen switched to simulated votes with the reveal running, and the music's first play starting at 6.02 s
 
 ### Next: the lab page (StrawWaffle's answers, 2026-11-09)
 

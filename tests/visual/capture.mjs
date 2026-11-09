@@ -141,6 +141,11 @@ await shot("results-mobile", { path: "/results", viewport: mobile });
 
 await setMode(admin, "locked");
 await shot("locked", { path: "/" });
+// Admins' previews of each stage, while the site is locked.
+await shot("preview-before", { path: "/preview/before", token: admin });
+await shot("preview-voting", { path: "/preview/voting/vote", token: admin });
+await shot("preview-closed", { path: "/preview/closed", token: admin });
+await shot("preview-results", { path: "/preview/results/results", token: admin });
 await setMode(admin, "voting");
 
 for (const tab of ["Nominees", "Settings", "Admins", "Votes"]) {

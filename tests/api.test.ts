@@ -94,6 +94,11 @@ describe("static and public routes", () => {
       ["/results", "DGG Awards"],
       ["/2025", "DGG Awards"],
       ["/lab", "DGG Awards"],
+      ["/preview", "DGG Awards"],
+      ["/preview/before", "DGG Awards"],
+      ["/preview/voting/vote", "DGG Awards"],
+      ["/preview/results/results", "DGG Awards"],
+      ["/preview/closed/lab", "DGG Awards"],
     ] as const) {
       const res = await req(path);
       expect(res.status).toBe(200);

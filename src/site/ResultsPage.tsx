@@ -7,33 +7,41 @@ type Tally = { voters: number; ballots: number; days: { day: string; voters: num
 
 /**
  * This year's results, to read through after the show: public once the site
- * is in reviewing mode. Admins can preview them any time with `?preview=1`
- * (or `/vote?preview=results`), with real votes or simulated ones (made up in
- * the browser, never saved); without it they see what visitors see.
- * With them, the tally: how many voted, and per day (counts only).
+ * is in reviewing mode. Admins can preview them any time in the "Results out"
+ * preview (`/preview/results/results`), with real votes or simulated ones
+ * (made up in the browser, never saved); without it they see what visitors
+ * see. With them, the tally: how many voted, and per day (counts only).
+ * In a preview, `config` is the previewed stage's.
  */
-export function ResultsPage({ me, config, onHome }: { me: Me | undefined; config: SiteConfig | null; onHome: (e: React.MouseEvent) => void }) {
-  const params = new URLSearchParams(location.search);
-  const asked = params.get("preview") === "1" || params.get("preview") === "results";
-  const admin = !!me?.admin && asked;
+export function ResultsPage({
+  me,
+  config,
+  preview,
+  onHome,
+}: {
+  me: Me | undefined;
+  config: SiteConfig | null;
+  preview: boolean;
+  onHome: (e: React.MouseEvent) => void;
+}) {
   const published = config?.viewingMode === "reviewing";
   const [tally, setTally] = useState<Tally | null>(null);
   const [simulated, setSimulated] = useState<boolean | null>(null);
 
   useEffect(() => {
-    if (!config || me === undefined || (!published && !admin)) return;
-    fetch(`/api/vote/tally${published ? "" : "?preview=1"}`)
+    if (!config || me === undefined || !published) return;
+    fetch(`/api/vote/tally${preview ? "?preview=1" : ""}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((t: Tally | null) => {
         setTally(t);
-        // An admin preview without any votes starts on simulated results.
-        setSimulated(!published && (t?.ballots ?? 0) === 0);
+        // A preview without any votes starts on simulated results.
+        setSimulated(preview && (t?.ballots ?? 0) === 0);
       })
-      .catch(() => setSimulated(!published));
-  }, [config, me, published, admin]);
+      .catch(() => setSimulated(preview));
+  }, [config, me, published, preview]);
 
   if (!config || me === undefined) return <div className="cozy-panel p-8">Loading…</div>;
-  if (!published && !admin) {
+  if (!published) {
     return (
       <div className="cozy-panel mx-auto max-w-2xl space-y-4 p-8 text-center">
         <Emote name="PepoG" size={1.6} title="" />
@@ -48,7 +56,7 @@ export function ResultsPage({ me, config, onHome }: { me: Me | undefined; config
 
   return (
     <div className="space-y-4">
-      {!published && (
+      {preview && (
         <div className="cozy-panel flex flex-wrap items-center gap-3 px-5 py-3" style={{ background: "var(--highlight)" }}>
           <span className="cozy-chip coral">Preview</span>
           <span className="font-semibold">The results page as it'll look once results are out.</span>

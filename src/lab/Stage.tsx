@@ -6,8 +6,9 @@ import { Sketch, useDrawnLook } from "@/lab/sketch";
 import { type FeedStatus, liveFeed, simulatedFeed } from "@/lab/chatFeed";
 import { type Levels, type Source, useFrame } from "@/lab/music";
 import { useBursts } from "@/lab/Bursts";
-import { Board, loadResults } from "@/lab/Results";
+import { type Award, Board, loadResults } from "@/lab/Results";
 import { DvdMenu, type ShowAward, TitleCard, WinnerCard, loadShow } from "@/lab/Scenes";
+import { loadSimulated } from "@/lab/Summary";
 import type { ChatSummary } from "@/server/lab/chat-aggregator";
 
 type Npc = {
@@ -95,6 +96,16 @@ function boxIn(el: HTMLElement, stage: Element | null) {
   return { left, right: left + el.offsetWidth, top, bottom: top + el.offsetHeight };
 }
 
+/** The results page's simulated votes, in the shape the reveal takes (last place first). */
+async function simulatedResults(): Promise<Award[]> {
+  return (await loadSimulated()).map((a) => ({
+    id: a.id,
+    title: a.title,
+    total: a.total ?? 0,
+    results: [...a.standings].reverse().map((r) => ({ id: r.id, title: r.title, count: r.count ?? 0, percentage: r.percentage, isWinner: r.isWinner })),
+  }));
+}
+
 const nickClass = (flair: string | null) => `nick${flair ? ` nick-${flair}` : ""}`;
 
 /**
@@ -141,12 +152,29 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
     return () => observer.disconnect();
   }, []);
   const [show, setShow] = useState<ShowAward[] | null>(null);
+  /** Real votes, or simulated ones (as on the results preview); simulated while there are none. */
+  const [votes, setVotes] = useState<"real" | "simulated" | null>(null);
   useEffect(() => {
     loadResults()
-      .then(loadShow)
-      .then(setShow)
-      .catch(() => setShow([]));
+      .then((real) => setVotes(real.some((a) => a.total > 0) ? "real" : "simulated"))
+      .catch(() => setVotes("simulated"));
   }, []);
+  useEffect(() => {
+    if (!votes) return;
+    let live = true;
+    (votes === "real" ? loadResults() : simulatedResults())
+      .then(loadShow)
+      .then((s) => {
+        if (!live) return;
+        setShow(s);
+        setAwardIndex((i) => Math.max(0, Math.min(i, s.length - 1)));
+        setRun((r) => r + 1);
+      })
+      .catch(() => live && setShow([]));
+    return () => {
+      live = false;
+    };
+  }, [votes]);
   const [awardIndex, setAwardIndex] = useState(0);
   const [scene, setScene] = useState<Scene>("title");
   /** Results scene: how many rows to reveal, and a counter to start the board over. */
@@ -659,6 +687,13 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
                   </select>
                 </label>
                 <label className="flex items-center gap-2">
+                  Votes
+                  <select value={votes ?? "real"} onChange={(e) => setVotes(e.currentTarget.value as "real" | "simulated")} className="cozy-input py-1!">
+                    <option value="real">Real votes</option>
+                    <option value="simulated">Simulated (made up, never saved)</option>
+                  </select>
+                </label>
+                <label className="flex items-center gap-2">
                   Characters at most
                   <input type="range" min={10} max={400} step={10} value={max} onChange={(e) => setMax(Number(e.currentTarget.value))} className="cozy-range" />
                   <span className="w-9 tabular-nums">{max}</span>
@@ -705,6 +740,7 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
                 ))}
               </select>
               <span className="cozy-chip">{stats.perSecond.toLocaleString()} msg/s</span>
+              {votes === "simulated" && <span className="cozy-chip">Simulated votes</span>}
               <span className="cozy-chip green">{feed === "live" ? "Live chat" : "Simulator"}</span>
             </div>
             <div className="flex flex-wrap items-center gap-2">

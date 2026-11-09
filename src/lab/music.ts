@@ -21,6 +21,11 @@ export type Levels = {
 };
 export type Source = "live" | "map";
 
+/** Seconds into the track where the music is in fully: a bar line (beats every 0.5 s from 0.02). */
+const MUSIC_IN = 6.024;
+/** Where a loop goes back to: the end of the opening silence, as the fade-in starts. */
+const LOOP_TO = 2.0;
+
 const SILENT: Levels = { bass: 0, mid: 0, high: 0, beat: false, downbeat: false, time: 0 };
 const PREFS_KEY = "lab.music";
 /**
@@ -73,10 +78,17 @@ class Music {
     // Chromium builds without proprietary codecs.
     const aac = new Audio().canPlayType('audio/mp4; codecs="mp4a.40.2"') !== "";
     this.audio = new Audio(aac ? "/lab/black-lover.m4a" : "/lab/black-lover.mp3");
-    this.audio.loop = true;
     this.audio.preload = "auto";
+    // Looping by hand: from the end straight to where the fade-in starts,
+    // skipping the 2 s of silence at the top. The song's own fade out and in
+    // stay, as the way round.
+    this.audio.addEventListener("ended", () => {
+      this.audio.currentTime = LOOP_TO;
+      this.audio.play().catch(() => {});
+    });
     this.audio.addEventListener("play", () => this.set(() => (this.playing = true)));
-    this.audio.addEventListener("pause", () => this.set(() => (this.playing = false)));
+    // Ending is the loop going round (see below), not a stop.
+    this.audio.addEventListener("pause", () => !this.audio.ended && this.set(() => (this.playing = false)));
   }
 
   subscribe = (listener: () => void) => {
@@ -125,6 +137,16 @@ class Music {
 
   async play() {
     this.graph();
+    // The track opens with 2 s of silence and a 4 s fade-in. Starting from the
+    // top, the music took about 6 s to be heard; start at the bar where it's
+    // in fully instead (6.02 s, on the beat map's grid), faded in briefly.
+    if (this.audio.currentTime < MUSIC_IN) {
+      this.audio.currentTime = MUSIC_IN;
+      const t = this.ctx!.currentTime;
+      this.gain?.gain.cancelScheduledValues(t);
+      this.gain?.gain.setValueAtTime(0, t);
+      this.applyVolume(0.4);
+    }
     await this.ctx!.resume();
     await this.audio.play().catch(() => {});
     this.set(() => (this.prefs.off = false));

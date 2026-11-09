@@ -8,9 +8,12 @@ export type Nominee = { id: string; title: string; image: string | null; clip: C
 /** One award on the big screen: its results joined to its nominees' pictures and clips. */
 export type ShowAward = Award & { description: string; nominees: Nominee[] };
 
-/** The results (admin preview) joined to the nominees, in the awards' order. */
+/**
+ * The results joined to the nominees, in the awards' order. The nominees come
+ * from the admin list, so pictures and clips show while the site is locked.
+ */
 export async function loadShow(results: Award[]): Promise<ShowAward[]> {
-  const data = await fetch("/api/nominees").then((r) => r.json());
+  const data = await fetch("/api/admin/nominees").then((r) => (r.ok ? r.json() : []));
   const categories: any[] = Array.isArray(data) ? data : [];
   return results.map((award) => {
     const category = categories.find((c) => c.id === award.id);
