@@ -2,6 +2,7 @@
 // the server validates with it and the client's request types come from it.
 import { z } from "zod";
 import { linkTypes } from "@/lib/links";
+import { votingStyles } from "@/lib/voting";
 import type { ImportableData, ViewingMode } from "@/lib/types";
 
 const required = z.string().min(1);
@@ -10,16 +11,31 @@ const renderType = z.enum(["default", "compact"]);
 export const viewingModes = ["idle", "locked", "reviewing", "voting"] as const;
 viewingModes satisfies readonly ViewingMode[];
 
-export const voteSubmit = z.object({
-  category_id: required,
-  nominee_id: required,
+/**
+ * A ballot. Single-pick categories take `nominee_id` (the 2025 shape);
+ * ranked ones take `ranking`, best first. Which one a category needs is
+ * checked against its voting style in the route.
+ */
+export const voteSubmit = z.union([
+  z.object({ category_id: required, nominee_id: required }),
+  z.object({ category_id: required, ranking: z.array(required).min(1).max(100) }),
+]);
+
+export const settingsPatch = z.object({
+  awardYear: z.number().int().min(2000).max(2100).optional(),
+  defaultVotingStyle: z.enum(votingStyles).optional(),
 });
 
 // Admin forms are plain HTML <form> posts, so every field arrives as a string.
+/** An optional form field: blank means not given. */
+const blankable = <T extends z.ZodType>(schema: T) =>
+  z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? undefined : v), schema.optional());
+
 export const categoryForm = z.object({
   category_id: required,
   category_title: required,
   category_description: required,
+  voting_style: blankable(z.enum(votingStyles)),
 });
 
 // Nominee details added after 2025. The schemas check shape only; whether the
@@ -32,10 +48,6 @@ const nomineeDetails = {
   clipStart: seconds.nullable().optional(),
   clipEnd: seconds.nullable().optional(),
 };
-
-/** An optional form field: blank means not given. */
-const blankable = <T extends z.ZodType>(schema: T) =>
-  z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? undefined : v), schema.optional());
 
 export const nomineeForm = z.object({
   nominee_id: required,
@@ -66,6 +78,8 @@ export const categoryPatch = z.object({
   id: required,
   title: z.string().optional(),
   description: z.string().optional(),
+  /** null: follow the site default. */
+  votingStyle: z.enum(votingStyles).nullable().optional(),
 });
 
 export const nomineePatch = z.object({
@@ -97,6 +111,7 @@ export const importedData = z.array(
     id: required,
     title: z.string(),
     description: z.string(),
+    votingStyle: z.enum(votingStyles).nullable().optional(),
     options: z.array(
       z.object({
         id: required,

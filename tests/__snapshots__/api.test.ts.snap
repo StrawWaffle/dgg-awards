@@ -120,6 +120,8 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
       },
     ],
     "title": "Ally of the Year",
+    "usesDefaultStyle": true,
+    "votingStyle": "single",
   },
   {
     "description": "Most entertaining rival of the stream.",
@@ -211,6 +213,8 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
       },
     ],
     "title": "Antagonist of the Year",
+    "usesDefaultStyle": true,
+    "votingStyle": "single",
   },
   {
     "description": "The NoBullshit Award. Which orbiter routinely and continuously lowered everyone's IQ?",
@@ -330,6 +334,8 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
       },
     ],
     "title": "Brainlet of the Year",
+    "usesDefaultStyle": true,
+    "votingStyle": "single",
   },
   {
     "description": "Friendliest co-stream partner.",
@@ -421,6 +427,8 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
       },
     ],
     "title": "Buddy of the Year",
+    "usesDefaultStyle": true,
+    "votingStyle": "single",
   },
   {
     "description": "",
@@ -498,6 +506,8 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
       },
     ],
     "title": "Community Member of the Year",
+    "usesDefaultStyle": true,
+    "votingStyle": "single",
   },
   {
     "description": "Who deserves the most blue chats?",
@@ -659,6 +669,8 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
       },
     ],
     "title": "DGG Chatter of the Year",
+    "usesDefaultStyle": true,
+    "votingStyle": "single",
   },
   {
     "description": "Behind-the-scenes or on-stream member who kept things running.",
@@ -778,6 +790,8 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
       },
     ],
     "title": "Employee of the Year",
+    "usesDefaultStyle": true,
+    "votingStyle": "single",
   },
   {
     "description": "Who did we hate that we loved?",
@@ -897,6 +911,8 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
       },
     ],
     "title": "Frenemy of the Year",
+    "usesDefaultStyle": true,
+    "votingStyle": "single",
   },
   {
     "description": "Mental Health Awareness Award",
@@ -1002,6 +1018,8 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
       },
     ],
     "title": "Neurodivergent of the Year",
+    "usesDefaultStyle": true,
+    "votingStyle": "single",
   },
   {
     "description": "Best long-form conversation or interview.",
@@ -1107,6 +1125,8 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
       },
     ],
     "title": "Conversation of the Year",
+    "usesDefaultStyle": true,
+    "votingStyle": "single",
   },
   {
     "description": "Cutest moment from this year.",
@@ -1170,6 +1190,8 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
       },
     ],
     "title": "Cutestiny of the Year",
+    "usesDefaultStyle": true,
+    "votingStyle": "single",
   },
   {
     "description": "The dankest meme moment from this year.",
@@ -1261,6 +1283,8 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
       },
     ],
     "title": "Dankmemes of the Year",
+    "usesDefaultStyle": true,
+    "votingStyle": "single",
   },
   {
     "description": "Best debate or panel of the year.",
@@ -1422,6 +1446,8 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
       },
     ],
     "title": "Debate of the Year",
+    "usesDefaultStyle": true,
+    "votingStyle": "single",
   },
   {
     "description": "The most temmiedank moment from this year.",
@@ -1485,6 +1511,8 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
       },
     ],
     "title": "Derpstiny of the Year",
+    "usesDefaultStyle": true,
+    "votingStyle": "single",
   },
   {
     "description": "Biggest arc, or saga from the community.",
@@ -1590,6 +1618,8 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
       },
     ],
     "title": "Drama of the Year",
+    "usesDefaultStyle": true,
+    "votingStyle": "single",
   },
   {
     "description": "The most EPIC moment of the stream.",
@@ -1667,6 +1697,8 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
       },
     ],
     "title": "Godstiny of the Year",
+    "usesDefaultStyle": true,
+    "votingStyle": "single",
   },
   {
     "description": "The funniest LOL moment of the stream.",
@@ -1772,6 +1804,8 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
       },
     ],
     "title": "Omegalul of the Year",
+    "usesDefaultStyle": true,
+    "votingStyle": "single",
   },
   {
     "description": "The most anyone ever got mad.",
@@ -1849,6 +1883,8 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
       },
     ],
     "title": "REE of the Year",
+    "usesDefaultStyle": true,
+    "votingStyle": "single",
   },
   {
     "description": "The absolute mess you could not look away from.",
@@ -1996,6 +2032,8 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
       },
     ],
     "title": "Shitshow of the Year",
+    "usesDefaultStyle": true,
+    "votingStyle": "single",
   },
   {
     "description": "Chat emote that defined 2025.",
@@ -2395,6 +2433,8 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
       },
     ],
     "title": "New Emote of the Year",
+    "usesDefaultStyle": true,
+    "votingStyle": "single",
   },
   {
     "description": "Yikes... why post this.",
@@ -2472,6 +2512,8 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
       },
     ],
     "title": "Yikestiny of the Year",
+    "usesDefaultStyle": true,
+    "votingStyle": "single",
   },
   {
     "description": "One-liner, or chat meme of the year.",
@@ -2591,6 +2633,8 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
       },
     ],
     "title": "Meme Phrase of the Year",
+    "usesDefaultStyle": true,
+    "votingStyle": "single",
   },
 ]
 `;
@@ -2644,7 +2688,7 @@ exports[`admin results in reviewing mode add up and are sorted 1`] = `
       ],
       [
         "asmongold",
-        18,
+        15,
       ],
       [
         "jane_doe",
@@ -2652,7 +2696,7 @@ exports[`admin results in reviewing mode add up and are sorted 1`] = `
       ],
       [
         "hasan_piker",
-        114,
+        110,
       ],
       [
         "Nick_Fuentes",
@@ -2663,22 +2707,26 @@ exports[`admin results in reviewing mode add up and are sorted 1`] = `
         156,
       ],
     ],
-    "t": 436,
+    "t": 429,
   },
   {
     "c": "brainlet",
     "o": [
       [
         "asmongold",
-        18,
+        3,
+      ],
+      [
+        "hasan_piker",
+        4,
+      ],
+      [
+        "legal_mindset",
+        4,
       ],
       [
         "ryan_mullaley",
         23,
-      ],
-      [
-        "legal_mindset",
-        76,
       ],
       [
         "rob_noerr",
@@ -2693,15 +2741,11 @@ exports[`admin results in reviewing mode add up and are sorted 1`] = `
         93,
       ],
       [
-        "hasan_piker",
-        114,
-      ],
-      [
         "misfit_patriot",
         121,
       ],
     ],
-    "t": 623,
+    "t": 426,
   },
   {
     "c": "buddy",
@@ -2906,7 +2950,7 @@ exports[`admin results in reviewing mode add up and are sorted 1`] = `
       ],
       [
         "legal_mindset",
-        76,
+        72,
       ],
       [
         "xena",
@@ -2917,7 +2961,7 @@ exports[`admin results in reviewing mode add up and are sorted 1`] = `
         204,
       ],
     ],
-    "t": 437,
+    "t": 433,
   },
   {
     "c": "conversation",
@@ -3116,7 +3160,7 @@ exports[`admin results in reviewing mode add up and are sorted 1`] = `
     "o": [
       [
         "destiny_uses_his_premonition_powers",
-        8,
+        6,
       ],
       [
         "destiny_makes_xqc_rage_quit",
@@ -3135,7 +3179,7 @@ exports[`admin results in reviewing mode add up and are sorted 1`] = `
         241,
       ],
     ],
-    "t": 419,
+    "t": 417,
   },
   {
     "c": "omegalul",
@@ -3146,7 +3190,7 @@ exports[`admin results in reviewing mode add up and are sorted 1`] = `
       ],
       [
         "destiny_uses_his_premonition_powers",
-        8,
+        2,
       ],
       [
         "ae_bullies_miles",
@@ -3169,7 +3213,7 @@ exports[`admin results in reviewing mode add up and are sorted 1`] = `
         125,
       ],
     ],
-    "t": 410,
+    "t": 404,
   },
   {
     "c": "ree",

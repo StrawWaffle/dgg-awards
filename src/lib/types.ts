@@ -7,6 +7,7 @@ import type {
   usersTable,
   votesTable,
 } from "@/lib/data/schema";
+import type { RunoffResult, VotingStyle } from "@/lib/voting";
 import type { nomineePatch } from "@/server/schemas";
 
 // Request and response types for the HTTP API are not written here: requests
@@ -24,7 +25,8 @@ export type Category = InferSelectModel<typeof categoriesTable>;
 /** Nominee fields added after 2025; optional in data files and imports. */
 export type NomineeDetails = "date" | "linkType" | "clipStart" | "clipEnd";
 
-export type ImportableData = (Category & {
+export type ImportableData = (Omit<Category, "votingStyle"> &
+  Partial<Pick<Category, "votingStyle">> & {
   options: (Omit<Option, "categoryId" | NomineeDetails> &
     Partial<Pick<Option, NomineeDetails>>)[];
 })[];
@@ -130,7 +132,12 @@ export type ResultsData = {
   categoryId: string;
   categoryTitle: string;
   categoryDescription: string;
+  votingStyle: VotingStyle;
+  /** Voters in this category. */
   totalVotes: number;
+  /** Ranked categories only: the instant-runoff rounds and winner. */
+  runoff?: RunoffResult;
+  /** Last place first. `count` is first choices. */
   options: {
     id: string;
     title: string;

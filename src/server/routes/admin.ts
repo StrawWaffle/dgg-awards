@@ -5,6 +5,9 @@ import {
   getAllUsers,
   getAllVotes,
   getAllVotesFiltered,
+  categoryHasVotes,
+  pinVotedCategoryStyles,
+  setSetting,
   getConfig,
   getNominees,
   insertCategory,
@@ -15,6 +18,7 @@ import {
   updateUserMakeAdmin,
 } from "@/lib/data/driver";
 import { checkAwards } from "@/lib/nominee-checks";
+import { effectiveStyle, withEffectiveStyles } from "@/lib/voting";
 import { DGG_NAME, fetchDggProfile } from "@/server/dgg-profile";
 import { type SessionEnv, rejectInvalid, requireAdmin, zValidator } from "@/server/middleware";
 import {
@@ -26,6 +30,7 @@ import {
   nomineeForm,
   nomineePatch,
   nomineeQuery,
+  settingsPatch,
   userIdBody,
   votesQuery,
 } from "@/server/schemas";
@@ -45,6 +50,7 @@ export const adminRoutes = new Hono<SessionEnv>()
         id: category.id,
         description: category.description,
         title: category.title,
+        votingStyle: category.votingStyle ?? null,
       });
       for (const option of category.options) {
         await insertNominee({ ...option, categoryId: category.id });
@@ -59,12 +65,33 @@ export const adminRoutes = new Hono<SessionEnv>()
       id: form.category_id,
       title: form.category_title,
       description: form.category_description,
+      votingStyle: form.voting_style ?? null,
     });
     return backToAdmin();
   })
   .patch("/category", zValidator("json", categoryPatch, rejectInvalid), async (c) => {
-    await updateCategory(c.req.valid("json"));
+    const patch = c.req.valid("json");
+    // Once a category has votes its style is pinned: changing it would mix
+    // single picks and ranked ballots.
+    if (patch.votingStyle !== undefined && (await categoryHasVotes(patch.id))) {
+      return c.text("This category already has votes, so its voting style can't change.", 409);
+    }
+    await updateCategory(patch);
     return c.body(null, 200);
+  })
+
+  /**
+   * Site settings. The default voting style applies to categories without
+   * their own; categories that already have votes keep the style they had.
+   */
+  .patch("/settings", zValidator("json", settingsPatch, rejectInvalid), async (c) => {
+    const { awardYear, defaultVotingStyle } = c.req.valid("json");
+    if (awardYear !== undefined) await setSetting("awardYear", String(awardYear));
+    if (defaultVotingStyle !== undefined) {
+      await pinVotedCategoryStyles(effectiveStyle(null, (await getConfig()).defaultVotingStyle));
+      await setSetting("defaultVotingStyle", defaultVotingStyle);
+    }
+    return c.json(await getConfig(), 200);
   })
   .delete("/category", zValidator("query", idQuery, rejectInvalid), async (c) =>
     c.json(await deleteCategory(c.req.valid("query").id), 200),
@@ -98,7 +125,10 @@ export const adminRoutes = new Hono<SessionEnv>()
     return c.body(null, 200);
   })
 
-  .get("/nominees", async (c) => c.json(await getNominees(), 200))
+  .get("/nominees", async (c) => {
+    const config = await getConfig();
+    return c.json(withEffectiveStyles(await getNominees(), config.defaultVotingStyle), 200);
+  })
   // Everything wrong with the nominees, for the admin editor. Problems come
   // from src/lib/nominee-checks.ts; the year from the awardYear setting.
   .get("/checks", async (c) => {

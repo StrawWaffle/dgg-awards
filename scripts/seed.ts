@@ -2,10 +2,12 @@
 //
 //   bun scripts/seed.ts --mode voting
 //   bun scripts/seed.ts --mode reviewing --fake-votes 500
+//   bun scripts/seed.ts --mode reviewing --fake-votes 500 --ranked emote,moment
 //
 // Re-running replaces all categories, nominees and votes. --fake-votes adds
 // that many invented voters (negative uids, ip "seed") so the results reveal
-// has something to show. They are not last year's real numbers.
+// has something to show. They are not last year's real numbers. --ranked makes
+// those categories ranked, and their fake voters rank 1–4 nominees.
 import { Database } from "bun:sqlite";
 import { parseArgs } from "util";
 import { Data } from "@/data";
@@ -17,6 +19,7 @@ const { values } = parseArgs({
   options: {
     mode: { type: "string", default: "voting" },
     "fake-votes": { type: "string", default: "0" },
+    ranked: { type: "string", default: "" },
   },
   strict: true,
 });
@@ -28,6 +31,13 @@ if (!modes.includes(mode)) {
   process.exit(1);
 }
 const fakeVoters = Number(values["fake-votes"]);
+const ranked = new Set(values.ranked.split(",").filter(Boolean));
+for (const id of ranked) {
+  if (!Data.some((c) => c.id === id)) {
+    console.error(`--ranked: no category "${id}"`);
+    process.exit(1);
+  }
+}
 /** src/data.ts holds the 2025 nominees. */
 const AWARD_YEAR = "2025";
 
@@ -49,7 +59,7 @@ db.transaction(() => {
   db.run("DELETE FROM users WHERE uid < 0");
 
   const insCat = db.prepare(
-    "INSERT INTO categories (id, title, description) VALUES (?, ?, ?)",
+    "INSERT INTO categories (id, title, description, votingStyle) VALUES (?, ?, ?, ?)",
   );
   const insOpt = db.prepare(
     `INSERT INTO options (id, categoryId, title, description, url, imageId, videoId, renderType,
@@ -57,7 +67,7 @@ db.transaction(() => {
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   for (const c of Data) {
-    insCat.run(c.id, c.title, c.description);
+    insCat.run(c.id, c.title, c.description, ranked.has(c.id) ? "ranked" : (c.votingStyle ?? null));
     for (const o of c.options) {
       insOpt.run(
         o.id,
@@ -81,8 +91,15 @@ db.transaction(() => {
       "INSERT INTO users (uid, name, createdDate, admin) VALUES (?, ?, ?, 0)",
     );
     const insVote = db.prepare(
-      "INSERT INTO votes (uid, at, categoryId, optionId, sessionSnapshot) VALUES (?, ?, ?, ?, ?)",
+      "INSERT INTO votes (uid, at, categoryId, optionId, rank, sessionSnapshot) VALUES (?, ?, ?, ?, ?, ?)",
     );
+    /** Weighted pick of an index among those not taken yet. */
+    const pickFrom = (w: number[], taken: Set<number>) => {
+      const open = w.map((x, i) => (taken.has(i) ? 0 : x));
+      let r = rand() * open.reduce((a, b) => a + b, 0);
+      const i = open.findIndex((x) => (r -= x) < 0);
+      return i === -1 ? open.findLastIndex((x) => x > 0) : i;
+    };
     const now = Math.floor(Date.now() / 1000);
     // Per category, give each nominee a random weight with a long tail so
     // there is a clear winner and some close races.
@@ -105,8 +122,17 @@ db.transaction(() => {
         const w = weights[ci]!;
         let r = rand() * w.reduce((a, b) => a + b, 0);
         const pick = w.findIndex((x) => (r -= x) < 0);
-        const option = c.options[pick === -1 ? w.length - 1 : pick]!;
-        insVote.run(uid, now, c.id, option.id, snapshot);
+        const first = pick === -1 ? w.length - 1 : pick;
+        insVote.run(uid, now, c.id, c.options[first]!.id, 1, snapshot);
+        if (!ranked.has(c.id)) return;
+        // Ranked: add up to three more choices, weighted the same way.
+        const taken = new Set([first]);
+        const extra = Math.min(Math.floor(rand() * 4), w.length - 1);
+        for (let rank = 2; rank <= extra + 1; rank++) {
+          const next = pickFrom(w, taken);
+          taken.add(next);
+          insVote.run(uid, now, c.id, c.options[next]!.id, rank, snapshot);
+        }
       });
     }
   }

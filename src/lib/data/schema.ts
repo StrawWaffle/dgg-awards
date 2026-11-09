@@ -9,6 +9,7 @@ import {
 } from "drizzle-orm/sqlite-core";
 import type { LinkType } from "@/lib/links";
 import type { Session } from "@/lib/types";
+import type { VotingStyle } from "@/lib/voting";
 
 export const usersTable = sqliteTable("users", {
   uid: int().primaryKey(),
@@ -44,6 +45,8 @@ export const categoriesTable = sqliteTable("categories", {
   id: text().primaryKey(),
   title: text().notNull(),
   description: text().notNull(),
+  /** Null: use the site default (config defaultVotingStyle). Fixed once voted on. */
+  votingStyle: text().$type<VotingStyle>(),
 });
 
 export const optionsTable = sqliteTable(
@@ -99,10 +102,13 @@ export const votesTable = sqliteTable(
       .references(() => categoriesTable.id, { onDelete: "cascade" })
       .notNull(),
     optionId: text().notNull(),
+    /** 1 for a single-pick vote; 1, 2, 3… for a ranked ballot's choices. */
+    rank: int().notNull().default(1),
     sessionSnapshot: text({ mode: "json" }).$type<Session>().notNull(),
   },
   (table) => [
-    primaryKey({ columns: [table.uid, table.categoryId] }),
+    // One row per choice: a ranked ballot has several per category.
+    primaryKey({ columns: [table.uid, table.categoryId, table.optionId] }),
     foreignKey({
       columns: [table.optionId, table.categoryId],
       foreignColumns: [optionsTable.id, optionsTable.categoryId],
@@ -111,9 +117,12 @@ export const votesTable = sqliteTable(
 );
 
 export const votesRelations = relations(votesTable, ({ one }) => ({
+  // Nominee ids are only unique within a category (the same person can be in
+  // several), so a vote belongs to (optionId, categoryId). Matching on the id
+  // alone credited each nominee with its namesakes' votes in other categories.
   option: one(optionsTable, {
-    fields: [votesTable.optionId],
-    references: [optionsTable.id],
+    fields: [votesTable.optionId, votesTable.categoryId],
+    references: [optionsTable.id, optionsTable.categoryId],
   }),
   category: one(categoriesTable, {
     fields: [votesTable.categoryId],

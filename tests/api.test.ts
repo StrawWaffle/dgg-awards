@@ -268,7 +268,7 @@ describe("admin", () => {
     const all = await (await req("/api/admin/votes", {}, admin)).json();
     expect(all).toHaveLength(100);
     expect(Object.keys(all[0]).sort()).toEqual(
-      ["at", "categoryId", "optionId", "sessionSnapshot", "uid"].sort(),
+      ["at", "categoryId", "optionId", "rank", "sessionSnapshot", "uid"].sort(),
     );
     const byIp = await (await req("/api/admin/votes?filter_ip=seed", {}, admin)).json();
     expect(byIp).toHaveLength(100);
@@ -505,6 +505,120 @@ describe("admin", () => {
     expect(ok.headers.get("location")).toBe("/admin");
     const bad = await req("/api/admin/import", { method: "POST", body: form({ data: "{" }) }, admin);
     expect(bad.status).toBe(400);
+  });
+
+  test("ranked voting: ballots, style lock, settings and instant runoff", async () => {
+    const json = (method: string, body: unknown) => ({
+      method,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const post = (path: string, fields: Record<string, string>) =>
+      req(path, { method: "POST", body: form(fields) }, admin);
+
+    // A ranked category with three nominees, and an empty one.
+    expect(
+      (await post("/api/admin/category", {
+        category_id: "rankedcat",
+        category_title: "Ranked Cat",
+        category_description: "d",
+        voting_style: "ranked",
+      })).status,
+    ).toBe(302);
+    expect(
+      (await post("/api/admin/category", {
+        category_id: "emptycat",
+        category_title: "Empty Cat",
+        category_description: "d",
+      })).status,
+    ).toBe(302);
+    for (const id of ["a", "b", "c"]) {
+      await post("/api/admin/nominee", {
+        nominee_id: id,
+        category_id: "rankedcat",
+        nominee_title: id.toUpperCase(),
+        nominee_description: "d",
+        url: "https://example.com",
+      });
+    }
+    const styles = Object.fromEntries(
+      (await (await req("/api/nominees")).json()).map((c: any) => [
+        c.id,
+        [c.votingStyle, c.usesDefaultStyle],
+      ]),
+    );
+    expect(styles.rankedcat).toEqual(["ranked", false]);
+    // Antagonist has only seed votes, so nothing has pinned its style yet.
+    // (Ally was pinned to single by the API vote in an earlier test.)
+    expect(styles.antagonist).toEqual(["single", true]);
+    expect(styles.ally).toEqual(["single", false]);
+
+    // Ballots must match the style and the category's nominees.
+    const v1 = await signIn("Ranker1");
+    const ballot = (jar: Jar, body: unknown) => req("/api/vote", json("POST", body), jar);
+    expect((await ballot(v1, { category_id: "rankedcat", nominee_id: "a" })).status).toBe(400);
+    expect((await ballot(v1, { category_id: "rankedcat", ranking: ["a", "a"] })).status).toBe(400);
+    expect((await ballot(v1, { category_id: "rankedcat", ranking: ["a", "zee"] })).status).toBe(400);
+    expect((await ballot(v1, { category_id: "ally", ranking: ["zee"] })).status).toBe(400);
+    expect((await ballot(v1, { category_id: "nope", nominee_id: "a" })).status).toBe(400);
+
+    // Round 1: a 2, b 2, c 1, no majority, so c is out and its ballot moves
+    // to b. Round 2: b 3, a 2, so b wins.
+    const ballots = [["a", "b"], ["a", "b"], ["b", "c"], ["b", "c"], ["c", "b"]];
+    for (const [i, ranking] of ballots.entries()) {
+      const jar = i === 0 ? v1 : await signIn(`Ranker${i + 1}`);
+      expect((await ballot(jar, { category_id: "rankedcat", ranking })).status).toBe(200);
+    }
+    const again = await ballot(v1, { category_id: "rankedcat", ranking: ["c"] });
+    expect(again.status).toBe(400);
+    expect(await (await req("/api/vote/ballots", {}, v1)).json()).toEqual({ rankedcat: ["a", "b"] });
+    expect(await (await req("/api/vote", {}, v1)).json()).toEqual({ rankedcat: "a" });
+
+    // A voted category's style is locked; an empty one can still change.
+    const lock = await req("/api/admin/category", json("PATCH", { id: "rankedcat", votingStyle: "single" }), admin);
+    expect(lock.status).toBe(409);
+    expect(
+      (await req("/api/admin/category", json("PATCH", { id: "emptycat", votingStyle: "ranked" }), admin)).status,
+    ).toBe(200);
+
+    // Changing the default keeps voted categories as they were.
+    const settings = await req("/api/admin/settings", json("PATCH", { defaultVotingStyle: "ranked", awardYear: 2026 }), admin);
+    expect(settings.status).toBe(200);
+    expect(await settings.json()).toMatchObject({ defaultVotingStyle: "ranked", awardYear: "2026" });
+    const after = Object.fromEntries(
+      (await (await req("/api/nominees")).json()).map((c: any) => [c.id, c.votingStyle]),
+    );
+    expect(after.antagonist).toBe("single"); // had votes: pinned before the switch
+    expect(after.emptycat).toBe("ranked");
+    expect(
+      (await req("/api/admin/settings", json("PATCH", { defaultVotingStyle: "single", awardYear: 2025 }), admin)).status,
+    ).toBe(200);
+    expect((await req("/api/admin/settings", json("PATCH", { awardYear: 1999 }), admin)).status).toBe(400);
+
+    // Results: the runoff decides the winner and the reveal order.
+    await setMode(admin, "reviewing");
+    const result = (await (await req("/api/vote/results")).json()).find(
+      (c: any) => c.categoryId === "rankedcat",
+    );
+    expect(result.votingStyle).toBe("ranked");
+    expect(result.totalVotes).toBe(5);
+    expect(result.runoff).toEqual({
+      rounds: [
+        { counts: { a: 2, b: 2, c: 1 }, exhausted: 0, eliminated: ["c"] },
+        { counts: { a: 2, b: 3 }, exhausted: 0, eliminated: [] },
+      ],
+      winners: ["b"],
+    });
+    expect(result.options.map((o: any) => [o.id, o.count, o.isWinner])).toEqual([
+      ["c", 1, false],
+      ["a", 2, false],
+      ["b", 2, true],
+    ]);
+    await setMode(admin, "voting");
+
+    for (const id of ["rankedcat", "emptycat"]) {
+      await req(`/api/admin/category?id=${id}`, { method: "DELETE" }, admin);
+    }
   });
 
   test("locked mode hides nominees", async () => {
