@@ -4,6 +4,7 @@ import {
   getUser,
   getVerifier,
   insertUser,
+  updateUserMakeAdmin,
 } from "@/lib/data/driver";
 import { buildUrl, env } from "@/lib/util";
 import type {
@@ -24,6 +25,13 @@ function errorRedirect(message: string) {
 const client_id = env("DGG_CLIENT_ID");
 const redirect_uri = env("DGG_REDIRECT");
 const dgg_origin = env("DGG_ORIGIN", "https://www.destiny.gg");
+// Comma-separated DGG usernames that become admins when they sign in.
+const adminUsernames = new Set(
+  env("ADMIN_USERNAMES", "")
+    .split(",")
+    .map((name) => name.trim().toLowerCase())
+    .filter(Boolean),
+);
 
 export async function oauth(req: Bun.BunRequest) {
   const cookieState = req.cookies.get("state");
@@ -88,6 +96,12 @@ export async function oauth(req: Bun.BunRequest) {
           createdDate: userInfoData.createdDate,
           admin: false,
         });
+      }
+      if (
+        !possibleUser?.admin &&
+        adminUsernames.has(userInfoData.nick.toLowerCase())
+      ) {
+        await updateUserMakeAdmin(userInfoData.userId);
       }
 
       // This uses cloudflare's ip header
