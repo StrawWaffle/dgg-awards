@@ -514,6 +514,13 @@ StrawWaffle: `/vote?preview=voting` and `?preview=results` should show the new l
   - Browser: the admin preview while locked (22 awards, a vote not saved), the results preview (real with tally, then simulated), the lab, locked and signed-out visitors, a real vote kept after reload, and a ranked ballot saved in order.
   - The screenshot script now captures the front page, voting and results of the new site; its old baselines are out of date.
 
+### In progress: previews only on request, and a user menu (branch `worktree-user-menu`, 2026-11-09)
+
+StrawWaffle, after the one-site deploy:
+- **The admin preview showed whenever voting wasn't open.** It should only show with the preview address: `/vote?preview=voting`, and `/vote?preview=results` or `/results?preview=1`. Without it, admins see what visitors see. No "preview it" link on the visitor notice (StrawWaffle: not wanted).
+- **A user menu in the header**, as the old page had. It shows your destiny.gg picture (if you have one) and your name. Hovering or clicking opens a menu with your subscriber tier, team, member-since date, Admin (if you are one), a link to your destiny.gg profile, the admin page (admins) and Sign out. Signed out, it shows a Sign in button.
+  - Server side, done: `GET /api/me/profile` returns your own destiny.gg profile (`fetchDggProfile`), kept 10 minutes per name.
+
 ### Next: the lab page (StrawWaffle's answers, 2026-11-09)
 
 StrawWaffle wants the front page and the presentation to feel fun, quirky and wholesome. It gets built on an experimental page first (`/lab`, admins only) until rinlux approves. Order: the follow-ups above, merge and deploy, then the lab.
