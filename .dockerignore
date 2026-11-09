@@ -6,3 +6,5 @@ dist
 *.db-shm
 *.db-wal
 dev
+.claude
+tests/visual/out
