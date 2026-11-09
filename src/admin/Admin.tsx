@@ -10,6 +10,7 @@ import { type Theme, useTheme } from "@/admin/theme";
 import { useStored } from "@/admin/useStored";
 import {
   BarChartIcon,
+  MagicWandIcon,
   CounterClockwiseClockIcon,
   DesktopIcon,
   DoubleArrowLeftIcon,
@@ -126,6 +127,9 @@ function AdminPage() {
           </SideLink>
           <SideLink href="/" icon={<HomeIcon />} collapsed={collapsed}>
             Open the site
+          </SideLink>
+          <SideLink href="/lab" icon={<MagicWandIcon />} collapsed={collapsed}>
+            Open the lab
           </SideLink>
           <ThemeSwitch theme={theme} setTheme={setTheme} collapsed={collapsed} />
           <p
