@@ -48,6 +48,19 @@ function errorRedirect(message: string) {
   });
 }
 
+/**
+ * Where to go after signing in: a path on this site, or the front page.
+ * Anything that could leave the site ("//evil.example", "https://…", "/\\…")
+ * is refused, so the parameter can't be used for an open redirect.
+ */
+export function safeNext(next: string | undefined | null): string {
+  if (!next || next.length > 512) return "/";
+  if (!next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) return "/";
+  if (/[\u0000-\u001f\\]/.test(next)) return "/";
+  return next;
+}
+const NEXT_COOKIE = "next";
+
 export const authRoutes = new Hono()
   .get("/signin", async (c) => {
     const state = crypto.getRandomValues(new Uint8Array(16)).toHex();
@@ -58,6 +71,8 @@ export const authRoutes = new Hono()
     const code_challenge = btoa(sha256hex(verifier + secret));
 
     setCookie(c, "state", state, { path: "/", sameSite: "Lax" });
+    // Back to the page that sent you here (?next=/admin), once signed in.
+    setCookie(c, NEXT_COOKIE, safeNext(c.req.query("next")), { path: "/", sameSite: "Lax", httpOnly: true, maxAge: 600 });
     await insertState({ id: state, verifier });
 
     return c.redirect(
@@ -152,7 +167,9 @@ export const authRoutes = new Hono()
 
     const session = await createSession(userInfo.userId, ip, agent);
     setCookie(c, SESSION_COOKIE, session, { ...sessionCookie, maxAge: 604800 });
-    return c.redirect("/", 302);
+    const next = safeNext(getCookie(c, NEXT_COOKIE));
+    deleteCookie(c, NEXT_COOKIE, { path: "/" });
+    return c.redirect(next, 302);
   })
 
   .post("/signout", async (c) => {

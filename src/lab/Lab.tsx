@@ -183,7 +183,7 @@ export function Lab() {
           <div className="cozy-panel space-y-4 p-8 text-center">
             <Emote name="PepoG" size={2} />
             <p className="font-bold">The lab is for admins while we try things out.</p>
-            <a className="cozy-btn primary" href="/signin">
+            <a className="cozy-btn primary" href="/signin?next=/lab">
               Sign in
             </a>
           </div>

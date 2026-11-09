@@ -374,7 +374,7 @@ StrawWaffle saw what looked like being signed out after every deploy. Sessions w
 - Old `/admin/<code>` addresses redirect to `/admin`.
 - The only thing given up is that anyone can download the admin page's JavaScript (labels and route names, no data).
 - The API tests now check the admin API instead of the old redirect (42 pass).
-- Signing in still returns to `/`, not to the page you came from.
+- **Signing in returns you to where you were:** `/signin?next=/admin` (the admin page and the lab use it) keeps the path in a short-lived cookie and redirects there after destiny.gg. `safeNext()` in `routes/auth.ts` only allows paths on this site (`//…`, `https://…`, backslashes and control characters go to `/`), so it can't be used as an open redirect. Covered by an API test (43 now).
 
 ### Next: the lab page (StrawWaffle's answers, 2026-11-09)
 

@@ -69,7 +69,7 @@ function AdminGate() {
       </p>
       <div className="flex gap-2">
         {!me.data && (
-          <a href="/signin" className="rounded border border-neutral-900 bg-neutral-900 px-3 py-1.5 text-white">
+          <a href="/signin?next=/admin" className="rounded border border-neutral-900 bg-neutral-900 px-3 py-1.5 text-white">
             Sign in
           </a>
         )}

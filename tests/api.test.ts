@@ -42,9 +42,9 @@ const onBase = (url: string) => {
   return BASE + u.pathname + u.search;
 };
 
-async function signIn(username: string): Promise<Jar> {
-  const jar: Jar = new Map();
-  const start = await req("/signin", {}, jar);
+async function signIn(username: string, next?: string): Promise<Jar & { landed?: string }> {
+  const jar: Jar & { landed?: string } = new Map();
+  const start = await req(next === undefined ? "/signin" : `/signin?next=${encodeURIComponent(next)}`, {}, jar);
   const authorize = new URL(start.headers.get("location")!);
   const body = new URLSearchParams(authorize.search);
   body.set("username", username);
@@ -57,7 +57,8 @@ async function signIn(username: string): Promise<Jar> {
   const callback = granted.headers.get("location")!;
   const done = await req(onBase(callback), {}, jar);
   expect(done.status).toBe(302);
-  expect(done.headers.get("location")).toBe("/");
+  jar.landed = done.headers.get("location")!;
+  if (next === undefined) expect(jar.landed).toBe("/");
   return jar;
 }
 
@@ -711,6 +712,14 @@ describe("admin", () => {
     expect((await undo(removed.id)).status).toBe(200);
     expect(await ids()).toContain("ally_copy");
     await req("/api/admin/category?id=ally_copy", { method: "DELETE" }, admin);
+  });
+
+  test("signing in returns to the page you came from, never off the site", async () => {
+    expect((await signIn("Tester", "/admin")).landed).toBe("/admin");
+    expect((await signIn("Tester", "/lab#stage")).landed).toBe("/lab#stage");
+    for (const evil of ["//evil.example", "https://evil.example", "/\\evil.example", "evil"]) {
+      expect((await signIn("Tester", evil)).landed).toBe("/");
+    }
   });
 
   test("make admin by uid", async () => {
