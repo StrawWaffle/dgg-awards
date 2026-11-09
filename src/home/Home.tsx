@@ -52,7 +52,7 @@ export function Home() {
         <a
           href="/"
           onClick={go("home")}
-          className="rounded-xl border-2 px-4 py-1 text-lg font-black tracking-widest uppercase"
+          className="cozy-logo rounded-xl border-2 px-4 py-1 text-lg font-black tracking-widest uppercase"
           style={{ background: "var(--cream)", borderColor: "var(--panel-border)", color: "var(--text)", boxShadow: "0 3px 0 rgb(0 0 0 / 0.15)" }}
         >
           DGG Awards

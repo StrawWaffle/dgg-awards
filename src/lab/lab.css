@@ -142,10 +142,11 @@
   color: var(--text);
   border: 2px solid var(--panel-border);
   box-shadow: 0 4px 0 var(--cream-shadow);
-  transition: translate 80ms ease, box-shadow 80ms ease, background-color 150ms ease;
+  transition: translate 80ms ease, box-shadow 80ms ease, background-color 150ms ease, border-color 150ms ease;
 }
-.cozy-btn:hover {
-  background: color-mix(in oklab, var(--cream), var(--text) 5%);
+.cozy-btn:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--cream), var(--text) 9%);
+  border-color: color-mix(in oklab, var(--panel-border), var(--text) 20%);
 }
 .cozy-btn:active:not(:disabled) {
   translate: 0 3px;
@@ -165,6 +166,10 @@
   border-color: var(--primary-shadow);
   box-shadow: 0 4px 0 var(--primary-shadow);
 }
+.cozy-btn.primary:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--primary), var(--primary-shadow) 35%);
+  border-color: var(--primary-shadow);
+}
 .cozy-btn.primary:active:not(:disabled) {
   box-shadow: 0 1px 0 var(--primary-shadow);
 }
@@ -179,12 +184,61 @@
   padding: 0.35rem 1rem;
   font-weight: 800;
   color: var(--header-text);
+  transition: background-color 150ms ease;
+}
+.cozy-tab:hover:not([aria-selected="true"]):not([aria-current="page"]) {
+  background: color-mix(in oklab, var(--header-text) 18%, transparent);
 }
 .cozy-tab[aria-selected="true"],
 .cozy-tab[aria-current="page"] {
   background: var(--cream);
   color: var(--text);
   box-shadow: 0 3px 0 rgb(0 0 0 / 0.12);
+}
+
+/*
+ * Hover for the rest of what can be clicked (2026-11-09 pass): a row in a
+ * list, a card, a chip that's a link, the logo, and text links. Colour only,
+ * 150 ms, no movement. A row's own background (the current one) wins.
+ */
+.cozy-row {
+  transition: background-color 150ms ease;
+}
+.cozy-row:hover {
+  background: color-mix(in oklab, var(--highlight) 65%, transparent);
+}
+.cozy-card {
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.cozy-card:hover:not([aria-pressed="true"]) {
+  border-color: color-mix(in oklab, var(--primary-shadow) 70%, var(--panel-border)) !important;
+}
+a.cozy-chip,
+button.cozy-chip {
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+a.cozy-chip:not(.coral):not(.green):hover,
+button.cozy-chip:not(.coral):not(.green):hover {
+  background: var(--highlight);
+  border-color: var(--primary-shadow);
+  color: var(--text);
+}
+a.cozy-chip.coral:hover,
+button.cozy-chip.coral:hover {
+  background: color-mix(in oklab, var(--coral), black 12%);
+}
+.cozy-logo {
+  transition: background-color 150ms ease;
+}
+.cozy-logo:hover {
+  background: color-mix(in oklab, var(--cream), var(--text) 7%) !important;
+}
+.lab a.underline {
+  transition: color 150ms ease;
+}
+.lab a.underline:hover {
+  color: var(--primary-shadow);
+  text-decoration-thickness: 2px;
 }
 
 /* Small rounded labels. */

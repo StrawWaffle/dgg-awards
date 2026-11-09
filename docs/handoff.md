@@ -481,6 +481,15 @@ StrawWaffle downloaded the original `dgga25.zip` again (7.9 MB, 167 files, code 
 - **Compared with the import commit `6b884f8`:** 166 files are byte-for-byte identical. The only file not imported is `scripts/data-to-json.out.json`, the output of `scripts/data-to-json.ts` (the nominees as JSON). It's an **older** export than the zip's `src/data.ts`, despite its later file date (2 January against 31 December): `data.ts` has the typo fixes ("podcast", "continuously", "malicious"…) and JohnHentai's link that the JSON lacks. So nothing is missing.
 - **Archived** on Google Drive as `DGG Awards backups/archive/dgga25-original-source.zip`, uploaded with rclone and checked by MD5 against the original. Not encrypted (code only).
 
+### Hover pass and the results side list (branch `worktree-hover-pass`, 2026-11-09)
+
+StrawWaffle noticed missing hover effects and a side list that didn't follow the page.
+- **Hover:**
+  - `.cozy-btn.primary` had none: the plain hover rule lost to its colour rule. The plain button hover is stronger now.
+  - New classes in `lab.css`, colour or background only, 150 ms: `.cozy-row` (list rows, the scene steps, small icon buttons), `.cozy-card` (nominee cards), linked `.cozy-chip`s, `.cozy-logo`, and text links (`a.underline`). Tabs got one too.
+  - Checked in the browser: all 10 sampled elements change on hover.
+- **Results / 2025 side list:** the highlighted award is now worked out on scroll: the last one whose heading has passed the upper third, the last one at the very bottom (the short final awards never reached the old observer's band), and none above the first. The list scrolls itself to keep it in view: a third of the way down when it nears an edge, back to the top at the overview.
+
 ### Next: the lab page (StrawWaffle's answers, 2026-11-09)
 
 StrawWaffle wants the front page and the presentation to feel fun, quirky and wholesome. It gets built on an experimental page first (`/lab`, admins only) until rinlux approves. Order: the follow-ups above, merge and deploy, then the lab.

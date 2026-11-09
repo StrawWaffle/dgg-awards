@@ -719,7 +719,7 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
                     type="button"
                     onClick={() => scene !== x.id && goTo(awardIndex, x.id, i < sceneAt)}
                     aria-current={scene === x.id ? "step" : undefined}
-                    className="rounded-full px-3 py-1 text-sm font-extrabold transition-colors"
+                    className="cozy-row rounded-full px-3 py-1 text-sm font-extrabold"
                     style={scene === x.id ? { background: "var(--header)", color: "white" } : { color: "var(--muted)" }}
                   >
                     {i + 1}. {x.label}

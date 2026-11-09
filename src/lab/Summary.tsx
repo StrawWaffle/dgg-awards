@@ -141,21 +141,48 @@ export function Summary({
       .catch(() => setAwards([]));
   }, [load]);
 
-  // Which award is on screen, for the list on the side.
+  // Keep the highlighted award in view in the side list, which scrolls on its
+  // own: when it gets near an edge, bring it to a third of the way down.
+  const sideList = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const list = sideList.current;
+    if (!list) return;
+    if (!current) return list.scrollTo({ top: 0, behavior: "smooth" });
+    const item = list.querySelector<HTMLElement>(`[data-award="${CSS.escape(current)}"]`);
+    if (!item) return;
+    const box = list.getBoundingClientRect();
+    const r = item.getBoundingClientRect();
+    if (r.top < box.top + 48 || r.bottom > box.bottom - 16) {
+      list.scrollTo({ top: list.scrollTop + (r.top - box.top) - box.height / 3, behavior: "smooth" });
+    }
+  }, [current]);
+
+  // Which award is on screen, for the list on the side: the last one whose
+  // heading has passed the upper third of the window; none above the first
+  // (the overview); the last one at the very bottom of the page, where the
+  // short final awards can't reach that line.
   useEffect(() => {
     if (!awards) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const top = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-        if (top) setCurrent(top.target.id.replace(/^award-/, ""));
-      },
-      { rootMargin: "-20% 0px -60% 0px" },
-    );
-    for (const a of awards) {
-      const el = document.getElementById(`award-${a.id}`);
-      if (el) observer.observe(el);
-    }
-    return () => observer.disconnect();
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const atBottom = scrollY + innerHeight >= document.documentElement.scrollHeight - 4;
+      let found: string | null = null;
+      for (const a of awards) {
+        const el = document.getElementById(`award-${a.id}`);
+        if (el && el.getBoundingClientRect().top <= innerHeight / 3) found = a.id;
+      }
+      setCurrent(atBottom && found ? awards[awards.length - 1]!.id : found);
+    };
+    const onScroll = () => void (frame ||= requestAnimationFrame(update));
+    update();
+    addEventListener("scroll", onScroll, { passive: true });
+    addEventListener("resize", onScroll);
+    return () => {
+      removeEventListener("scroll", onScroll);
+      removeEventListener("resize", onScroll);
+      cancelAnimationFrame(frame);
+    };
   }, [awards]);
 
   if (awards === null) return <div className="cozy-panel p-8">Loading…</div>;
@@ -192,6 +219,7 @@ export function Summary({
 
       {/* Every award, with its winner, to jump to. */}
       <nav
+        ref={sideList}
         aria-label="Awards"
         className="cozy-panel hidden h-fit max-h-[calc(100dvh-var(--lab-header,64px)-2rem)] overflow-y-auto p-3 lg:sticky lg:top-[calc(var(--lab-header,64px)+1rem)] lg:block"
       >
@@ -206,7 +234,8 @@ export function Summary({
                 <button
                   type="button"
                   onClick={() => jump(a.id)}
-                  className="block w-full rounded-2xl px-3 py-1.5 text-left text-sm"
+                  data-award={a.id}
+                  className="cozy-row block w-full rounded-2xl px-3 py-1.5 text-left text-sm"
                   style={current === a.id ? { background: "var(--highlight)" } : undefined}
                   aria-current={current === a.id ? "true" : undefined}
                 >
@@ -292,7 +321,7 @@ function Highlights({
       <ol className="space-y-1">
         {items.map(({ a, text }) => (
           <li key={a.id}>
-            <button type="button" className="w-full rounded-xl px-2 py-1 text-left hover:bg-[var(--highlight)]" onClick={() => onJump(a.id)}>
+            <button type="button" className="cozy-row w-full rounded-xl px-2 py-1 text-left" onClick={() => onJump(a.id)}>
               <span className="block text-sm font-bold">{a.title}</span>
               <span className="block text-xs font-semibold" style={{ color: "var(--muted)" }}>
                 {text}
@@ -407,7 +436,7 @@ function AwardSection({ award, onWatch }: { award: AwardResult; onWatch: (clip: 
               {s.clip && (
                 <button
                   type="button"
-                  className="shrink-0 rounded-full p-1"
+                  className="cozy-row shrink-0 rounded-full p-1"
                   style={{ color: "var(--coral)" }}
                   onClick={() => onWatch(s.clip!)}
                   aria-label={`Watch the clip of ${s.title}`}

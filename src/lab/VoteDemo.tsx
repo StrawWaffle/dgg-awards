@@ -113,7 +113,7 @@ export function VoteDemo() {
                     setPicked(choiceFor(a.id)?.pick ?? null);
                     setStep(i);
                   }}
-                  className="flex w-full items-center justify-between gap-2 rounded-2xl px-3 py-2 text-left text-sm font-bold"
+                  className="cozy-row flex w-full items-center justify-between gap-2 rounded-2xl px-3 py-2 text-left text-sm font-bold"
                   style={step === i ? { background: "var(--highlight)" } : undefined}
                 >
                   <span>{a.title}</span>
@@ -155,7 +155,7 @@ export function VoteDemo() {
                       setPicked(n.id);
                       fire("Klappa", ...originOf(e, box.current), 6);
                     }}
-                    className="group block h-full w-full rounded-[20px] border-2 p-2 text-left transition-[translate,box-shadow] active:translate-y-[3px]"
+                    className="cozy-card group block h-full w-full rounded-[20px] border-2 p-2 text-left active:translate-y-[3px]"
                     style={{
                       background: "var(--cream)",
                       borderColor: mine ? "var(--primary-shadow)" : "var(--panel-border)",
