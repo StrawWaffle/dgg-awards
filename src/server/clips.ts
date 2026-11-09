@@ -19,9 +19,16 @@ const ENCODE_TIMEOUT_MS = 5 * 60_000;
 const THUMB_WIDTH = 640;
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
-/** Prefer H.264 + AAC at ≤720p (no re-encode needed), else whatever exists. */
+/** Prefer H.264 + AAC at ≤1080p (no second encode needed), else what exists. */
 const FORMAT =
-  "bv*[height<=720][vcodec^=avc1]+ba[ext=m4a]/bv*[height<=720]+ba/b[height<=720]/b";
+  "bv*[height<=1080][vcodec^=avc1]+ba[ext=m4a]/bv*[height<=1080]+ba/b[height<=1080]/b";
+
+/**
+ * Quality budget. Bandwidth from R2 is free; this keeps storage and mobile
+ * data sane: a typical 15–20 s clip is 4–8 MB, a 60 s one at most ~30 MB.
+ */
+const MAX_HEIGHT = 1080;
+const MAX_VIDEO_KBPS = 4000;
 
 type Nominee = NonNullable<Awaited<ReturnType<typeof getNominee>>>;
 
@@ -107,17 +114,31 @@ async function buildClip(categoryId: string, id: string) {
     const source = (await readdir(dir)).find((f) => f.startsWith("source."));
     if (!source) throw new Error("yt-dlp finished without a file.");
 
+    // yt-dlp's precise cut already encoded once. Only encode again if the
+    // result doesn't fit (codec, size, bitrate); otherwise just repackage
+    // for fast start, since every encode loses detail.
     const out = join(dir, "clip.mp4");
+    const input = join(dir, source);
+    const info = await probeStreams(input);
+    const fits =
+      info.video?.codec === "h264" &&
+      (info.video.height ?? Infinity) <= MAX_HEIGHT &&
+      (info.video.kbps ?? Infinity) <= MAX_VIDEO_KBPS * 1.1 &&
+      (info.audio === null || info.audio.codec === "aac");
     await run(
       "ffmpeg",
-      [
-        "-y", "-i", join(dir, source),
-        "-vf", "scale='min(1280,iw)':-2",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "26", "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "128k",
-        "-movflags", "+faststart",
-        out,
-      ],
+      fits
+        ? ["-y", "-i", input, "-c", "copy", "-movflags", "+faststart", out]
+        : [
+            "-y", "-i", input,
+            "-vf", `scale=-2:'min(${MAX_HEIGHT},ih)'`,
+            "-c:v", "libx264", "-preset", "medium", "-crf", "21",
+            "-maxrate", `${MAX_VIDEO_KBPS}k`, "-bufsize", `${MAX_VIDEO_KBPS * 2}k`,
+            "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "160k",
+            "-movflags", "+faststart",
+            out,
+          ],
       ENCODE_TIMEOUT_MS,
     );
 
@@ -230,6 +251,27 @@ async function removeReplaced(old: (string | null)[], current: string[]) {
   for (const key of old) {
     if (key && !current.includes(key)) await storage.delete(key).catch(() => {});
   }
+}
+
+/** Codec, height and bitrate of the first video and audio streams. */
+async function probeStreams(path: string) {
+  const { stdout } = await run(
+    "ffprobe",
+    ["-v", "error", "-show_entries", "stream=codec_type,codec_name,height,bit_rate:format=bit_rate", "-of", "json", path],
+    30_000,
+  );
+  const data = JSON.parse(stdout) as {
+    streams: { codec_type: string; codec_name: string; height?: number; bit_rate?: string }[];
+    format?: { bit_rate?: string };
+  };
+  const v = data.streams.find((s) => s.codec_type === "video");
+  const a = data.streams.find((s) => s.codec_type === "audio");
+  const kbps = (s?: string) => (s ? Number(s) / 1000 : undefined);
+  return {
+    // Some containers only report the overall bitrate; use it as an upper bound.
+    video: v ? { codec: v.codec_name, height: v.height, kbps: kbps(v.bit_rate) ?? kbps(data.format?.bit_rate) } : null,
+    audio: a ? { codec: a.codec_name } : null,
+  };
 }
 
 async function probeDuration(path: string) {
