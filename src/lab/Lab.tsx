@@ -7,7 +7,7 @@ import { useSourceChoice, useStartOnFirstGesture } from "@/lab/music";
 import { Stage } from "@/lab/Stage";
 import { type Theme, useLabTheme } from "@/lab/theme";
 import { Visualizer } from "@/lab/Visualizer";
-import { Results } from "@/lab/Results";
+import { Summary } from "@/lab/Summary";
 import { setDrawnLook, useDrawnLook } from "@/lab/sketch";
 import { VoteDemo } from "@/lab/VoteDemo";
 
@@ -97,7 +97,7 @@ export function Lab() {
     return (
       <main className="mx-auto max-w-7xl space-y-5 px-4 py-6">
         {v === "voting" && <VoteDemo />}
-        {v === "results" && <Results />}
+        {v === "results" && <Summary />}
         {v === "sound" && <Visualizer source={source} setSource={setSource} />}
         <p className="text-center text-xs" style={{ color: "var(--muted)" }}>
           The lab: ideas being tried out, separate from the real site. Look inspired by a community destiny.gg skin.

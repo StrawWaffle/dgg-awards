@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import rough from "roughjs";
 import { annotate } from "rough-notation";
-import { useBursts } from "@/lab/Bursts";
 import { cssVar, useDrawnLook } from "@/lab/sketch";
 
 export type Result = { id: string; title: string; count: number; percentage: number; isWinner: boolean };
@@ -33,121 +32,6 @@ const BAR_H = 26;
 const BOX_MS = 650;
 /** A beat between one bar finishing (and sliding into place) and the next starting. */
 const PAUSE_MS = 900;
-
-/**
- * The results reveal, drawn like a person would:
- * - The rows start in a scrambled order (seeded by the award, so the preview
- *   and the stream match) and nominees are revealed from last place up.
- * - Each bar is scribbled in from left to right, then a box is drawn round it,
- *   then the row slides into its ranked place, so it ends sorted.
- * - The longest bar so far fills the width, so earlier bars squish as bigger
- *   ones come in, and the winner's length is no giveaway.
- * - The winner's scribble races to just short of second place, creeps past
- *   it, then finishes quickly.
- * Uses the admin results preview, so it works before voting closes.
- */
-export function Results() {
-  const [awards, setAwards] = useState<Award[] | null>(null);
-  const [index, setIndex] = useState(0);
-  /** How many to reveal (from last place up); the board works its way there. */
-  const [target, setTarget] = useState(0);
-  /** Bumped to start an award over. */
-  const [run, setRun] = useState(0);
-  const box = useRef<HTMLDivElement>(null);
-  const [layer, fire] = useBursts();
-
-  useEffect(() => {
-    loadResults()
-      .then(setAwards)
-      .catch(() => setAwards([]));
-  }, []);
-
-  const cheer = useCallback(
-    (el: HTMLElement) => {
-      const frame = box.current?.getBoundingClientRect();
-      const r = el.getBoundingClientRect();
-      if (!frame) return;
-      fire("CHEERSTINY", r.left - frame.left + 40, r.top - frame.top, 8);
-      setTimeout(() => fire("Klappa", r.left - frame.left + 180, r.top - frame.top, 8), 200);
-    },
-    [fire],
-  );
-
-  if (awards === null) return <div className="cozy-panel p-8">Loading…</div>;
-  if (awards.length === 0) return <div className="cozy-panel p-8">No results to show.</div>;
-  const award = awards[index]!;
-  const n = award.results.length;
-  const go = (i: number) => {
-    setIndex((i + awards.length) % awards.length);
-    setTarget(0);
-    setRun((r) => r + 1);
-  };
-
-  return (
-    <div className="space-y-5">
-      <div ref={box} className="cozy-panel relative overflow-hidden p-6 sm:p-8">
-        {layer}
-        <div className="mb-6 flex flex-wrap items-center gap-2">
-          <span className="cozy-chip coral">Results</span>
-          <span className="cozy-chip">
-            Award {index + 1} of {awards.length}
-          </span>
-          <span className="cozy-chip green hand text-base!">{award.total.toLocaleString()} votes</span>
-        </div>
-        <Title key={award.id} text={award.title} />
-        <Board key={`${award.id}-${run}`} award={award} target={target} onWinner={cheer} />
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <button type="button" className="cozy-btn" onClick={() => go(index - 1)}>
-          ← Previous award
-        </button>
-        <button type="button" className="cozy-btn primary" onClick={() => setTarget((t) => Math.min(n, t + 1))} disabled={target >= n}>
-          Reveal next
-        </button>
-        <button type="button" className="cozy-btn" onClick={() => setTarget((t) => Math.max(t, n - 3))} disabled={target >= n - 3}>
-          Reveal all but the last three
-        </button>
-        <button type="button" className="cozy-btn" onClick={() => setTarget(n)} disabled={target >= n}>
-          Reveal everything
-        </button>
-        <button
-          type="button"
-          className="cozy-btn"
-          onClick={() => {
-            setTarget(0);
-            setRun((r) => r + 1);
-          }}
-        >
-          Start over
-        </button>
-        <button type="button" className="cozy-btn" onClick={() => go(index + 1)}>
-          Next award →
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/** The award title, underlined by hand as it appears. */
-function Title({ text }: { text: string }) {
-  const el = useRef<HTMLSpanElement>(null);
-  const drawn = useDrawnLook();
-  useEffect(() => {
-    if (!el.current || !drawn) return;
-    const a = annotate(el.current, { type: "underline", color: cssVar("--primary-shadow"), strokeWidth: 3, padding: 2, animationDuration: 700 });
-    const timer = setTimeout(() => a.show(), 150);
-    return () => {
-      clearTimeout(timer);
-      a.remove();
-    };
-  }, [text, drawn]);
-  return (
-    <h2 className="inline-block text-4xl font-black">
-      <span ref={el}>{text}</span>
-    </h2>
-  );
-}
 
 // ---- Timing of one bar's scribble.
 
@@ -199,7 +83,17 @@ type RowEls = {
   name: HTMLSpanElement | null;
 };
 
-/** One award's rows, revealed up to `target`, one bar at a time. */
+/**
+ * One award's results reveal on the big screen, up to `target` rows, one at a time, drawn like a person would:
+ * - The rows start in a scrambled order (seeded by the award, so the preview
+ *   and the stream match) and nominees are revealed from last place up.
+ * - Each bar is scribbled in from left to right, then a box is drawn round it,
+ *   then the row slides into its ranked place, so it ends sorted.
+ * - The longest bar so far fills the width, so earlier bars squish as bigger
+ *   ones come in, and the winner's length is no giveaway.
+ * - The winner's scribble races to just short of second place, creeps past
+ *   it, then finishes quickly.
+ */
 export function Board({
   award,
   target,

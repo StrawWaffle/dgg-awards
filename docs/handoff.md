@@ -330,6 +330,16 @@ StrawWaffle's notes, built:
 - **Fixed: the "Characters at most" limit.** A verified message gave its sender a character past the limit, and lowering the limit didn't send anyone off. Now both respect it, and extras leave a few at a time.
 - **Clip controls** are our own in the lab look: play, a seek bar, the time, sound and full screen. They hide 2 s after the pointer stops while playing.
 
+### The Results tab as a summary (branch `worktree-lab-summary`, 2026-11-09, not deployed)
+
+The big screen does the live reveal now, so the lab's Results tab became a page to read through after the show (`Summary.tsx`). It's built from `/api/vote/results` alone (no server change):
+- **Overview:** awards, ballots cast, the closest race and the biggest win (in points of the votes counted), and a top three of closest races, biggest wins and most votes. Each links down to its award.
+- **A side list** of every award with its winner, sticky, marking the one on screen.
+- **Each award:** the winner with picture, votes, share of first choices and how far they won by, and their clip; the full standings with bars that grow as the award scrolls into view, and a clip button per nominee.
+- **Ranked awards:** the margin is from the final runoff round, and a collapsible table shows every round's counts, who went out, and ballots with no choices left.
+- The old reveal page (`Results()`) is gone; `Results.tsx` keeps the `Board` the big screen uses.
+- Not included, since it needs rinlux's say: overall unique voters and votes per day (the admin stats have them). Ballots cast is the sum over awards.
+
 ### Next: the lab page (StrawWaffle's answers, 2026-11-09)
 
 StrawWaffle wants the front page and the presentation to feel fun, quirky and wholesome. It gets built on an experimental page first (`/lab`, admins only) until rinlux approves. Order: the follow-ups above, merge and deploy, then the lab.
