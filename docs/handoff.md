@@ -87,6 +87,10 @@ The source zip (`dgga25.zip`) was deleted at StrawWaffle's request, so commit 1 
 - **Real 2025 results for the archive:** ask rinlux whether they have the 2025 production database, an export or the final numbers. The zip had none, and the live site shows fake votes. Fallbacks are rebuilding from the stream (incomplete, with garbled captions) or archiving the nominees and winners only.
   - **The 2025 code double-counted** (found 2026-11-09). A nominee in several categories got the votes from all of them, because votes joined nominees on id only. On the stream that would have affected Hasan Piker, Asmongold, Legal Mindset and "Destiny Uses his Premonition Powers". With seeded data it inflated Brainlet's total by 46% and changed its winner.
   - The zip predates the stream version, so the live 2025 site may or may not have had the bug. With rinlux's raw votes, the archive can show the **correct** results. Ask whether the announced winners match a correct count.
+  - **Follow-up, StrawWaffle wants to come back to this once the current work is done:** double-check the bug and the fix.
+    - Reproduce it on the original code (`dgga-base`, port 3100) against the fixed code.
+    - If the 2025 votes turn up, recount them both ways and compare with the winners announced on stream.
+    - The fix is the composite join in `votesRelations` in `src/lib/data/schema.ts`, covered by the results snapshot in `tests/api.test.ts`.
 - **What rinlux thinks is missing** compared with the live 2025 version.
 
 ## Stack upgrade (branch `stack-upgrade`, merged into `main` 2026-11-09)
