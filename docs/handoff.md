@@ -169,10 +169,10 @@ Order StrawWaffle gave: preview to rinlux first, then discuss, then these.
 5. **Re-pull emotes from the DGG CDN:** `https://cdn.destiny.gg/emotes/emotes.json` and `emotes.css`. Some emotes are sprite sheets or animated by CSS transforms, so a plain `<img>` won't show them correctly. DGG-Radio's `emotes.md` explains this and has a working approach to reuse.
 6. **Privacy page** saying exactly what's collected (DGG id and name, IP and user agent per vote) and why, with a retention plan. Do this when StrawWaffle lifts the privacy deferral.
 7. **Cloudflare bot signals:** compare results with and without suspected bot votes (shared IPs, new DGG accounts) and show both.
-8. **Archive of past years** (StrawWaffle's idea, 2026-11-09).
+8. **Archive of past years** (StrawWaffle's idea, 2026-11-09). **Backlogged until the complete 2025 vote data is found.** Without full, correct counts there's nothing trustworthy to publish: the zip had no votes, the stream captions are incomplete, and the 2025 code double-counted (see Open questions).
    - Serve `/archive/<year>` from a frozen file in the repo holding that year's nominees, images, final counts and winners. Render it with the results view, fully revealed.
    - No live database or voting code is involved, so it keeps working as the site changes.
-   - Start with 2025 once its real results are found (see Open questions).
+   - Start with 2025 only once its raw votes are in hand, recounted with the fixed code.
 
 ## Backlog: fixes from the 2025 stream
 
