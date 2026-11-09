@@ -175,6 +175,12 @@ StrawWaffle pointed out that the wiki has the confirmed 2025 results: https://wi
 - **Except Omegalul, which adds to 125.02% on the page.** Its winner shows Godstiny's 45.98%, so it's most likely a copy slip on the wiki; the real figure would be 20.96%. Ask RiN_LuX. Details are in the doc.
 - **For the archive (feature 8):** this is enough for winners and percentages, but not counts. Whether to build the archive from it is StrawWaffle's call.
 
+### StrawWaffle's follow-ups on the history round (2026-11-09, not built yet)
+
+- **Hide categories instead of deleting them once voting has started.** Deleting a category deletes its votes, so a restored one comes back empty. Once voting starts, "Delete" should become "Hide": the category leaves the public site, and its nominees and votes are kept.
+- **Back up before an import, and offer an export.** Imports can't be undone. Instead, take an automatic backup before each import that can be restored, plus an export of the nominees and categories as a file.
+- **Archive: wait for the full 2025 data.** Don't build it from the wiki percentages.
+
 **Ideas from StrawWaffle, not built.** Several need rinlux's say first, since they are in charge of these decisions:
 - **More roles** than admin, e.g. moderators or editors who can only edit nominees.
 - **Lock the site behind sign-in** before voting, with a countdown to the voting date.
@@ -352,12 +358,13 @@ Method (from the Theo video): hill climbing.
 
 ## Reference material
 
-- **jadseya.com/2025/vote/released/**, the site rinlux likes:
-  - One category per page, with Back/Next buttons.
-  - A sidebar with progress per section ("Games 0/6").
-  - Ranked voting by drag, plus a simpler type-a-number mode.
-  - Twitch login and playful copy.
-  - The text fetch didn't capture the visual style, so get screenshots for that.
+- **jadseya.com/2025/vote/released/**, the site rinlux likes (screenshotted 2026-11-09):
+  - **Look:** dark, with gold foil lettering and ornate frames. Each award title is a big tilted sign hanging on ropes, pulled up by a hand-drawn character of the streamer.
+  - **Flow:** a start page with a playful welcome, then one award per page with Back/Next. A collapsible left sidebar groups awards into sections with progress counters ("Games 0/6", "Moments 0/10"), and it ends with survey questions and "Done".
+  - **Nominees** are tall poster cards in a row, image filling the card, title in heavy italic at the bottom. A rank badge ("1st") sits on the card.
+  - **Voting:** ranked, counted with a **Condorcet** method, not instant runoff. You can rank one or all nominees and skip whole awards, and change votes any time until voting closes. Settings offer a "simpler ranker" where you type numbers instead of dragging.
+  - **Extras:** achievement popups (gamification), a time-zone setting ("Joe time"), personal results and an optional public ballot after the stream, and a survey section.
+  - Clip awards say "Click nominees to see the clip!" on the card row.
 - **StrawWaffle's visualization article:** (not public yet) (work in progress). For the results page:
   - Use sorted horizontal bars starting at zero, with name, count and percentage labelled on each bar.
   - Show the vote total per category, and use one visual emphasis for the winner.
