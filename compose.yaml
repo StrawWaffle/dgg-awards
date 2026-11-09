@@ -1,0 +1,49 @@
+# Local preview of the awards site.
+#
+#   docker compose --profile mock-auth up -d --build     app + fake destiny.gg login
+#   docker compose exec app bun scripts/seed.ts --mode voting
+#   docker compose exec app bun scripts/seed.ts --mode reviewing --fake-votes 500
+#   docker compose exec app bun scripts/make-admin.ts --db /data/sqlite.db --username <name>
+#
+# Add --profile tunnel (and CLOUDFLARE_TUNNEL_TOKEN in .env) to publish it.
+services:
+  app:
+    build: .
+    env_file: .env
+    environment:
+      DB_FILE_NAME: /data/sqlite.db
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - awards_data:/data
+    restart: unless-stopped
+
+  # Stand-in for destiny.gg's OAuth endpoints (copied from dggradio). The app
+  # calls it as http://dgg-oauth:8789, the browser at localhost:8789. Set the
+  # matching values in .env (see .env.example).
+  dgg-oauth:
+    profiles: [mock-auth]
+    image: node:22-alpine
+    command: node /srv/server.mjs
+    environment:
+      PORT: 8789
+      DGG_CLIENT_ID: dev-client
+      DGG_CLIENT_SECRET: dev-secret
+    volumes:
+      - ./dev/dgg-oauth/server.mjs:/srv/server.mjs:ro
+    ports:
+      - "127.0.0.1:8789:8789"
+
+  # Cloudflare named tunnel. Point the public hostname at http://app:3000 in
+  # the Cloudflare dashboard.
+  tunnel:
+    profiles: [tunnel]
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on: [app]
+    restart: unless-stopped
+
+volumes:
+  awards_data:

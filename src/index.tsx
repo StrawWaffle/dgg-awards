@@ -138,9 +138,18 @@ const server = serve({
         },
       );
     },
-    "/Media/:id": ({ params }) => {
-      const destination = `${mediaUrl}${params.id}`;
-      return Response.redirect(destination, 301);
+    "/Media/:id": async ({ params }) => {
+      // Serve from src/media first; the old CDN (cdn.dgg.events) is gone.
+      const name = decodeURIComponent(params.id);
+      if (/^[\w.-]+$/.test(name) && !name.startsWith(".")) {
+        const file = Bun.file(`${import.meta.dir}/media/${name}`);
+        if (await file.exists()) {
+          return new Response(file, {
+            headers: [["Cache-Control", "public, max-age=3600"]],
+          });
+        }
+      }
+      return Response.redirect(`${mediaUrl}${params.id}`, 302);
     },
   },
 

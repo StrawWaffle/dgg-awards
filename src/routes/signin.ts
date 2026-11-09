@@ -6,6 +6,10 @@ const client_id = env("DGG_CLIENT_ID");
 const client_secret = env("DGG_CLIENT_SECRET");
 const redirect_uri = env("DGG_REDIRECT");
 const dgg_origin = env("DGG_ORIGIN", "https://www.destiny.gg");
+// Where the browser is sent to sign in. Differs from DGG_ORIGIN only when the
+// server reaches the provider at another address, e.g. the dev/dgg-oauth
+// stand-in inside Docker.
+const authorize_origin = env("DGG_AUTHORIZE_ORIGIN", dgg_origin);
 
 export async function signin(req: Bun.BunRequest) {
   const state = crypto.getRandomValues(new Uint8Array(16)).toHex();
@@ -23,9 +27,10 @@ export async function signin(req: Bun.BunRequest) {
     redirect_uri,
     state,
     code_challenge,
+    code_challenge_method: "S256",
   };
 
   return Response.redirect(
-    buildUrl(dgg_origin, "/oauth/authorize", params),
+    buildUrl(authorize_origin, "/oauth/authorize", params),
   );
 }
