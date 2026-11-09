@@ -16,6 +16,9 @@ declare module "*.module.css" {
   export = classes;
 }
 
+// Plain stylesheets are imported for their side effect only.
+declare module "*.css";
+
 declare module "*.png" {
   const value: string;
   export default value;

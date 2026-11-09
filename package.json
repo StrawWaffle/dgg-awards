@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "bun --hot src/index.tsx",
     "start": "NODE_ENV=production bun src/index.tsx",
-    "build": "bun run build.tsx"
+    "build": "bun run build.ts",
+    "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
     "@radix-ui/react-icons": "^1.3.2",
@@ -29,6 +30,7 @@
     "@types/react-dom": "^19.3.0",
     "drizzle-kit": "^0.31.11",
     "prettier": "^3.9.10",
-    "prettier-plugin-tailwindcss": "^0.8.1"
+    "prettier-plugin-tailwindcss": "^0.8.1",
+    "typescript": "^7.0.2"
   }
 }
