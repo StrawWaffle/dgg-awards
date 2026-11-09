@@ -28,21 +28,21 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 | | |
 |---|---|
 | Site | https://dgg-awards.strawwaffle.dev |
-| Fake login page | https://dgg-awards-login.strawwaffle.dev |
 | Local | http://localhost:3000 (pages load, but sign-in only works on the tunnel URL) |
 
-- Docker Compose runs three services. `app` is Bun with SQLite in the `awards_data` volume. `dgg-oauth` is a stand-in for destiny.gg login, behind the `mock-auth` profile. `tunnel` is cloudflared, behind the `tunnel` profile, and uses one token for both hostnames.
-- Cloudflare dashboard routes: `dgg-awards` → `http://app:3000`, `dgg-awards-login` → `http://dgg-oauth:8789`.
-- It currently shows the **results** page with 500 fake voters. Admins can switch to voting under Settings in `/admin`.
+- **Sign-in is real destiny.gg OAuth** (switched 2026-11-09, verified by StrawWaffle signing in and reaching `/admin`). The app is registered on the DGG account StrawWaffle set up for this, with the redirect `https://dgg-awards.strawwaffle.dev/oauth`. The credentials are only in `.env` (gitignored). `DGG_CLIENT_SECRET` contains `$`, so it's wrapped in single quotes there, which stops Compose from expanding it.
+- Docker Compose runs `app` (Bun, with SQLite in the `awards_data` volume) and `tunnel` (cloudflared, profile `tunnel`). The `dgg-oauth` stand-in (profile `mock-auth`) is no longer run on the live stack. It's kept for local and test use, see `tests/`. Its `dgg-awards-login` Cloudflare route has been deleted.
+- Cloudflare dashboard route: `dgg-awards` → `http://app:3000`.
+- It currently shows the **results** page with 500 fake voters (negative uids, ip `seed`). Admins can switch to voting under Configuration in `/admin`.
 - `ADMIN_USERNAMES=StrawWaffle,RiN_LuX` in `.env`. Anyone on that list becomes admin when they sign in.
-- **Known risk, accepted by StrawWaffle:** the fake login page is public and accepts any username, so anyone who finds it can sign in as an admin. It goes away when real DGG login is set up. Cloudflare Access and a passphrase were offered and declined.
+- **Known bug on the live site:** five emote images are broken, because the image names in `data.ts` are capitalized differently from the files and Linux treats them as different names: `eatFresh.png`, `gagaga.png`, `Mhm.gif`, `PeepoHug.png` and `PepoTurtle.png`. `dgg_chatter_of_the_year_banner_cutechristiangirl.png` (results page) isn't in `src/media` at all. Not fixed yet, pending StrawWaffle's go-ahead.
 - Crawlers and AI indexing are blocked through `robots.txt` (with 25 AI bots named), a meta robots tag and an `X-Robots-Tag` header on images. Cloudflare's "Block AI bots" toggle was suggested but not confirmed as turned on.
 - The first version is being sent to rinlux for review. **Wait for their feedback before doing the backlog.**
 
 ### Commands
 
 ```bash
-docker compose --profile mock-auth --profile tunnel up -d --build
+docker compose --profile tunnel up -d --build
 docker compose exec app bun scripts/seed.ts --mode voting                          # replaces nominees and ALL votes
 docker compose exec app bun scripts/seed.ts --mode reviewing --fake-votes 500
 MSYS_NO_PATHCONV=1 docker compose exec app bun scripts/make-admin.ts --db /data/sqlite.db --username <name>
@@ -83,19 +83,13 @@ The source zip (`dgga25.zip`) was deleted at StrawWaffle's request, so commit 1 
 ## Open questions
 
 - **Voting style:** one pick per category (as in 2025), or ranked voting like jadseya.com? To decide with rinlux.
-- **Real destiny.gg OAuth app:** StrawWaffle will set it up soon. Per DGG-Radio's notes, destiny.gg allows **one app per account**, and StrawWaffle's may already be used by DGG-Radio. He may need another account.
 - **What rinlux thinks is missing** compared with the live 2025 version.
 
 ## Planned features (agreed, not started)
 
 Order StrawWaffle gave: preview to rinlux first, then discuss, then these.
 
-1. **Switch to real DGG login.** Steps:
-   - Register the app with the redirect `https://dgg-awards.strawwaffle.dev/oauth`.
-   - In `.env`: set the real `DGG_CLIENT_ID` and `DGG_CLIENT_SECRET`, set `DGG_ORIGIN=https://www.destiny.gg`, and remove `DGG_AUTHORIZE_ORIGIN`.
-   - Stop the `mock-auth` profile and delete the fake users and sessions. Real accounts have different user IDs, and the fake ones are derived from the username hash.
-   - StrawWaffle deletes the `dgg-awards-login` route in Cloudflare.
-   - Prompt StrawWaffle when this is needed. He creates the app himself.
+1. ~~**Switch to real DGG login.**~~ Done 2026-11-09 (see Current state).
 2. **Dependency upgrades** to current versions, as one commit of their own. `bun outdated` showed minor bumps, the largest being radix-ui 1.4 → 1.8 and Tailwind 4.1 → 4.3.
 3. **Regression tests first, then end-to-end type safety.**
    - Write characterization tests with `bun test` against a seeded database. Cover status codes, response shapes, sign-in, voting twice in a category, and that results totals add up.
