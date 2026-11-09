@@ -55,10 +55,13 @@ export function NomineeEditor() {
   const category = categories.find((c) => c.id === selected);
 
   return (
-    <div className="flex min-h-[70vh] flex-col rounded border border-neutral-200 bg-white md:flex-row md:items-start">
-      {/* Sticks while the nominees scroll, with its own scrollbar if long. */}
+    // On wide screens the editor is exactly the window's height (less the
+    // page padding, 3rem) and each side scrolls by itself, so the page never
+    // does. A sticky, screen-tall list inside a padded page left a few pixels
+    // of page scroll that cut off its top or bottom (Firefox showed it).
+    <div className="flex min-h-[70vh] flex-col rounded border border-neutral-200 bg-white md:h-[calc(100dvh-3rem)] md:min-h-0 md:flex-row md:overflow-hidden">
       <nav
-        className="shrink-0 border-b border-neutral-200 md:sticky md:top-0 md:max-h-screen md:w-64 md:overflow-y-auto md:border-b-0"
+        className="shrink-0 border-b border-neutral-200 md:w-64 md:overflow-y-auto md:overscroll-contain md:border-b-0"
         aria-label="Categories"
       >
         <SortableList ids={categories.map((c) => c.id)} onReorder={(ids) => reorder.mutate({ ids })}>
@@ -77,7 +80,7 @@ export function NomineeEditor() {
         <ErrorText>{reorder.error?.message}</ErrorText>
         <AddCategory taken={new Set(categories.map((c) => c.id))} onAdded={setSelected} />
       </nav>
-      <div className="min-h-[70vh] min-w-0 flex-1 self-stretch p-4 md:border-l md:border-neutral-200">
+      <div className="min-w-0 flex-1 p-4 md:overflow-y-auto md:overscroll-contain md:border-l md:border-neutral-200">
         {category ? (
           <CategoryPanel key={category.id} category={category} issues={issuesFor(category.id)} />
         ) : (
