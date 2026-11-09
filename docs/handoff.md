@@ -27,7 +27,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 
 ### At a glance (end of session 2, 2026-11-09)
 
-**Live** (`main` at `7068b01` plus docs, deployed and pushed):
+**Live** (`main` at `7568e2a` plus docs, deployed and pushed):
 - **Infrastructure:** the Docker preview behind a Cloudflare tunnel, real destiny.gg sign-in, the stack upgrade (Bun 1.4, Hono, Zod, TS 7), and clips into Cloudflare R2 at 1080p.
 - **Admin page:**
   - a left sidebar, dark theme, drag to reorder, and collapsible sections
@@ -45,6 +45,8 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
   - a calmer stage cast, combos in the chat column, and the beat as a shared gust on the background emotes
   - the music button shows the volume while it changes (MMMM, OOOO at a speed that follows the volume, OverRustle at full), on a perceptual volume curve
   - the Results tab is a summary to scroll through after the show: overview, highlights, standings and runoff rounds per award
+  - first and second place are revealed together on the big screen, trading the lead before the winner pulls ahead
+  - nominees without a built clip play from the source (YouTube, Twitch, Streamable embeds, or a video file)
   - the big screen fills the window and presents in scenes per award: title, a DVD-style nominee menu, the results reveal, and the winner. Clips are lowered in and the music fades out for them. Tabs slide, and background emotes show their colours on hover.
 
 **Waiting on rinlux** (StrawWaffle is asking; they decide on privacy):
@@ -57,6 +59,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
   - Where voters are: an IP lookup, asking voters, or browser location, or none.
   - Who else gets access: a presenter allowlist for the big screen (it uses the live chat relay), editors or moderators with fewer rights, and preview access for chosen people.
   - Locking the site behind sign-in before voting, with a countdown.
+  - Embedding YouTube and Twitch players for clips we haven't built: they load those sites in visitors' browsers.
   - The privacy page's content, and whether the repo can ever be public (the nominee data names real people).
 
 **Ideas from StrawWaffle, not built (some need rinlux's say):**
@@ -83,7 +86,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 - Fast-forward `main`, run `docker compose --profile tunnel up -d --build app`, then check `/`, `/api/config`, `/lab` (200), `/api/admin/checks` and `/api/lab/emotes` (401), and `/signin` (to destiny.gg).
 - Push `main`.
 
-**Worktrees:** everything under `.claude/worktrees/` is merged (`admin-pass`, `editor-scroll`, `lab`, `lab-polish`, `lab-polish-2`, `lab-polish-3`, `lab-polish-4`, `lab-summary`, `nominee-images`, `sketchy`) and can be removed.
+**Worktrees:** everything under `.claude/worktrees/` is merged (`admin-pass`, `editor-scroll`, `lab`, `lab-polish`, `lab-polish-2`, `lab-polish-3`, `lab-polish-4`, `lab-summary`, `admin-lab-link`, `duel-reveal`, `nominee-images`, `sketchy`) and can be removed.
 
 **Test containers**, on network `dgga-test`, all kept running:
 
@@ -348,11 +351,11 @@ The big screen does the live reveal now, so the lab's Results tab became a page 
 - The old reveal page (`Results()`) is gone; `Results.tsx` keeps the `Board` the big screen uses.
 - Not included, since it needs rinlux's say: overall unique voters and votes per day (the admin stats have them). Ballots cast is the sum over awards.
 
-### First and second revealed together (branch `worktree-duel-reveal`, 2026-11-09, not deployed)
+### First and second revealed together (2026-11-09, deployed)
 
 On the big screen's results scene, the last two rows go together (`duelPlan` in `Results.tsx`). One "Reveal next" starts both once only they are left. Their bars grow side by side and swap the lead five times over about 5 s (six lead changes measured), level at the end of the race. Then the runner-up stops at its count while the winner pulls ahead to its own. The sway is small enough that neither bar shrinks. Both bars keep the plain colour and hatching until the race is over, and only then does the winner turn coral and cross-hatched and get circled. This replaced the winner's solo race against the runner-up.
 
-### Clips that haven't been built play from the source (same branch, 2026-11-09, not deployed)
+### Clips that haven't been built play from the source (2026-11-09, deployed)
 
 In the lab (voting, big screen, results summary), a nominee without a built clip now plays its source link in the platform's own player:
 - **YouTube** (`youtube-nocookie.com`) starts and ends at the clip's times, from `clipStart`/`clipEnd` or the link's own timestamp.
