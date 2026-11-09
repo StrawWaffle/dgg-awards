@@ -148,7 +148,7 @@ await setMode(admin, "locked");
 await shot("locked");
 await setMode(admin, "voting");
 
-for (const tab of ["Nominees", "Configuration", "Management", "Users", "Votes"]) {
+for (const tab of ["Nominees", "Settings", "Admins", "Votes"]) {
   await shot(`admin-${tab.toLowerCase()}`, {
     path: "/admin",
     token: admin,

@@ -54,28 +54,35 @@ export async function submitVote(categoryId: string, nomineeId: string) {
 
 // Admin
 
-export async function fetchAllUsers() {
-  return parseResponse(client.api.admin.users.$get());
+/** The admins, or with `q` up to 20 users whose name contains it. */
+export async function fetchUsers(q?: string) {
+  return parseResponse(client.api.admin.users.$get({ query: q ? { q } : {} }));
 }
+
+export type AdminUser = Awaited<ReturnType<typeof fetchUsers>>[number];
 
 export async function fetchAdminNom() {
   return parseResponse(client.api.admin.nominees.$get());
 }
 
+export type VoteFilter = { uid?: number; ip?: string; name?: string };
+
 /** One page of votes, 100 per page, page numbers from 0. */
-export async function fetchAllVotes(
-  page: number,
-  filter: undefined | { uid?: number; ip?: string },
-) {
+export async function fetchAllVotes(page: number, filter: VoteFilter = {}) {
   return parseResponse(
     client.api.admin.votes.$get({
       query: {
         page: page.toString(),
-        filter_uid: filter?.uid?.toString(),
-        filter_ip: filter?.ip || undefined,
+        filter_uid: filter.uid?.toString(),
+        filter_ip: filter.ip || undefined,
+        filter_name: filter.name || undefined,
       },
     }),
   );
+}
+
+export async function fetchVoteStats() {
+  return parseResponse(client.api.admin.stats.$get());
 }
 
 export async function deleteCategory(id: string) {
@@ -86,23 +93,9 @@ export async function deleteNominee(categoryId: string, id: string) {
   await client.api.admin.nominee.$delete({ query: { categoryId, id } });
 }
 
-export async function updateCategory(
-  categoryId: string,
-  description?: string,
-  title?: string,
-) {
-  await client.api.admin.category.$patch({
-    json: { id: categoryId, description, title },
-  });
-}
-
 export type NomineePatch = Parameters<
   typeof client.api.admin.nominee.$patch
 >[0]["json"];
-
-export async function updateNominee(data: NomineePatch) {
-  await client.api.admin.nominee.$patch({ json: data });
-}
 
 // Editor calls: unlike the fire-and-forget helpers above, these throw an
 // Error carrying the server's message, so the form can show what went wrong.
@@ -186,8 +179,8 @@ export async function fetchDggProfile(name: string) {
   return parseResponse(Promise.resolve(res));
 }
 
-export async function makeAdmin(uid: number) {
-  await client.api.admin.user.$patch({ json: uid });
+export async function setAdmin(uid: number, admin: boolean) {
+  await ok(await client.api.admin.user.$patch({ json: { uid, admin } }), "Couldn't change that");
 }
 
 // Third-party lookups, not our API.

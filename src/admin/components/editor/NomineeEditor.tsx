@@ -11,7 +11,6 @@ import {
   createCategory,
   createNominee,
   deleteCategory,
-  deleteNominee,
   fetchAdminNom,
   fetchChecks,
   saveCategory,
@@ -49,8 +48,11 @@ export function NomineeEditor() {
   const category = categories.find((c) => c.id === selected);
 
   return (
-    <div className="flex min-h-[70vh] rounded border border-neutral-200 bg-white">
-      <nav className="w-60 shrink-0 border-r border-neutral-200" aria-label="Categories">
+    <div className="flex min-h-[70vh] flex-col rounded border border-neutral-200 bg-white md:flex-row">
+      <nav
+        className="shrink-0 border-b border-neutral-200 md:w-64 md:border-r md:border-b-0"
+        aria-label="Categories"
+      >
         <ul>
           {categories.map((c) => {
             const issues = issuesFor(c.id);
@@ -61,15 +63,17 @@ export function NomineeEditor() {
                   type="button"
                   onClick={() => setSelected(c.id)}
                   className={clsx(
-                    "flex w-full items-baseline justify-between gap-2 border-b border-neutral-100 px-3 py-2 text-left text-sm hover:bg-neutral-50",
-                    c.id === selected && "bg-neutral-100 font-bold",
+                    "block w-full border-b border-l-2 border-b-neutral-100 px-3 py-2 text-left text-sm hover:bg-neutral-50",
+                    c.id === selected ? "border-l-emerald-700 bg-neutral-100 font-bold" : "border-l-transparent",
                   )}
                 >
-                  <span className="truncate">{c.title}</span>
-                  <span className="shrink-0 text-xs">
-                    {errors > 0 && <span className="text-red-700">{errors} err</span>}
+                  <span className="block">{c.title}</span>
+                  <span className="block text-xs font-normal text-neutral-500">
+                    {errors > 0 && <span className="text-red-700">{errors} error{errors === 1 ? "" : "s"}</span>}
                     {errors > 0 && issues.length > errors && " · "}
-                    {issues.length > errors && <span className="text-neutral-500">{issues.length - errors} warn</span>}
+                    {issues.length > errors &&
+                      `${issues.length - errors} warning${issues.length - errors === 1 ? "" : "s"}`}
+                    {issues.length === 0 && "No problems"}
                   </span>
                 </button>
               </li>
@@ -82,7 +86,7 @@ export function NomineeEditor() {
         {category ? (
           <CategoryPanel key={category.id} category={category} issues={issuesFor(category.id)} />
         ) : (
-          <p className="text-sm text-neutral-600">No categories yet. Add one in Management.</p>
+          <p className="text-sm text-neutral-600">No categories yet. Add the first one under the list.</p>
         )}
       </div>
     </div>
@@ -205,10 +209,6 @@ function CategoryPanel({ category, issues }: { category: AdminCategory; issues: 
     mutationFn: () => deleteCategory(category.id),
     onSuccess: refresh,
   });
-  const removeNominee = useMutation({
-    mutationFn: (id: string) => deleteNominee(category.id, id),
-    onSuccess: refresh,
-  });
 
   return (
     <div className="space-y-6">
@@ -300,14 +300,6 @@ function CategoryPanel({ category, issues }: { category: AdminCategory; issues: 
                     </span>
                   </button>
                   <Button onClick={() => setOpen(isOpen ? null : n.id)}>{isOpen ? "Close" : "Edit"}</Button>
-                  <Button
-                    variant="danger"
-                    onClick={() => {
-                      if (confirm(`Delete "${n.title}"?`)) removeNominee.mutate(n.id);
-                    }}
-                  >
-                    Delete
-                  </Button>
                 </div>
                 {isOpen && (
                   <div className="border-t border-neutral-200 bg-neutral-50 p-4">

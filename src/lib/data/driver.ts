@@ -3,6 +3,8 @@ import {
   type InferInsertModel,
   type InferSelectModel,
   and,
+  asc,
+  desc,
   eq,
   isNull,
   lt,
@@ -48,8 +50,24 @@ export async function getUser(
   )[0];
 }
 
-export async function getAllUsers() {
-  return await db.query.usersTable.findMany();
+/** Everyone who is an admin, by name. */
+export async function getAdmins() {
+  return await db
+    .select()
+    .from(schema.usersTable)
+    .where(eq(schema.usersTable.admin, true))
+    .orderBy(asc(schema.usersTable.name));
+}
+
+/** Up to 20 users whose name contains `q` (any case). */
+export async function searchUsers(q: string) {
+  const pattern = `%${q.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
+  return await db
+    .select()
+    .from(schema.usersTable)
+    .where(sql`${schema.usersTable.name} LIKE ${pattern} ESCAPE '\\'`)
+    .orderBy(asc(schema.usersTable.name))
+    .limit(20);
 }
 
 export async function insertState(
@@ -234,30 +252,88 @@ export async function setSetting(key: string, val: string) {
     .onConflictDoUpdate({ target: schema.configurationTable.key, set: { val } });
 }
 
-export async function getAllVotes(offset = 0) {
-  return await db.query.votesTable.findMany({ limit: 100, offset });
+const voteIp = sql<string>`json_extract(${schema.votesTable.sessionSnapshot}, '$.ip')`;
+
+/**
+ * One page of votes (100 rows), newest first, with the voter's name and the
+ * category and nominee titles. A ranked ballot is one row per choice.
+ */
+export async function getVotesPage(
+  offset = 0,
+  filter: { ip?: string; uid?: number; name?: string } = {},
+) {
+  const v = schema.votesTable;
+  return await db
+    .select({
+      uid: v.uid,
+      name: schema.usersTable.name,
+      at: v.at,
+      categoryId: v.categoryId,
+      categoryTitle: schema.categoriesTable.title,
+      optionId: v.optionId,
+      optionTitle: schema.optionsTable.title,
+      rank: v.rank,
+      ip: voteIp,
+    })
+    .from(v)
+    .innerJoin(schema.usersTable, eq(schema.usersTable.uid, v.uid))
+    .innerJoin(schema.categoriesTable, eq(schema.categoriesTable.id, v.categoryId))
+    .leftJoin(
+      schema.optionsTable,
+      and(eq(schema.optionsTable.id, v.optionId), eq(schema.optionsTable.categoryId, v.categoryId)),
+    )
+    .where(
+      and(
+        filter.uid !== undefined ? eq(v.uid, filter.uid) : undefined,
+        filter.ip ? eq(voteIp, filter.ip) : undefined,
+        filter.name ? sql`lower(${schema.usersTable.name}) = lower(${filter.name})` : undefined,
+      ),
+    )
+    .orderBy(desc(v.at), asc(v.uid), asc(v.categoryId), asc(v.rank))
+    .limit(100)
+    .offset(offset);
 }
 
-export async function getAllVotesFiltered(
-  offset = 0,
-  ipFilter?: string,
-  uidFilter?: string,
-) {
-  return await db.query.votesTable.findMany({
-    limit: 100,
-    offset,
-    where() {
-      return and(
-        uidFilter ? eq(schema.votesTable.uid, parseInt(uidFilter)) : undefined,
-        ipFilter
-          ? eq(
-              sql<string>`json_extract(${schema.votesTable.sessionSnapshot}, '$.ip')`,
-              ipFilter,
-            )
-          : undefined,
-      );
-    },
-  });
+/**
+ * Totals for the admin Votes tab. A ballot is one voter's vote in one
+ * category (a ranked ballot counts once, however many choices it has).
+ */
+export async function getVoteStats() {
+  const v = schema.votesTable;
+  const [totals] = await db
+    .select({
+      voters: sql<number>`count(distinct ${v.uid})`,
+      ballots: sql<number>`count(*) filter (where ${v.rank} = 1)`,
+      users: sql<number>`(select count(*) from ${schema.usersTable})`,
+    })
+    .from(v);
+  const categories = await db
+    .select({
+      id: schema.categoriesTable.id,
+      title: schema.categoriesTable.title,
+      ballots: sql<number>`count(${v.uid})`,
+    })
+    .from(schema.categoriesTable)
+    .leftJoin(v, and(eq(v.categoryId, schema.categoriesTable.id), eq(v.rank, 1)))
+    .groupBy(schema.categoriesTable.id)
+    // Insertion order, as everywhere else categories are listed.
+    .orderBy(sql`${schema.categoriesTable}.rowid`);
+  const day = sql<string>`date(${v.at}, 'unixepoch')`;
+  const days = await db
+    .select({ day, ballots: sql<number>`count(*)`, voters: sql<number>`count(distinct ${v.uid})` })
+    .from(v)
+    .where(eq(v.rank, 1))
+    .groupBy(day)
+    .orderBy(asc(day));
+  // Several accounts voting from one address is the plainest bot signal.
+  const sharedIps = await db
+    .select({ ip: voteIp, voters: sql<number>`count(distinct ${v.uid})` })
+    .from(v)
+    .groupBy(voteIp)
+    .having(sql`count(distinct ${v.uid}) > 1`)
+    .orderBy(desc(sql`count(distinct ${v.uid})`))
+    .limit(10);
+  return { ...totals!, categories, days, sharedIps };
 }
 
 export async function getNominee(categoryId: string, id: string) {
@@ -428,10 +504,10 @@ export async function setViewingMode(
   }
 }
 
-export async function updateUserMakeAdmin(uid: User["uid"]) {
+export async function setUserAdmin(uid: User["uid"], admin: boolean) {
   await db
     .update(schema.usersTable)
-    .set({ admin: true })
+    .set({ admin })
     .where(eq(schema.usersTable.uid, uid));
 }
 

@@ -8,7 +8,7 @@ import {
   getVerifier,
   insertState,
   insertUser,
-  updateUserMakeAdmin,
+  setUserAdmin,
 } from "@/lib/data/driver";
 import { buildUrl, env } from "@/lib/util";
 import type {
@@ -27,7 +27,7 @@ const dgg_origin = env("DGG_ORIGIN", "https://www.destiny.gg");
 // stand-in inside Docker.
 const authorize_origin = env("DGG_AUTHORIZE_ORIGIN", dgg_origin);
 // Comma-separated DGG usernames that become admins when they sign in.
-const adminUsernames = new Set(
+export const adminUsernames = new Set(
   env("ADMIN_USERNAMES", "")
     .split(",")
     .map((name) => name.trim().toLowerCase())
@@ -143,7 +143,7 @@ export const authRoutes = new Hono()
       });
     }
     if (!existing?.admin && adminUsernames.has(userInfo.nick.toLowerCase())) {
-      await updateUserMakeAdmin(userInfo.userId);
+      await setUserAdmin(userInfo.userId, true);
     }
 
     // Cloudflare's header; "Unknown" when not behind the tunnel.

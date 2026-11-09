@@ -44,7 +44,8 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 1. **Voting page redesign:** ranked-voting UI, one category per page with progress (like jadseya.com), cuter. The hill-climbing method applies.
 2. **Results reveal and presenter mode:** reveal-all-but-last-three, clips that stop, room for the stream camera, charts per StrawWaffle's visualization article, and the runoff rounds.
 3. **Re-check the double-count fix** against the original code, and against the real 2025 votes if they turn up.
-4. Smaller items:
+4. **Admin pass** (branch `worktree-admin-pass`, waiting for StrawWaffle's review, not merged). See "Admin pass" below.
+5. Smaller items:
    - Re-pull emotes from the DGG CDN.
    - Privacy page.
    - Bot-vote comparison.
@@ -65,7 +66,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 - **Sign-in is real destiny.gg OAuth** (switched 2026-11-09, verified by StrawWaffle signing in and reaching `/admin`). The app is registered on the DGG account StrawWaffle set up for this, with the redirect `https://dgg-awards.strawwaffle.dev/oauth`. The credentials are only in `.env` (gitignored). `DGG_CLIENT_SECRET` contains `$`, so it's wrapped in single quotes there, which stops Compose from expanding it.
 - Docker Compose runs `app` (Bun, with SQLite in the `awards_data` volume) and `tunnel` (cloudflared, profile `tunnel`). The `dgg-oauth` stand-in (profile `mock-auth`) is no longer run on the live stack. It's kept for local and test use, see `tests/`. Its `dgg-awards-login` Cloudflare route has been deleted.
 - Cloudflare dashboard route: `dgg-awards` → `http://app:3000`.
-- It currently shows the **results** page with 500 fake voters (negative uids, ip `seed`). Admins can switch to voting under Configuration in `/admin`.
+- It currently shows the **results** page with 500 fake voters (negative uids, ip `seed`). Admins can switch to voting under Settings in `/admin`.
 - `ADMIN_USERNAMES=StrawWaffle,RiN_LuX` in `.env`. Anyone on that list becomes admin when they sign in.
 - Crawlers and AI indexing are blocked through `robots.txt` (with 25 AI bots named), a meta robots tag and an `X-Robots-Tag` header on images. Cloudflare's "Block AI bots" toggle was suggested but not confirmed as turned on.
 - The first version is being sent to rinlux for review. **Wait for their feedback before doing the backlog.**
@@ -100,13 +101,42 @@ These were the first changes. The routes have since moved to `src/server/` (Hono
 
 - **Stack:** Bun (server and bundler), React 19, Tailwind 4, Radix UI, TanStack Query, Drizzle ORM on SQLite. About 8 route files in `src/routes`. StrawWaffle wants to keep this stack.
 - **Login:** destiny.gg's custom OAuth. It isn't standard PKCE: the challenge is `base64(sha256hex(verifier + sha256hex(secret)))`. DGG-Radio's `docs/research/dgg-oauth-netlify.md` documents the protocol. Sessions are signed cookies that last a week.
-- **Bot defense already in place:** every vote stores a snapshot of the session (`CF-Connecting-IP`, user agent). The admin Votes tab filters by IP. Users' DGG account creation dates are stored.
+- **Bot defense already in place:** every vote stores a snapshot of the session (`CF-Connecting-IP`, user agent). The admin Votes tab filters by voter or IP and lists addresses shared by several voters. Users' DGG account creation dates are stored.
 - **Modes:** `locked`, `voting`, `idle`, `reviewing`, plus start and end times in the `configuration` table.
 - **The zip is older than the version used on stream.** On stream there was click-to-reveal per nominee and a "Reveal all but last three" button (transcript 4:39). The zip has neither, only a single per-category "Reveal" that unblurs nominees one by one. Those features have to be rebuilt. Newest file in the zip: 2026-01-03.
 - **Dead hosts:** `cdn.dgg.events`, `dgg.events` and `git.defeten.com` (the original repo). No Wayback Machine copies exist. All 88 images in `data.ts` are in `src/media`.
 - The sidebar that tracks your position was never finished (`todo.md`).
 - `PossibleLink` (`src/components/util.tsx`) already sets `target="_blank"`, yet on stream the ↗ arrow didn't open a new tab on left click. Not investigated.
 - Results bars are drawn at `percentage / 1.6` height, which doesn't match the visualization principles below.
+
+## Admin pass (branch `worktree-admin-pass`, 2026-11-09)
+
+StrawWaffle asked for a visual pass over the admin page and whether everything there was needed, then approved steps 1–5:
+
+1. **Management tab removed.** Its add-category and add-nominee forms duplicated the editor, and its nominee form still asked for a "Video ID". The JSON import box went with it.
+   - **The server routes stay:** `POST /api/admin/import`, `/category` and `/nominee` (form posts). The API tests use the last two for setup.
+   - **Import is pending rinlux:** StrawWaffle will ask what format they use now, and whether they need an import. Either keep the route or build a new one for that format, then drop the old routes.
+2. **Settings** (was Configuration) is one form: mode, voting opens and closes (`datetime-local` in the browser's time zone, no more Unix seconds), award year and default voting style. `PATCH /api/admin/settings` now also takes `startTime`, `endTime` and `viewingMode`. `POST /api/admin/config` stays because the screenshot script and `dgga-base` use it.
+3. **Editor and layout:**
+   - The tabs are underlined instead of pills, the padding matches the header, and the header shows the award year from settings instead of a hard-coded 2025.
+   - The category list shows full titles, with the error and warning counts on a second line.
+   - Delete nominee moved from each row into the open form. The disabled button is plain grey (the faded green looked broken), and the thumbnail upload is a button.
+   - The editor stacks on narrow screens.
+4. **Votes:**
+   - Totals: voters, ballots, people signed in; ballots per category and per day (UTC); addresses shared by several voters.
+   - The vote list is a table with names and titles. Clicking a voter or an IP filters by it, and the voter filter takes a name or a uid.
+   - Endpoints: `GET /api/admin/stats`, and `GET /api/admin/votes` now returns `name`, `categoryTitle`, `optionTitle` and `ip` instead of the session snapshot. It also takes `filter_name`.
+5. **Admins** (was Users): lists the admins only, with a name search to add more and a Remove button.
+   - You can't remove yourself or anyone in `ADMIN_USERNAMES`, because sign-in would make them admin again.
+   - `GET /api/admin/users` returns the admins, or with `?q=` up to 20 name matches. Each comes with `fromEnv`. `PATCH /api/admin/user` takes `{uid, admin}`; a bare uid still makes someone admin.
+
+Tests: typecheck, 78 unit tests and 38 API tests pass, with both snapshots unchanged. New API tests cover user search, vote names and filters, the stats and the settings window. Screenshots were checked at 1440, 1024 and 390 px wide. Built and running as `dgga-review` (port 3500, image `dgga:review`), a container just for this branch.
+
+**Ideas from StrawWaffle, not built.** Several need rinlux's say first, since they are in charge of these decisions:
+- **More roles** than admin, e.g. moderators or editors who can only edit nominees.
+- **Lock the site behind sign-in** before voting, with a countdown to the voting date.
+- **Let chosen people preview** the reveal page or other pages.
+- **Where voters are:** an IP lookup for regions, asking voters directly, or asking permission before a lookup or browser location. Privacy matters here, and it ties in with the privacy page (feature 6).
 
 ## Open questions
 
@@ -201,7 +231,7 @@ Order StrawWaffle gave: preview to rinlux first, then discuss, then these.
      - **Configuration tab:** now has the award year and default voting style. Also fixed: the timing fields could stay empty, because their `defaultValue` was set before the config had loaded.
      - **Preview:** the admin header links to `/?preview=voting` and `/?preview=results`. Signed-in admins see that page with a banner, and everyone else sees the real mode. `GET /api/vote/results?preview=1` is admin-only, and `/api/me` now includes `admin`.
      - **Verified in the browser:** editing Peter Miller (clip 1:00–1:15 and a date) cleared his warnings, building the clip went to Ready on its own, picking the 9 s frame updated the thumbnail, and the results preview worked while public results stayed 401.
-     - **Adding:** "New category" under the category list and "New nominee" in each category take just a title (plus an optional link). The id comes from the title (`src/lib/ids.ts`, with `_2`, `_3`… if taken), and the full form opens next. Endpoints: `POST /api/admin/categories` and `/api/admin/nominees` (JSON). The old Management tab forms still work.
+     - **Adding:** "New category" under the category list and "New nominee" in each category take just a title (plus an optional link). The id comes from the title (`src/lib/ids.ts`, with `_2`, `_3`… if taken), and the full form opens next. Endpoints: `POST /api/admin/categories` and `/api/admin/nominees` (JSON). The Management tab that had the old forms was removed in the admin pass (see below); its server routes remain.
    - **Nominee model and checks: done on branch `worktree-nominee-model`** (step 1). The new columns are `date`, `linkType`, `clipStart` and `clipEnd`. `src/lib/links.ts` and `src/lib/nominee-checks.ts` hold the logic, `GET /api/admin/checks` and `bun scripts/check-nominees.ts` report problems, and the config gains `awardYear`. The 2025 data scores 0 of 174 clean, with 25 errors and 317 warnings. When deploying, also set `awardYear` to 2025 in the live database, because the seed only sets it for fresh databases.
    - **DGG profiles for chatter nominees** (step 1, StrawWaffle's idea).
      - `destiny.gg/u/<name>` is the "membership card". The `dgg-profile` link type is not a bare link.

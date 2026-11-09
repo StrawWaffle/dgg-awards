@@ -23,10 +23,18 @@ export const voteSubmit = z.union([
 
 export const resultsQuery = z.object({ preview: z.literal("1").optional() });
 
-export const settingsPatch = z.object({
-  awardYear: z.number().int().min(2000).max(2100).optional(),
-  defaultVotingStyle: z.enum(votingStyles).optional(),
-});
+export const settingsPatch = z
+  .object({
+    awardYear: z.number().int().min(2000).max(2100).optional(),
+    defaultVotingStyle: z.enum(votingStyles).optional(),
+    /** Unix seconds. Voting is open between them in voting mode. */
+    startTime: z.number().int().positive().optional(),
+    endTime: z.number().int().positive().optional(),
+    viewingMode: z.enum(viewingModes).optional(),
+  })
+  .refine((s) => s.startTime === undefined || s.endTime === undefined || s.startTime < s.endTime, {
+    message: "Voting has to end after it starts",
+  });
 
 // Admin forms are plain HTML <form> posts, so every field arrives as a string.
 /** An optional form field: blank means not given. */
@@ -112,7 +120,14 @@ export const nomineePatch = z.object({
   ...nomineeDetails,
 });
 
-export const userIdBody = z.number().int();
+/** Make a user admin (a bare uid, as before) or set it either way. */
+export const userAdminBody = z.union([
+  z.number().int().transform((uid) => ({ uid, admin: true })),
+  z.object({ uid: z.number().int(), admin: z.boolean() }),
+]);
+
+/** Admins only, or users whose name contains `q`. */
+export const usersQuery = z.object({ q: z.string().trim().min(1).max(40).optional() });
 
 export const idQuery = z.object({ id: required });
 
@@ -131,7 +146,8 @@ export const thumbnailUpload = z.object({
 
 export const votesQuery = z.object({
   filter_ip: z.string().optional(),
-  filter_uid: z.string().optional(),
+  filter_uid: z.string().regex(/^-?\d+$/).optional(),
+  filter_name: z.string().trim().min(1).optional(),
   page: z.string().optional(),
 });
 

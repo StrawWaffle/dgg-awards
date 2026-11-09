@@ -256,26 +256,47 @@ describe("admin", () => {
     ).toBe(401);
   });
 
-  test("users list", async () => {
+  test("users list has the admins, or name matches with ?q=", async () => {
     const res = await req("/api/admin/users", {}, admin);
     expect(res.status).toBe(200);
     const users = await res.json();
-    const tester = users.find((u: any) => u.name === "Tester");
-    expect(tester.admin).toBe(true);
-    expect(Object.keys(tester).sort()).toEqual(["admin", "createdDate", "name", "uid"]);
+    expect(users.map((u: any) => u.name)).toEqual(["Tester"]);
+    expect(users[0]).toMatchObject({ admin: true, fromEnv: true });
+    expect(Object.keys(users[0]).sort()).toEqual(["admin", "createdDate", "fromEnv", "name", "uid"]);
+    const found = await (await req("/api/admin/users?q=OTADM", {}, admin)).json();
+    expect(found.map((u: any) => [u.name, u.admin, u.fromEnv])).toEqual([["NotAdmin", false, false]]);
+    // LIKE wildcards are matched literally.
+    expect(await (await req("/api/admin/users?q=%25", {}, admin)).json()).toEqual([]);
   });
 
-  test("votes list pages by 100 and filters", async () => {
+  test("votes list pages by 100, with names and titles, and filters", async () => {
     const all = await (await req("/api/admin/votes", {}, admin)).json();
     expect(all).toHaveLength(100);
     expect(Object.keys(all[0]).sort()).toEqual(
-      ["at", "categoryId", "optionId", "rank", "sessionSnapshot", "uid"].sort(),
+      ["at", "categoryId", "categoryTitle", "ip", "name", "optionId", "optionTitle", "rank", "uid"].sort(),
     );
+    expect(all.every((v: any) => v.name && v.categoryTitle && v.optionTitle)).toBe(true);
     const byIp = await (await req("/api/admin/votes?filter_ip=seed", {}, admin)).json();
     expect(byIp).toHaveLength(100);
     const byUid = await (await req("/api/admin/votes?filter_uid=-1", {}, admin)).json();
     expect(byUid.every((v: any) => v.uid === -1)).toBe(true);
     expect(byUid.length).toBeGreaterThan(0);
+    const name = byUid[0].name;
+    const byName = await (await req(`/api/admin/votes?filter_name=${name.toUpperCase()}`, {}, admin)).json();
+    expect(byName).toEqual(byUid);
+    expect((await req("/api/admin/votes?filter_uid=abc", {}, admin)).status).toBe(400);
+  });
+
+  test("vote stats add up", async () => {
+    const res = await req("/api/admin/stats", {}, admin);
+    expect(res.status).toBe(200);
+    const stats = await res.json();
+    // The 500 seeded voters, plus the one from the voting tests.
+    expect(stats.voters).toBe(501);
+    expect(stats.categories.reduce((n: number, c: any) => n + c.ballots, 0)).toBe(stats.ballots);
+    expect(stats.days.reduce((n: number, d: any) => n + d.ballots, 0)).toBe(stats.ballots);
+    expect(stats.sharedIps).toEqual([{ ip: "seed", voters: 500 }]);
+    expect((await req("/api/admin/stats", {}, user)).status).toBe(401);
   });
 
   test("votes page by page number", async () => {
@@ -533,6 +554,18 @@ describe("admin", () => {
     );
     expect(res.status).toBe(200);
     expect((await req("/admin", {}, other)).status).toBe(302);
+
+    const set = (body: unknown) =>
+      req(
+        "/api/admin/user",
+        { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body) },
+        admin,
+      );
+    const testerUid = (await (await req("/api/me", {}, admin)).json()).uid;
+    // Yourself, and anyone in ADMIN_USERNAMES, can't be removed here.
+    expect((await set({ uid: testerUid, admin: false })).status).toBe(400);
+    expect((await set({ uid: uid, admin: false })).status).toBe(200);
+    expect((await req("/admin", {}, other)).status).toBe(401);
   });
 
   test("config rejects bad input", async () => {
@@ -545,6 +578,27 @@ describe("admin", () => {
       admin,
     );
     expect(res.status).toBe(400);
+  });
+
+  test("settings set the voting window and mode", async () => {
+    const patch = (body: unknown) =>
+      req(
+        "/api/admin/settings",
+        { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body) },
+        admin,
+      );
+    const before = await (await req("/api/config")).json();
+    expect((await patch({ startTime: 2000, endTime: 1000 })).status).toBe(400);
+    expect((await patch({ viewingMode: "party" })).status).toBe(400);
+    const res = await patch({ startTime: 1000, endTime: 2000, viewingMode: "idle" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ startTime: "1000", endTime: "2000", viewingMode: "idle" });
+    await patch({
+      startTime: Number(before.startTime),
+      endTime: Number(before.endTime),
+      viewingMode: before.viewingMode,
+    });
+    expect(await (await req("/api/config")).json()).toEqual(before);
   });
 
   test("data import requires admin", async () => {

@@ -27,7 +27,9 @@ export function Button({
       type="button"
       {...props}
       className={clsx(
-        "rounded border px-3 py-1 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+        "rounded border px-3 py-1 text-sm transition-colors",
+        // One plain disabled look for every variant; a faded green read as broken.
+        "disabled:cursor-not-allowed disabled:border-neutral-200 disabled:bg-neutral-100 disabled:text-neutral-400",
         {
           "border-neutral-300 bg-white text-neutral-800 hover:bg-neutral-100": variant === "default",
           "border-emerald-700 bg-emerald-700 text-white hover:bg-emerald-800": variant === "primary",

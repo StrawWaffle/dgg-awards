@@ -2,9 +2,11 @@ import { Hono } from "hono";
 import {
   deleteCategory,
   deleteNominee,
-  getAllUsers,
-  getAllVotes,
-  getAllVotesFiltered,
+  getAdmins,
+  getUser,
+  getVoteStats,
+  getVotesPage,
+  searchUsers,
   categoryHasVotes,
   pinVotedCategoryStyles,
   setSetting,
@@ -16,8 +18,9 @@ import {
   setConfig,
   updateCategory,
   updateNominee,
-  updateUserMakeAdmin,
+  setUserAdmin,
 } from "@/lib/data/driver";
+import { adminUsernames } from "@/server/routes/auth";
 import { slugify, uniqueId } from "@/lib/ids";
 import { checkAwards } from "@/lib/nominee-checks";
 import { effectiveStyle, withEffectiveStyles } from "@/lib/voting";
@@ -47,7 +50,8 @@ import {
   settingsPatch,
   thumbnailAt,
   thumbnailUpload,
-  userIdBody,
+  userAdminBody,
+  usersQuery,
   votesQuery,
 } from "@/server/schemas";
 
@@ -101,8 +105,11 @@ export const adminRoutes = new Hono<SessionEnv>()
    * their own; categories that already have votes keep the style they had.
    */
   .patch("/settings", zValidator("json", settingsPatch, rejectInvalid), async (c) => {
-    const { awardYear, defaultVotingStyle } = c.req.valid("json");
+    const { awardYear, defaultVotingStyle, startTime, endTime, viewingMode } = c.req.valid("json");
     if (awardYear !== undefined) await setSetting("awardYear", String(awardYear));
+    if (startTime !== undefined) await setSetting("startTime", String(startTime));
+    if (endTime !== undefined) await setSetting("endTime", String(endTime));
+    if (viewingMode !== undefined) await setSetting("viewingMode", viewingMode);
     if (defaultVotingStyle !== undefined) {
       await pinVotedCategoryStyles(effectiveStyle(null, (await getConfig()).defaultVotingStyle));
       await setSetting("defaultVotingStyle", defaultVotingStyle);
@@ -238,21 +245,42 @@ export const adminRoutes = new Hono<SessionEnv>()
       return c.body(null, 502);
     }
   })
-  .get("/users", async (c) => c.json(await getAllUsers(), 200))
-  .patch("/user", zValidator("json", userIdBody, rejectInvalid), async (c) => {
-    await updateUserMakeAdmin(c.req.valid("json"));
+  /**
+   * The admins, or with ?q= the users whose name matches. `fromEnv`: listed
+   * in ADMIN_USERNAMES, so made admin again at every sign-in.
+   */
+  .get("/users", zValidator("query", usersQuery, rejectInvalid), async (c) => {
+    const { q } = c.req.valid("query");
+    const users = q ? await searchUsers(q) : await getAdmins();
+    return c.json(
+      users.map((u) => ({ ...u, fromEnv: adminUsernames.has(u.name.toLowerCase()) })),
+      200,
+    );
+  })
+  .patch("/user", zValidator("json", userAdminBody, rejectInvalid), async (c) => {
+    const { uid, admin } = c.req.valid("json");
+    if (!admin) {
+      if (uid === c.get("session").uid) return c.text("You can't remove yourself.", 400);
+      const user = await getUser(uid);
+      if (user && adminUsernames.has(user.name.toLowerCase())) {
+        return c.text(`${user.name} is in ADMIN_USERNAMES. Remove them there first.`, 409);
+      }
+    }
+    await setUserAdmin(uid, admin);
     return c.body(null, 200);
   })
 
   .get("/votes", zValidator("query", votesQuery, rejectInvalid), async (c) => {
-    const { filter_ip, filter_uid, page } = c.req.valid("query");
+    const { filter_ip, filter_uid, filter_name, page } = c.req.valid("query");
     const offset = page ? parseInt(page) * 100 : 0;
-    const votes =
-      filter_ip || filter_uid
-        ? await getAllVotesFiltered(offset, filter_ip, filter_uid)
-        : await getAllVotes(offset);
+    const votes = await getVotesPage(offset, {
+      ip: filter_ip,
+      uid: filter_uid === undefined ? undefined : parseInt(filter_uid),
+      name: filter_name,
+    });
     return c.json(votes, 200);
   })
+  .get("/stats", async (c) => c.json(await getVoteStats(), 200))
 
   .post("/config", zValidator("form", configForm, rejectInvalid), async (c) => {
     const form = c.req.valid("form");

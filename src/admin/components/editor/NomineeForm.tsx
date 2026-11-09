@@ -7,6 +7,7 @@ import {
   type DggProfile,
   type Issue,
   buildClip,
+  deleteNominee,
   fetchDggProfile,
   pickThumbnail,
   saveNominee,
@@ -73,6 +74,10 @@ export function NomineeForm({ nominee, issues }: { nominee: AdminNominee; issues
         imageId: draft.imageId.trim() || null,
         renderType: draft.renderType,
       }),
+    onSuccess: refresh,
+  });
+  const remove = useMutation({
+    mutationFn: () => deleteNominee(nominee.categoryId, nominee.id),
     onSuccess: refresh,
   });
 
@@ -199,7 +204,17 @@ export function NomineeForm({ nominee, issues }: { nominee: AdminNominee; issues
           </Button>
         )}
         {!dirty && save.isSuccess && <span className="text-sm text-neutral-600">Saved.</span>}
-        <ErrorText>{save.error?.message}</ErrorText>
+        <ErrorText>{save.error?.message ?? remove.error?.message}</ErrorText>
+        <span className="grow" />
+        <Button
+          variant="danger"
+          disabled={remove.isPending}
+          onClick={() => {
+            if (confirm(`Delete "${nominee.title}"?`)) remove.mutate();
+          }}
+        >
+          Delete nominee
+        </Button>
       </div>
 
       <ClipSection nominee={nominee} unsaved={dirty} />
@@ -270,18 +285,21 @@ function ClipSection({ nominee, unsaved }: { nominee: AdminNominee; unsaved: boo
         </div>
       )}
 
-      <div className="flex items-center gap-3 text-sm">
+      <div className="flex flex-wrap items-center gap-3 text-sm">
         <input
           ref={fileInput}
           type="file"
           accept="image/png,image/jpeg,image/webp,image/gif"
-          className="text-sm"
+          className="hidden"
           onChange={(e) => {
             const file = e.currentTarget.files?.[0];
             if (file) upload.mutate(file, { onSettled: () => fileInput.current && (fileInput.current.value = "") });
           }}
         />
-        {upload.isPending && <span>Uploading…</span>}
+        <Button onClick={() => fileInput.current?.click()} disabled={upload.isPending}>
+          {upload.isPending ? "Uploading…" : "Upload a thumbnail"}
+        </Button>
+        <span className="text-neutral-600">PNG, JPEG, WebP or GIF. Replaces the current thumbnail.</span>
         <ErrorText>{upload.error?.message}</ErrorText>
       </div>
     </section>

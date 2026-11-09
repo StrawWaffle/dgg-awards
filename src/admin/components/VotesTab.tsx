@@ -1,177 +1,226 @@
-import { useState } from "react";
-import {
-  ArrowLeftIcon,
-  ArrowRightIcon,
-  Cross1Icon,
-  MagnifyingGlassIcon,
-  ReloadIcon,
-  UpdateIcon,
-} from "@radix-ui/react-icons";
-import { Tabs } from "radix-ui";
+import { type ReactNode, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { fetchAllVotes } from "@/lib/queries";
+import { Button, ErrorText, inputClass } from "@/admin/components/editor/fields";
+import { type VoteFilter, fetchAllVotes, fetchVoteStats } from "@/lib/queries";
+
+const number = new Intl.NumberFormat();
+const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: "short", timeStyle: "short" });
 
 export function VotesTab() {
+  const [filter, setFilter] = useState<VoteFilter>({});
+  return (
+    <div className="space-y-6">
+      <Stats onFilterIp={(ip) => setFilter({ ip })} />
+      <VoteList filter={filter} setFilter={setFilter} />
+    </div>
+  );
+}
+
+function Stats({ onFilterIp }: { onFilterIp: (ip: string) => void }) {
+  const stats = useQuery({ queryKey: ["vote-stats"], queryFn: fetchVoteStats, refetchInterval: 30000 });
+  if (stats.isPending) return <p className="text-sm">Loading…</p>;
+  if (stats.isError) return <ErrorText>Couldn't load the totals: {stats.error.message}</ErrorText>;
+  const s = stats.data;
+  const most = Math.max(1, ...s.categories.map((c) => c.ballots));
+
+  return (
+    <>
+      <p className="text-sm">
+        <b>{number.format(s.voters)}</b> voters cast <b>{number.format(s.ballots)}</b> ballots.{" "}
+        <span className="text-neutral-600">{number.format(s.users)} people have signed in.</span>
+      </p>
+      <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">
+        <Table title="Ballots per category" head={["Category", "Ballots"]}>
+          {s.categories.map((c) => (
+            <tr key={c.id}>
+              <td className="px-3 py-1.5">{c.title}</td>
+              <td className="w-1/2 px-3 py-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="w-12 shrink-0 text-right tabular-nums">{number.format(c.ballots)}</span>
+                  <span className="h-2 bg-neutral-400" style={{ width: `${(c.ballots / most) * 100}%` }} />
+                </div>
+              </td>
+            </tr>
+          ))}
+        </Table>
+        <div className="space-y-6">
+          <Table title="Ballots per day (UTC)" head={["Day", "Voters", "Ballots"]}>
+            {s.days.map((d) => (
+              <tr key={d.day}>
+                <td className="px-3 py-1.5">{d.day}</td>
+                <td className="px-3 py-1.5 text-right tabular-nums">{number.format(d.voters)}</td>
+                <td className="px-3 py-1.5 text-right tabular-nums">{number.format(d.ballots)}</td>
+              </tr>
+            ))}
+          </Table>
+          <Table
+            title="Addresses shared by several voters"
+            head={["IP", "Voters"]}
+            empty="No address has more than one voter."
+          >
+            {s.sharedIps.map((r) => (
+              <tr key={r.ip}>
+                <td className="px-3 py-1.5">
+                  <button type="button" className="underline" onClick={() => onFilterIp(r.ip)}>
+                    {r.ip}
+                  </button>
+                </td>
+                <td className="px-3 py-1.5 text-right tabular-nums">{number.format(r.voters)}</td>
+              </tr>
+            ))}
+          </Table>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function Table({
+  title,
+  head,
+  children,
+  empty = "Nothing yet.",
+}: {
+  title: string;
+  head: string[];
+  children: ReactNode[];
+  empty?: string;
+}) {
+  return (
+    <section className="rounded border border-neutral-200 bg-white">
+      <h2 className="border-b border-neutral-200 px-3 py-2 text-sm font-bold">{title}</h2>
+      {children.length === 0 ? (
+        <p className="px-3 py-3 text-sm text-neutral-600">{empty}</p>
+      ) : (
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-neutral-200 text-left text-xs text-neutral-600">
+              {head.map((h, i) => (
+                <th key={h} className={`px-3 py-1.5 font-medium ${i > 0 ? "text-right" : ""}`}>
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-neutral-100">{children}</tbody>
+        </table>
+      )}
+    </section>
+  );
+}
+
+function VoteList({ filter, setFilter }: { filter: VoteFilter; setFilter: (f: VoteFilter) => void }) {
   const [page, setPage] = useState(0);
-  const [uidInput, setUidInput] = useState("");
-  const [ipInput, setIpInput] = useState("");
+  const [user, setUser] = useState("");
+  const [ip, setIp] = useState("");
+  const [shown, setShown] = useState(filter);
+  // A click in the totals (an IP) replaces the filter; keep the inputs in step.
+  if (shown !== filter) {
+    setShown(filter);
+    setUser(filter.name ?? filter.uid?.toString() ?? "");
+    setIp(filter.ip ?? "");
+    setPage(0);
+  }
 
-  const [filters, setFilters] = useState<{ uid?: number; ip?: string }>({});
-
-  const query = useQuery({
-    queryKey: ["votes", page, filters],
-    queryFn: () => fetchAllVotes(page, filters),
+  const votes = useQuery({
+    queryKey: ["votes", page, filter],
+    queryFn: () => fetchAllVotes(page, filter),
     placeholderData: keepPreviousData,
     refetchInterval: 30000,
   });
+  const hasNext = votes.data?.length === 100;
+  const filtered = Object.values(filter).some((v) => v !== undefined);
 
-  const hasNextPage = (query.data?.length || 0) === 100;
-
-  const handleSearch = () => {
-    // Reset page to 0 when filtering
-    setPage(0);
-    setFilters({
-      uid: uidInput ? parseInt(uidInput, 10) : undefined,
-      ip: ipInput.trim() || undefined,
+  const apply = (f: VoteFilter) => setFilter(f);
+  const submit = () => {
+    const u = user.trim();
+    apply({
+      ...(u ? (/^-?\d+$/.test(u) ? { uid: Number(u) } : { name: u }) : {}),
+      ...(ip.trim() ? { ip: ip.trim() } : {}),
     });
   };
 
-  const handleClear = () => {
-    setUidInput("");
-    setIpInput("");
-    setPage(0);
-    setFilters({});
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleSearch();
-    }
-  };
-
   return (
-    <Tabs.Content value="votes" className="space-y-4 pt-4 outline-none">
-      <div className="flex flex-col gap-3 p-1 sm:flex-row">
-        <div className="relative flex-1">
-          <input
-            type="number"
-            placeholder="Filter by UID..."
-            value={uidInput}
-            onChange={(e) => setUidInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm placeholder:text-neutral-400 focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 focus:outline-none"
-          />
-        </div>
-        <div className="relative flex-1">
-          <input
-            type="text"
-            placeholder="Filter by IP..."
-            value={ipInput}
-            onChange={(e) => setIpInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm placeholder:text-neutral-400 focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 focus:outline-none"
-          />
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={handleSearch}
-            className="flex items-center gap-2 rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 focus:ring-2 focus:ring-neutral-500 focus:ring-offset-1 focus:outline-none"
-          >
-            <MagnifyingGlassIcon className="h-4 w-4" />
-            Search
-          </button>
-          {(filters.uid !== undefined || filters.ip !== undefined) && (
-            <button
-              onClick={handleClear}
-              className="flex items-center gap-2 rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 focus:ring-2 focus:ring-neutral-500 focus:ring-offset-1 focus:outline-none"
-            >
-              <Cross1Icon className="h-4 w-4" />
-              Clear
-            </button>
-          )}
-        </div>
+    <section className="space-y-3">
+      <form
+        className="flex flex-wrap items-end gap-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+      >
+        <h2 className="mr-auto self-center text-sm font-bold">Votes</h2>
+        <input
+          className={`${inputClass} w-48!`}
+          placeholder="Voter name or uid"
+          aria-label="Voter name or uid"
+          value={user}
+          onChange={(e) => setUser(e.currentTarget.value)}
+        />
+        <input
+          className={`${inputClass} w-48!`}
+          placeholder="IP address"
+          aria-label="IP address"
+          value={ip}
+          onChange={(e) => setIp(e.currentTarget.value)}
+        />
+        <Button type="submit">Filter</Button>
+        {filtered && <Button onClick={() => apply({})}>Clear</Button>}
+      </form>
+
+      {votes.isError && <ErrorText>Couldn't load the votes: {votes.error.message}</ErrorText>}
+
+      <div className="overflow-x-auto rounded border border-neutral-200 bg-white">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-neutral-200 text-left text-xs text-neutral-600">
+              <th className="px-3 py-2 font-medium">When</th>
+              <th className="px-3 py-2 font-medium">Voter</th>
+              <th className="px-3 py-2 font-medium">IP</th>
+              <th className="px-3 py-2 font-medium">Category</th>
+              <th className="px-3 py-2 font-medium">Nominee</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-neutral-100">
+            {votes.data?.map((v) => (
+              <tr key={`${v.uid}-${v.categoryId}-${v.optionId}`} className="hover:bg-neutral-50">
+                <td className="px-3 py-1.5 whitespace-nowrap text-neutral-600">{dateTime.format(new Date(v.at))}</td>
+                <td className="px-3 py-1.5">
+                  <button type="button" className="hover:underline" onClick={() => apply({ uid: v.uid })}>
+                    {v.name}
+                  </button>
+                </td>
+                <td className="px-3 py-1.5">
+                  <button type="button" className="hover:underline" onClick={() => apply({ ip: v.ip })}>
+                    {v.ip}
+                  </button>
+                </td>
+                <td className="px-3 py-1.5">{v.categoryTitle}</td>
+                <td className="px-3 py-1.5">
+                  {v.optionTitle ?? v.optionId}
+                  {v.rank > 1 && <span className="text-neutral-500"> (choice {v.rank})</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {votes.data?.length === 0 && <p className="p-6 text-center text-sm text-neutral-600">No votes found.</p>}
       </div>
 
-      {/* Loading State */}
-      {query.status === "pending" && (
-        <div className="flex h-40 items-center justify-center text-neutral-500">
-          <ReloadIcon className="h-6 w-6 animate-spin" />
-        </div>
-      )}
-
-      {/* Error State */}
-      {query.status === "error" && (
-        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-500">
-          Error loading votes.
-        </div>
-      )}
-
-      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm">
-        <div className="flex justify-between border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-xs font-medium tracking-wider text-neutral-500 uppercase">
-          <span>User / IP</span>
-          <span>Decision</span>
-        </div>
-
-        <div className="divide-y divide-neutral-100">
-          {query.data?.map((vote) => (
-            <div
-              key={`${vote.uid}-${vote.categoryId}`}
-              className="flex items-center justify-between px-4 py-3 text-sm transition-colors hover:bg-neutral-50"
-            >
-              <div className="flex flex-col">
-                <span className="max-w-37.5 truncate font-medium text-neutral-900 sm:max-w-xs">
-                  {vote.uid}
-                </span>
-                <span className="text-xs text-neutral-500">
-                  {vote.sessionSnapshot.ip}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 rounded bg-neutral-100 px-2 py-1 text-xs font-medium text-neutral-700">
-                <span>{vote.categoryId}</span>
-                <span className="text-neutral-400">→</span>
-                <span>{vote.optionId}</span>
-              </div>
-            </div>
-          ))}
-
-          {(!query.data || query.data.length === 0) && (
-            <div className="p-8 text-center text-sm text-neutral-500">
-              No votes found on this page.
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between px-1">
-        <span className="text-xs text-neutral-500">
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-neutral-600">
           Page {page + 1}
-          {query.isPlaceholderData && " (Loading...)"}
+          {votes.isPlaceholderData && " (loading…)"}
         </span>
-
         <div className="flex gap-2">
-          <button
-            onClick={() => setPage((old) => Math.max(0, old - 1))}
-            disabled={page === 0}
-            className="flex items-center gap-1 rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 shadow-sm transition-all hover:bg-neutral-50 focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <ArrowLeftIcon className="h-4 w-4" />
+          <Button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0}>
             Previous
-          </button>
-
-          <button
-            onClick={() => {
-              if (hasNextPage) {
-                setPage((old) => old + 1);
-              }
-            }}
-            disabled={!hasNextPage || query.isPlaceholderData}
-            className="flex items-center gap-1 rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 shadow-sm transition-all hover:bg-neutral-50 focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-          >
+          </Button>
+          <Button onClick={() => setPage((p) => p + 1)} disabled={!hasNext || votes.isPlaceholderData}>
             Next
-            <ArrowRightIcon className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
       </div>
-    </Tabs.Content>
+    </section>
   );
 }
