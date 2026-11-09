@@ -27,7 +27,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 
 ### At a glance (end of session 2, 2026-11-09)
 
-**Live** (`main` at `b4c7f05` plus docs, deployed and pushed):
+**Live** (`main` at `12c0b96`, deployed and pushed):
 - **Infrastructure:** the Docker preview behind a Cloudflare tunnel, real destiny.gg sign-in, the stack upgrade (Bun 1.4, Hono, Zod, TS 7), and clips into Cloudflare R2 at 1080p.
 - **Admin page:**
   - a left sidebar, dark theme, drag to reorder, and collapsible sections
@@ -99,7 +99,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 - Fast-forward `main`, run `docker compose --profile tunnel up -d --build app`, then check `/`, `/api/config`, `/lab`, `/admin` (200), `/api/admin/checks` and `/api/lab/emotes` (401), and `/signin` (to destiny.gg).
 - Push `main`.
 
-**Worktrees:** everything under `.claude/worktrees/` is merged (`admin-pass`, `editor-scroll`, `lab`, `lab-polish`, `lab-polish-2`, `lab-polish-3`, `lab-polish-4`, `lab-summary`, `admin-lab-link`, `duel-reveal`, `plain-admin`, `clip-preview`, `library-pictures`, `backups`, `frontpage`, `no-ip`, `privacy-flags`, `hover-pass`, `one-site`, `nominee-images`, `sketchy`) and can be removed.
+**Worktrees:** everything under `.claude/worktrees/` is merged (`admin-pass`, `editor-scroll`, `lab`, `lab-polish`, `lab-polish-2`, `lab-polish-3`, `lab-polish-4`, `lab-summary`, `admin-lab-link`, `duel-reveal`, `plain-admin`, `clip-preview`, `library-pictures`, `backups`, `frontpage`, `no-ip`, `privacy-flags`, `hover-pass`, `one-site`, `user-menu`, `nominee-images`, `sketchy`) and can be removed.
 
 **Test containers**, on network `dgga-test`, all kept running:
 
@@ -514,7 +514,7 @@ StrawWaffle: `/vote?preview=voting` and `?preview=results` should show the new l
   - Browser: the admin preview while locked (22 awards, a vote not saved), the results preview (real with tally, then simulated), the lab, locked and signed-out visitors, a real vote kept after reload, and a ranked ballot saved in order.
   - The screenshot script now captures the front page, voting and results of the new site; its old baselines are out of date.
 
-### Previews only on request, and a user menu (branch `worktree-user-menu`, 2026-11-09)
+### Previews only on request, and a user menu (2026-11-09, deployed)
 
 StrawWaffle, after the one-site deploy:
 - **The admin preview showed whenever voting wasn't open.** It should only show with the preview address: `/vote?preview=voting`, and `/vote?preview=results` or `/results?preview=1`. Without it, admins see what visitors see. No "preview it" link on the visitor notice (StrawWaffle: not wanted).
