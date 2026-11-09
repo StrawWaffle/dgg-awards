@@ -15,7 +15,8 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 ## Working agreements
 
 - **Check with StrawWaffle before any fix or feature.** Infrastructure needed to run the site is fine to do. Changes to how the site behaves or looks are not, until he agrees.
-- **Don't push anywhere.** Commit locally only. There's no remote yet, and pushing waits until privacy questions are settled with rinlux.
+- **Remote:** private repo https://github.com/StrawWaffle/dgg-awards (created 2026-11-09). Push `main` there. Keep it private and push nowhere else until privacy questions are settled with rinlux.
+- **Test containers** `dgga-base` (original code, port 3100), `dgga-new` (port 3200) and `dgga-mock` (port 8790), on network `dgga-test`, stay running until StrawWaffle says otherwise. `dgga-base` runs the original code as the before baseline for screenshot comparisons.
 - **Privacy is deferred.** The site is shared only as a private link for now. Don't spend time on it until StrawWaffle says so.
 - **Writing:** apply the `unslop` skill to prose. **UI:** apply the `uncodixify` skill (installed at `~/.claude/skills/uncodixify`, from StrawWaffle's private skills repo).
 - **Commit style:** short, sentence-case, past tense ("Added …"), per `AGENTS.md`.
@@ -49,7 +50,7 @@ MSYS_NO_PATHCONV=1 docker compose exec app bun scripts/make-admin.ts --db /data/
 
 In Git Bash, `MSYS_NO_PATHCONV=1` is needed or `/data/...` gets rewritten into a Windows path. Bun isn't installed on the host, so everything runs in Docker.
 
-### Git history (local only)
+### Git history
 
 1. `Imported dgga25 source from recovered zip`: the original code, unchanged. Diff against this to see everything we changed.
 2. `Added Docker preview stack with mock destiny.gg login`
@@ -81,7 +82,9 @@ The source zip (`dgga25.zip`) was deleted at StrawWaffle's request, so commit 1 
 
 ## Open questions
 
-- **Voting style:** one pick per category (as in 2025), or ranked voting like jadseya.com? To decide with rinlux.
+- **Voting style:** one pick per category (as in 2025), or ranked like jadseya.com? StrawWaffle wants it as an **admin setting**. Still open: per category or site-wide, and the counting method for ranked votes (instant runoff vs. Borda).
+- **Clip downloads:** see planned feature 4b. Still open: where clips are stored and served from, given the home connection and Cloudflare's rules on video.
+- **When nominations for 2026 open.** This decides how to order the planned features.
 - **What rinlux thinks is missing** compared with the live 2025 version.
 
 ## Stack upgrade (branch `stack-upgrade`, merged into `main` 2026-11-09)
@@ -128,7 +131,9 @@ Order StrawWaffle gave: preview to rinlux first, then discuss, then these.
 1. ~~**Switch to real DGG login.**~~ Done 2026-11-09 (see Current state).
 2. ~~**Dependency upgrades.**~~ Done on `stack-upgrade`.
 3. ~~**Regression tests, then end-to-end type safety.**~~ Done on `stack-upgrade`.
-4. **Admin editing with preview**, for an allowlist of DGG accounts. It should cover editing nominees and categories, previewing how the site looks, and previewing the results reveal.
+4. **Admin editing with preview**, for an allowlist of DGG accounts. It should cover editing nominees and categories, previewing how the site looks, and previewing the results reveal. StrawWaffle wants this to make setup easy for the organizers. Build it on a reworked nominee model that adds a date, a link type and clip start and end times, plus checks that reject bad links, wrong-year dates and duplicates. This is the first hill-climbing step.
+   - **4a. Voting style as an admin setting:** single pick or ranked. Needs a schema change: votes get a rank, and the primary key becomes (uid, categoryId, optionId). Lock the setting once a category has votes.
+   - **4b. Downloaded clips.** An admin enters the source URL plus start and end times. The server downloads just that segment, with yt-dlp (`--download-sections`) or StrawWaffle's Cobalt instance, turns it into an mp4 with a thumbnail, and the site plays it in its own `<video>`. That means no looping, the right segment, and nothing breaks if the source is deleted. Keep the original link as "source". The 2025 site never did this: it embedded YouTube and Streamable by id.
 5. **Re-pull emotes from the DGG CDN:** `https://cdn.destiny.gg/emotes/emotes.json` and `emotes.css`. Some emotes are sprite sheets or animated by CSS transforms, so a plain `<img>` won't show them correctly. DGG-Radio's `emotes.md` explains this and has a working approach to reuse.
 6. **Privacy page** saying exactly what's collected (DGG id and name, IP and user agent per vote) and why, with a retention plan. Do this when StrawWaffle lifts the privacy deferral.
 7. **Cloudflare bot signals:** compare results with and without suspected bot votes (shared IPs, new DGG accounts) and show both.
