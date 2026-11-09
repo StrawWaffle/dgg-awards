@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import rough from "roughjs";
 import { annotate } from "rough-notation";
-import { cssVar, useDrawnLook } from "@/lab/sketch";
+import { cssVar } from "@/lab/sketch";
 
 export type Result = { id: string; title: string; count: number; percentage: number; isWinner: boolean };
 export type Award = { id: string; title: string; total: number; results: Result[] };
@@ -113,7 +113,6 @@ export function Board({
   /** Once every row is drawn and in place. */
   onFinished?: () => void;
 }) {
-  const drawn = useDrawnLook();
   const n = award.results.length;
   // Last place first: the order they're revealed in.
   const [byRank] = useState(() => [...award.results].sort((a, b) => a.count - b.count));
@@ -169,7 +168,7 @@ export function Board({
           s.phase === "hidden" ? "?" : `${Math.round(s.v).toLocaleString()} · ${((s.v / Math.max(1, award.total)) * 100).toFixed(1)}%`;
       }
       // The box follows the bar's length as later bars squish it.
-      if (e.outline && (s.phase === "box" || s.phase === "done") && drawn) {
+      if (e.outline && (s.phase === "box" || s.phase === "done")) {
         const last = Number(e.outline.dataset.w ?? -1);
         if (Math.abs(last - w) > 0.5) {
           e.outline.replaceChildren(
@@ -185,7 +184,7 @@ export function Board({
         }
       }
     }
-  }, [award, barW, drawn]);
+  }, [award, barW]);
 
   // The scribble fill of every bar, drawn once at full width and revealed
   // through a clip as the bar grows.
@@ -196,28 +195,20 @@ export function Board({
       if (!e?.fill) continue;
       const svg = e.fill.ownerSVGElement!;
       e.fill.replaceChildren(
-        drawn
-          ? rough.svg(svg).rectangle(3, 4, barW - 8, BAR_H, {
-              seed: r.id.length * 13 + r.count,
-              roughness: 1.3,
-              stroke: "none",
-              fill: "currentColor",
-              fillStyle: r.isWinner && settled ? "cross-hatch" : "hachure",
-              hachureGap: 6,
-              fillWeight: 1.6,
-            })
-          : Object.assign(document.createElementNS("http://www.w3.org/2000/svg", "rect"), {}),
+        rough.svg(svg).rectangle(3, 4, barW - 8, BAR_H, {
+          seed: r.id.length * 13 + r.count,
+          roughness: 1.3,
+          stroke: "none",
+          fill: "currentColor",
+          fillStyle: r.isWinner && settled ? "cross-hatch" : "hachure",
+          hachureGap: 6,
+          fillWeight: 1.6,
+        }),
       );
-      if (!drawn) {
-        const rect = e.fill.firstChild as SVGRectElement;
-        Object.entries({ x: 3, y: 4, width: barW - 8, height: BAR_H, rx: 8, fill: "currentColor" }).forEach(([k, v]) =>
-          rect.setAttribute(k, String(v)),
-        );
-      }
       if (e.outline) delete e.outline.dataset.w;
     }
     paint();
-  }, [award, barW, drawn, paint, settled]);
+  }, [award, barW, paint, settled]);
 
   // Work through the reveals one at a time until `target` are done; the last
   // two go together, as soon as either is asked for.
@@ -273,7 +264,7 @@ export function Board({
           for (const r of rows) {
             const name = els.current.get(r.id)?.name;
             if (!final || !r.isWinner || !name) continue;
-            const a = annotate(name, { type: drawn ? "circle" : "highlight", color: cssVar("--coral"), strokeWidth: 3, padding: drawn ? 10 : 2, animationDuration: 800 });
+            const a = annotate(name, { type: "circle", color: cssVar("--coral"), strokeWidth: 3, padding: 10, animationDuration: 800 });
             timers.push(
               setTimeout(() => {
                 a.show();
@@ -294,7 +285,7 @@ export function Board({
     // A reveal runs to the end; only a new Board (Start over, another award)
     // stops one midway, and that throws this one's elements away.
     requestAnimationFrame(tick);
-  }, [done, target, barW, byRank, n, paint, drawn, onWinner, wake]);
+  }, [done, target, barW, byRank, n, paint, onWinner, wake]);
 
   return (
     <div className="relative mt-8" style={{ height: n * ROW_H }}>

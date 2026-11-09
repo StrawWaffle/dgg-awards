@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useBursts } from "@/lab/Bursts";
 import { Emote } from "@/lab/Emote";
-import { Sketch, useDrawnLook } from "@/lab/sketch";
+import { Sketch } from "@/lab/sketch";
 import type { SiteConfig } from "@/site/Site";
 
 type Phase = "unknown" | "before" | "open" | "closed" | "results";
@@ -40,7 +40,6 @@ export function Countdown({
   onResults: (e: React.MouseEvent) => void;
 }) {
   const [now, setNow] = useState(Date.now());
-  const drawn = useDrawnLook();
   const box = useRef<HTMLDivElement>(null);
   const [bursts, fire] = useBursts();
   useEffect(() => {
@@ -74,7 +73,7 @@ export function Countdown({
 
   return (
     <Sketch pad={5} radius={26} strokeWidth={3} boil roughness={1.5}>
-      <div ref={box} className={`${drawn ? "rounded-[24px]" : "cozy-panel"} relative space-y-6 overflow-hidden px-6 py-10 text-center sm:px-10`} style={drawn ? { background: "var(--panel)" } : undefined}>
+      <div ref={box} className="relative space-y-6 overflow-hidden rounded-[24px] px-6 py-10 text-center sm:px-10" style={{ background: "var(--panel)" }}>
         {bursts}
         <h1 className="text-4xl font-black sm:text-5xl">The DGG Awards{year ? ` ${year}` : ""}</h1>
 

@@ -4,7 +4,7 @@ import { annotate } from "rough-notation";
 import { originOf, useBursts } from "@/lab/Bursts";
 import { type Clip, ClipPlayer, nomineeClip } from "@/lab/ClipPlayer";
 import { Emote } from "@/lab/Emote";
-import { cssVar, useDrawnLook } from "@/lab/sketch";
+import { cssVar } from "@/lab/sketch";
 import type { Me, SiteConfig } from "@/site/Site";
 
 type Nominee = { id: string; title: string; description: string; image: string | null; clip: Clip | null };
@@ -132,7 +132,6 @@ function Ballot({
   const [casting, setCasting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [watching, setWatching] = useState<Clip | null>(null);
-  const drawn = useDrawnLook();
 
   const done = step >= awards.length;
   const award = awards[step];
@@ -140,15 +139,15 @@ function Ballot({
   const chosen = award ? (mine ?? picks[award.id] ?? []) : [];
   const votedCount = awards.filter((a) => voted[a.id]).length;
 
-  // In the drawn look, a single pick gets a box drawn round it by hand.
+  // A single pick gets a box drawn round it by hand.
   useEffect(() => {
-    if (!drawn || !award || award.ranked || chosen.length !== 1 || !grid.current) return;
+    if (!award || award.ranked || chosen.length !== 1 || !grid.current) return;
     const card = grid.current.querySelector<HTMLElement>(`[data-nominee="${CSS.escape(chosen[0]!)}"]`);
     if (!card) return;
     const a = annotate(card, { type: "box", color: cssVar("--primary-shadow"), strokeWidth: 3, padding: 4, animationDuration: 500 });
     a.show();
     return () => a.remove();
-  }, [drawn, award, chosen.join()]);
+  }, [award, chosen.join()]);
 
   // Keep the current award in view in the ballot list, which scrolls on its own.
   const list = useRef<HTMLOListElement>(null);

@@ -41,7 +41,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
   - in the clip section: a preview of the picked window, uploading a video and marking the part to keep, and the library for clips and pictures (rinlux's Drive folder: 46 videos and 11 pictures, 1.5 GB in `/data/library` on the live volume)
 - **Voting model:** single pick or ranked per category, ranked counted by instant runoff, and the 2025 double-count bug fixed.
 - **The lab** (`/lab`, admins only), where the 2026 voting page and presentation are being tried out:
-  - a cozy look after a community destiny.gg skin, light and dark, a hand-drawn "drawn look" switch, and drifting emote silhouettes in the background
+  - a cozy look after a community destiny.gg skin, light and dark, the hand-drawn look (always on since 2026-11-09), and drifting emote silhouettes in the background
   - music ("black lover", with permission) and a beat map
   - emote reactions, and the big screen with chat characters (a live relay or the simulator)
   - clips, and the results reveal: drawn by hand, rows starting scrambled, and a race for the winner
@@ -285,7 +285,7 @@ StrawWaffle: part of what makes the skin cute is its drawn buttons and details. 
   - **SVG filters** (`feTurbulence` plus `feDisplacementMap`) make anything wobble, and shuffling the filter's seed gives "boiling" lines. The lab does the boil with Rough.js seeds instead, so only the frame wobbles, never the video or text inside.
   - **Handwriting fonts** (OFL, through Fontsource): Gaegu (chosen), Patrick Hand, Kalam.
 - **Prototype** (`src/lab/sketch.tsx`, `Results.tsx`):
-  - A pencil button in the header switches the drawn look on and off (remembered), so it can be compared with the plain cozy look.
+  - A pencil button in the header switched the drawn look on and off. **Removed 2026-11-09 (StrawWaffle): the drawn look is always on.**
   - `Sketch` draws a wobbly, doubled, rounded hand-drawn frame around anything. It can boil (redrawn at 8 fps with 3 seeds; off for reduced motion) and draw itself in. It's used round the big-screen stage and its award sign.
   - **The Results tab** (new) uses the admin results preview.
     - The bars are hatched by hand, sorted, from zero, labelled with name, count and share, with the total shown. The winner is cross-hatched in coral.
@@ -542,6 +542,7 @@ StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, an
 - **The music started slowly.** The track opens with 2 s of silence and a 4 s fade-in (measured: silent to 2 s, −62 dB rising to −17 dB at 6 s). Loading wasn't the cause: the file is 2.5 MB with its index up front. Now:
   - The first start jumps to 6.02 s (a bar line on the beat map's grid), where the music is in fully, with a 0.4 s fade-in of our own.
   - Looping is by hand: at the end it goes back to 2 s, skipping the silence, and keeps the song's own fade-out and fade-in as the way round. The loop doesn't count as a pause, so the music button stays as it is (not tested in a browser: a full loop takes two minutes).
+- **The drawn look is always on** (StrawWaffle): the pencil button is gone from the header, and so are the plain-look versions (`useDrawnLook`, `setDrawnLook` and the `lab.drawn` setting). Frames, hatched bars, the circled winner and the box round a pick always show.
 - **Housekeeping:** the 23 merged worktrees were removed. The screenshot script now also captures the four stage previews. Its pictures aren't in git: two runs of this build match pixel for pixel, except the admin Votes tab (vote times).
 - Tested:
   - typecheck and 92 unit tests; 49 API tests, with the preview addresses added

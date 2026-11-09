@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { GearIcon } from "@radix-ui/react-icons";
 import { Emote } from "@/lab/Emote";
 import { type Clip, ClipPlayer } from "@/lab/ClipPlayer";
-import { Sketch, useDrawnLook } from "@/lab/sketch";
+import { Sketch } from "@/lab/sketch";
 import { type FeedStatus, liveFeed, simulatedFeed } from "@/lab/chatFeed";
 import { type Levels, type Source, useFrame } from "@/lab/music";
 import { useBursts } from "@/lab/Bursts";
@@ -186,7 +186,6 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
   const sceneNow = useRef(scene);
   sceneNow.current = scene;
   const [bursts, fire] = useBursts();
-  const drawn = useDrawnLook();
   const settings = useRef({ rate, emoteShare, max, names, showSaid });
   settings.current = { rate, emoteShare, max, names, showSaid };
   const fps = useRef({ frames: 0, since: performance.now(), value: 0 });
@@ -607,8 +606,8 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
             <Sketch className="inline-block" pad={3} radius={20} boil={!!winner} drawOn>
               <div
                 key={winner ?? award.id}
-                className={`${drawn ? "rounded-[20px]" : "cozy-panel"} lab-pop inline-block px-7 py-3 text-2xl font-black sm:text-4xl`}
-                style={drawn ? { background: "var(--panel)" } : undefined}
+                className="lab-pop inline-block rounded-[20px] px-7 py-3 text-2xl font-black sm:text-4xl"
+                style={{ background: "var(--panel)" }}
               >
                 {winner ? (
                   <span className="flex items-center gap-3">

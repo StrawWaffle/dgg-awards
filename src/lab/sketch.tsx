@@ -3,36 +3,8 @@
 // (the frame redrawn with a slightly different wobble ~8 times a second, the
 // way hand-drawn animation jitters). All strokes use currentColor, so CSS
 // colours them per theme.
-import { type ReactNode, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import rough from "roughjs";
-
-// ---- The lab-wide switch between the plain cozy look and the drawn one.
-
-const KEY = "lab.drawn";
-const listeners = new Set<() => void>();
-let drawn = (() => {
-  try {
-    return localStorage.getItem(KEY) !== "off";
-  } catch {
-    return true;
-  }
-})();
-export function setDrawnLook(on: boolean) {
-  drawn = on;
-  try {
-    localStorage.setItem(KEY, on ? "on" : "off");
-  } catch {}
-  for (const l of listeners) l();
-}
-export function useDrawnLook() {
-  return useSyncExternalStore(
-    (l) => {
-      listeners.add(l);
-      return () => listeners.delete(l);
-    },
-    () => drawn,
-  );
-}
 
 // ---- Drawing helpers.
 
@@ -93,8 +65,7 @@ function useSize<T extends HTMLElement>() {
 /**
  * A hand-drawn frame around `children`: a wobbly rounded outline (doubled,
  * like a pen going round twice), optionally boiling, optionally drawn in when
- * it appears. Turned off by the lab's drawn-look switch, which leaves just
- * the children.
+ * it appears.
  */
 export function Sketch({
   children,
@@ -121,15 +92,14 @@ export function Sketch({
   boil?: boolean;
   drawOn?: boolean;
 }) {
-  const on = useDrawnLook();
   const [box, size] = useSize<HTMLDivElement>();
   const svg = useRef<SVGSVGElement>(null);
-  const seed = useBoil(on && boil);
+  const seed = useBoil(boil);
   const drawnOnce = useRef(false);
 
   useEffect(() => {
     const el = svg.current;
-    if (!el || !on || size.w === 0) return;
+    if (!el || size.w === 0) return;
     el.replaceChildren();
     const rc = rough.svg(el);
     const d = roundedRect(strokeWidth, strokeWidth, size.w + pad * 2 - strokeWidth * 2, size.h + pad * 2 - strokeWidth * 2, radius);
@@ -147,18 +117,16 @@ export function Sketch({
       drawnOnce.current = true;
       drawIn(el, 900);
     }
-  }, [on, size.w, size.h, seed, pad, radius, roughness, strokeWidth, fill, color, drawOn]);
+  }, [size.w, size.h, seed, pad, radius, roughness, strokeWidth, fill, color, drawOn]);
 
   return (
     <div ref={box} className={`relative ${className}`}>
-      {on && (
-        <svg
-          ref={svg}
-          aria-hidden
-          className="pointer-events-none absolute overflow-visible"
-          style={{ left: -pad, top: -pad, width: size.w + pad * 2, height: size.h + pad * 2, zIndex: 1 }}
-        />
-      )}
+      <svg
+        ref={svg}
+        aria-hidden
+        className="pointer-events-none absolute overflow-visible"
+        style={{ left: -pad, top: -pad, width: size.w + pad * 2, height: size.h + pad * 2, zIndex: 1 }}
+      />
       {children}
     </div>
   );

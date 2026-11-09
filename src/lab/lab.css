@@ -117,7 +117,7 @@
   animation: none !important;
 }
 
-/* Handwriting, for numbers and notes in the drawn look (Gaegu, OFL). */
+/* Handwriting, for numbers and notes (Gaegu, OFL). */
 .hand {
   font-family: "Gaegu", "Nunito Variable", cursive;
 }
