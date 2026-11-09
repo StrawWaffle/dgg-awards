@@ -6,15 +6,15 @@ import { createApp } from "@/server/app";
 import { resumeClipJobs } from "@/server/clips";
 import { websocket } from "@/server/routes/lab";
 
-// The admin page lives at an unguessable path; /admin redirects admins there.
-const adminPath = `/admin/${crypto.getRandomValues(new Uint8Array(64)).toHex()}`;
-const app = createApp(adminPath);
+const app = createApp();
 
 const server = serve({
   // Bun bundles and serves the HTML pages; everything else is Hono.
   routes: {
     "/": index,
-    [adminPath]: admin,
+    // Anyone can load the page; it checks for an admin itself, and every
+    // /api/admin request is refused to anyone else.
+    "/admin": admin,
     // Experimental; the page itself checks for an admin.
     "/lab": lab,
   },

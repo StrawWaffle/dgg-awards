@@ -46,8 +46,38 @@ const tabFromHash = (): Tab => {
 export function Admin() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AdminPage />
+      <AdminGate />
     </QueryClientProvider>
+  );
+}
+
+/**
+ * The page is public; this shows it only to admins. It's a courtesy, not the
+ * protection: every /api/admin request is checked on the server.
+ */
+function AdminGate() {
+  const me = useQuery({ queryKey: ["me"], queryFn: fetchAuthSession, retry: false });
+  if (me.isPending) return <p className="p-6 font-mono text-sm text-neutral-500">Loading…</p>;
+  if (me.data?.admin) return <AdminPage />;
+  return (
+    <main className="mx-auto mt-24 max-w-sm space-y-4 px-4 font-mono text-sm text-neutral-900">
+      <h1 className="text-base font-bold">DGG Awards admin</h1>
+      <p>
+        {me.data
+          ? `You're signed in as ${me.data.name}, who isn't an admin.`
+          : "Sign in with your destiny.gg account to continue. Only admins can use this page."}
+      </p>
+      <div className="flex gap-2">
+        {!me.data && (
+          <a href="/signin" className="rounded border border-neutral-900 bg-neutral-900 px-3 py-1.5 text-white">
+            Sign in
+          </a>
+        )}
+        <a href="/" className="rounded border border-neutral-300 px-3 py-1.5">
+          Back to the site
+        </a>
+      </div>
+    </main>
   );
 }
 

@@ -237,14 +237,16 @@ describe("admin", () => {
   test("allowlisted user becomes admin, others do not", async () => {
     admin = await signIn("Tester");
     user = await signIn("NotAdmin");
-    expect((await req("/admin", {}, user)).status).toBe(401);
-    const res = await req("/admin", {}, admin);
-    expect(res.status).toBe(302);
-    const loc = res.headers.get("location")!;
-    expect(loc).toMatch(/^\/admin\/[0-9a-f]{128}$/);
-    const page = await req(loc, {}, admin);
+    // The page itself is public (it checks /api/me); the API is what's protected.
+    expect((await req("/api/me", {}, admin).then((r) => r.json())).admin).toBe(true);
+    expect((await req("/api/me", {}, user).then((r) => r.json())).admin).toBe(false);
+    const page = await req("/admin", {}, user);
     expect(page.status).toBe(200);
     expect(page.headers.get("content-type")).toContain("text/html");
+    // Old /admin/<code> bookmarks land on /admin.
+    const old = await req("/admin/0123abcd", {}, admin);
+    expect(old.status).toBe(302);
+    expect(old.headers.get("location")).toBe("/admin");
   });
 
   test("admin API is closed to non-admins", async () => {
@@ -724,7 +726,7 @@ describe("admin", () => {
       admin,
     );
     expect(res.status).toBe(200);
-    expect((await req("/admin", {}, other)).status).toBe(302);
+    expect((await req("/api/admin/users", {}, other)).status).toBe(200);
 
     const set = (body: unknown) =>
       req(
@@ -736,7 +738,7 @@ describe("admin", () => {
     // Yourself, and anyone in ADMIN_USERNAMES, can't be removed here.
     expect((await set({ uid: testerUid, admin: false })).status).toBe(400);
     expect((await set({ uid: uid, admin: false })).status).toBe(200);
-    expect((await req("/admin", {}, other)).status).toBe(401);
+    expect((await req("/api/admin/users", {}, other)).status).toBe(401);
   });
 
   test("config rejects bad input", async () => {

@@ -29,7 +29,7 @@ Voting and results site for the yearly destiny.gg community awards (DGG Awards).
 ## Architecture
 
 - **Runtime:** Bun 1.4, React 19, Tailwind 4 (Tailwind 4.1's font stack is pinned in `src/index.css`), radix-ui, TanStack Query. SQLite via Drizzle. Hono + Zod for the API, with a typed client (`hc`). TypeScript 7.
-- `src/index.tsx`: Bun serves the two HTML pages (`/` and the admin page at a random `/admin/<nonce>` path) and passes everything else to the Hono app. It also resumes interrupted clip jobs at start.
+- `src/index.tsx`: Bun serves the HTML pages (`/`, `/admin` and `/lab`; the admin page and the lab check for an admin themselves, and the server refuses every `/api/admin` request from anyone else) and passes everything else to the Hono app. It also resumes interrupted clip jobs at start.
 - `src/server/`
   - `app.tsx` assembles the API, `/robots.txt`, `/Media/*` (bundled images in `src/media`), `/files/*` (locally stored clips) and `/error`.
   - `routes/auth.ts` (destiny.gg OAuth, `/api/me`), `routes/public.ts` (nominees, voting, results) and `routes/admin.ts` (everything under `/api/admin`, admin-only via `.use(requireAdmin)`: register new routes **after** that line).

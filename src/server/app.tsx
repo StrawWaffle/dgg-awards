@@ -1,10 +1,7 @@
 import { Hono } from "hono";
-import { getCookie } from "hono/cookie";
 import { join } from "node:path";
 import { renderToReadableStream } from "react-dom/server";
-import { verifyAdminSession } from "@/lib/auth";
 import { env } from "@/lib/util";
-import { SESSION_COOKIE } from "@/server/middleware";
 import { adminRoutes } from "@/server/routes/admin";
 import { authRoutes } from "@/server/routes/auth";
 import { labRoutes } from "@/server/routes/lab";
@@ -32,22 +29,18 @@ const robotsTxt = [
 
 /**
  * Everything except the two HTML pages, which Bun serves from its bundler
- * (see src/index.tsx). `adminPath` is where the admin page is mounted.
+ * (see src/index.tsx).
  */
-export function createApp(adminPath: string) {
+export function createApp() {
   return new Hono()
     .route("/", authRoutes)
     .route("/", publicRoutes)
     .route("/api/admin", adminRoutes)
     .route("/", labRoutes)
 
-    .get("/admin", async (c) => {
-      const session = await verifyAdminSession(getCookie(c, SESSION_COOKIE));
-      if (!session) {
-        return c.body(null, 401);
-      }
-      return c.redirect(adminPath, 302);
-    })
+    // The admin page used to live at a random /admin/<code> address; old
+    // bookmarks land on /admin.
+    .get("/admin/*", (c) => c.redirect("/admin", 302))
 
     // Clips and thumbnails when they're stored locally (not on R2).
     .get("/files/*", async (c) => {

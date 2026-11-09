@@ -367,6 +367,15 @@ In the lab (voting, big screen, results summary), a nominee without a built clip
 - With the sample data, 68 nominees now have something to play on the summary.
 - **For rinlux, before this reaches the real site:** an embed loads YouTube or Twitch in visitors' browsers (the no-cookie YouTube domain is used), which is a privacy point.
 
+### The admin page at plain /admin (branch `worktree-plain-admin`, 2026-11-09, not deployed)
+
+StrawWaffle saw what looked like being signed out after every deploy. Sessions were never the problem: they live in the database and are signed with the fixed `AUTH_SECRET`, and a session from 06:33 was still valid after about ten deploys. The admin page lived at a random `/admin/<code>` address made fresh at each start (from the 2025 code, security through obscurity), so open tabs and bookmarks got a 404 after a deploy. StrawWaffle chose plain `/admin`:
+- Bun serves the admin page at `/admin` to anyone, like the lab. The page asks `/api/me` and shows the admin UI only to admins. Others get a short sign-in or "not an admin" note. That's a courtesy: the protection is the server, which refuses every `/api/admin` request from non-admins, as it always did.
+- Old `/admin/<code>` addresses redirect to `/admin`.
+- The only thing given up is that anyone can download the admin page's JavaScript (labels and route names, no data).
+- The API tests now check the admin API instead of the old redirect (42 pass).
+- Signing in still returns to `/`, not to the page you came from.
+
 ### Next: the lab page (StrawWaffle's answers, 2026-11-09)
 
 StrawWaffle wants the front page and the presentation to feel fun, quirky and wholesome. It gets built on an experimental page first (`/lab`, admins only) until rinlux approves. Order: the follow-ups above, merge and deploy, then the lab.
