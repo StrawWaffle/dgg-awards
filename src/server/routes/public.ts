@@ -24,6 +24,7 @@ import {
   zValidator,
 } from "@/server/middleware";
 import { resultsQuery, voteSubmit } from "@/server/schemas";
+import chatReview from "@/archive/chat-2026.json";
 
 /** 401 with no body unless voting is open right now. */
 const requireVotingOpen = createMiddleware(async (c, next) => {
@@ -97,6 +98,18 @@ export const publicRoutes = new Hono<SessionEnv>()
       return c.body(null, 200);
     },
   )
+
+  // The year in DGG chat (src/archive/chat-2026.json): public with the
+  // results, and for admins with ?preview=1. Served from here rather than
+  // bundled into the page, so it stays out of sight until then.
+  .get("/api/chat-review", zValidator("query", resultsQuery, rejectInvalid), async (c) => {
+    const config = await getConfig();
+    const preview =
+      c.req.valid("query").preview === "1" &&
+      (await verifyAdminSession(getCookie(c, SESSION_COOKIE))) !== null;
+    if (config.viewingMode !== "reviewing" && !preview) return c.body(null, 401);
+    return c.json(chatReview, 200);
+  })
 
   // The tally (voters, ballots, per day): public with the results, and for
   // admins with ?preview=1.

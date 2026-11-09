@@ -33,11 +33,13 @@ export function Countdown({
   onArchive,
   onVote,
   onResults,
+  onChat,
 }: {
   config: SiteConfig | null;
   onArchive: (e: React.MouseEvent) => void;
   onVote: (e: React.MouseEvent) => void;
   onResults: (e: React.MouseEvent) => void;
+  onChat: (e: React.MouseEvent) => void;
 }) {
   const [now, setNow] = useState(Date.now());
   const box = useRef<HTMLDivElement>(null);
@@ -117,9 +119,14 @@ export function Countdown({
             <p className="flex items-center justify-center gap-3 text-2xl font-black">
               <Emote name="CHEERSTINY" size={1.1} title="" /> The winners are in!
             </p>
-            <a className="cozy-btn primary text-lg" href="/results" onClick={onResults}>
-              See the results
-            </a>
+            <div className="flex flex-wrap justify-center gap-3">
+              <a className="cozy-btn primary text-lg" href="/results" onClick={onResults}>
+                See the results
+              </a>
+              <a className="cozy-btn text-lg" href="/chat" onClick={onChat}>
+                The year in DGG chat
+              </a>
+            </div>
           </div>
         )}
 

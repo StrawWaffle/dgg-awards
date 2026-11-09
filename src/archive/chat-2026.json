@@ -1,0 +1,1367 @@
+{
+ "year": "2026",
+ "from": "2026-01-01",
+ "through": "2026-11-09",
+ "days": 313,
+ "numbers": [
+  {
+   "label": "messages",
+   "value": 29099659,
+   "note": "About 93k a day: one every 0.93 seconds, for 313 days."
+  },
+  {
+   "label": "chatters",
+   "value": 16024,
+   "note": "Every one of them right, according to themselves."
+  },
+  {
+   "label": "emotes",
+   "value": 26524887,
+   "note": "609 different ones. Close to one per message: words are optional."
+  },
+  {
+   "label": "combos",
+   "value": 5012,
+   "note": "The biggest had 196 people in it."
+  },
+  {
+   "label": "links",
+   "value": 437390,
+   "note": "Most of them now lead nowhere."
+  },
+  {
+   "label": "greentexts",
+   "value": 519240,
+   "note": "> be chat > quote everything"
+  },
+  {
+   "label": "punishments",
+   "value": 33545,
+   "note": "The bot handed out 84% of them and asked for nothing in return."
+  },
+  {
+   "label": "duels",
+   "value": 372,
+   "note": "Settled like adults."
+  }
+ ],
+ "emotes": {
+  "cards": [
+   {
+    "emote": "OMEGALUL",
+    "big": "2,740,498",
+    "title": "OMEGALUL of the year",
+    "text": "More than the next three (CINEMA, GIGACHAD, hesRight) put together (1,966,045). Chat laughed 8,756 times a day, at 6,942 people's hands. Drugflood alone did 26,787."
+   },
+   {
+    "emote": "MMMM",
+    "big": "50,052",
+    "title": "Bing and MMMM",
+    "text": "One in every 8 MMMMs in chat this year came from Bing. Mmmm."
+   },
+   {
+    "emote": "VeryPog",
+    "big": "27,165",
+    "title": "aus_bits and VeryPog",
+    "text": "About one in 10 of all VeryPogs. Very pog, very consistent."
+   },
+   {
+    "emote": "OMEGALUL",
+    "big": "3",
+    "title": "Drugflood's emote crowns",
+    "text": "The top user of OMEGALUL, GAGAGA and TF. A dynasty."
+   },
+   {
+    "emote": "GIGACHAD",
+    "big": "3",
+    "title": "adbrain's emote crowns",
+    "text": "The top user of GIGACHAD, NAHH and RapThis. A dynasty."
+   }
+  ],
+  "top": [
+   {
+    "name": "OMEGALUL",
+    "emote": "OMEGALUL",
+    "value": 2740498,
+    "sub": "6,942 people · most by Drugflood (26,787)"
+   },
+   {
+    "name": "CINEMA",
+    "emote": "CINEMA",
+    "value": 716879,
+    "sub": "5,743 people · most by telescopebuilder (4,399)"
+   },
+   {
+    "name": "GIGACHAD",
+    "emote": "GIGACHAD",
+    "value": 625770,
+    "sub": "5,274 people · most by adbrain (11,354)"
+   },
+   {
+    "name": "hesRight",
+    "emote": "hesRight",
+    "value": 623396,
+    "sub": "4,931 people · most by bean (5,338)"
+   },
+   {
+    "name": "NAHH",
+    "emote": "NAHH",
+    "value": 438002,
+    "sub": "4,165 people · most by adbrain (13,112)"
+   },
+   {
+    "name": "omgBruh",
+    "emote": "omgBruh",
+    "value": 390072,
+    "sub": "3,176 people · most by Maplestory (6,596)"
+   },
+   {
+    "name": "MMMM",
+    "emote": "MMMM",
+    "value": 377770,
+    "sub": "3,792 people · most by Bing (50,052)"
+   },
+   {
+    "name": "LULW",
+    "emote": "LULW",
+    "value": 369756,
+    "sub": "4,190 people · most by Readysetzerg (9,590)"
+   },
+   {
+    "name": "ShrimpleAs",
+    "emote": "ShrimpleAs",
+    "value": 355615,
+    "sub": "4,400 people · most by Incruente (9,684)"
+   },
+   {
+    "name": "PEPE",
+    "emote": "PEPE",
+    "value": 355143,
+    "sub": "4,504 people · most by eagle (3,575)"
+   },
+   {
+    "name": "SpeedLaugh",
+    "emote": "SpeedLaugh",
+    "value": 349773,
+    "sub": "2,982 people · most by Jihan (7,575)"
+   },
+   {
+    "name": "KEK",
+    "emote": "KEK",
+    "value": 322239,
+    "sub": "2,677 people · most by rep (6,213)"
+   },
+   {
+    "name": "Cooked",
+    "emote": "Cooked",
+    "value": 308384,
+    "sub": "4,054 people · most by peciti (3,253)"
+   },
+   {
+    "name": "REE",
+    "emote": "REE",
+    "value": 297186,
+    "sub": "4,423 people · most by BawlsMcLongcack (5,680)"
+   },
+   {
+    "name": "WWWWaiting",
+    "emote": "WWWWaiting",
+    "value": 273905,
+    "sub": "3,235 people · most by Eaze (9,478)"
+   }
+  ],
+  "users": [
+   {
+    "name": "ArchdukeCyan",
+    "emote": "OMEGALUL",
+    "value": 185397,
+    "sub": "favourite: OMEGALUL"
+   },
+   {
+    "name": "PuffPoropo",
+    "emote": "OMEGALUL",
+    "value": 181600,
+    "sub": "favourite: OMEGALUL"
+   },
+   {
+    "name": "telescopebuilder",
+    "emote": "SCHIZO",
+    "value": 172968,
+    "sub": "favourite: SCHIZO"
+   },
+   {
+    "name": "Drugflood",
+    "emote": "OMEGALUL",
+    "value": 162657,
+    "sub": "favourite: OMEGALUL"
+   },
+   {
+    "name": "denkkis",
+    "emote": "OMEGALUL",
+    "value": 121352,
+    "sub": "favourite: OMEGALUL"
+   },
+   {
+    "name": "Jihan",
+    "emote": "SpeedLaugh",
+    "value": 108835,
+    "sub": "favourite: SpeedLaugh"
+   },
+   {
+    "name": "LysergicAcid",
+    "emote": "VeryPog",
+    "value": 106892,
+    "sub": "favourite: VeryPog"
+   },
+   {
+    "name": "bean",
+    "emote": "SpeedLaugh",
+    "value": 106814,
+    "sub": "favourite: SpeedLaugh"
+   },
+   {
+    "name": "drewftg",
+    "emote": "OMEGALUL",
+    "value": 106296,
+    "sub": "favourite: OMEGALUL"
+   },
+   {
+    "name": "peciti",
+    "emote": "OMEGALUL",
+    "value": 104088,
+    "sub": "favourite: OMEGALUL"
+   }
+  ]
+ },
+ "combos": {
+  "cards": [
+   {
+    "emote": "DANKMEMES",
+    "big": "196",
+    "title": "The biggest combo",
+    "text": "196 people, DANKMEMES, on 26 July. Then VieiraN typed \"ChibiDesti\"."
+   },
+   {
+    "emote": "DANKMEMES",
+    "big": "9",
+    "title": "The night of 26 July",
+    "text": "9 of the year's top 25 combos happened on that one night, 1,204 combo messages between them. Whatever happened that night, chat had a lot to say about it."
+   },
+   {
+    "emote": "JARVIS",
+    "big": "m",
+    "title": "JoeRosing's masterpiece",
+    "text": "A 166-strong JARVIS combo, ended with a single letter: m."
+   },
+   {
+    "emote": "Klappa",
+    "big": "480",
+    "title": "CaptainFerret, team player",
+    "text": "Joined 480 combos and typed only 4 extra messages in them. Never the hero, never the villain."
+   },
+   {
+    "emote": "REE",
+    "big": "47",
+    "title": "Mexiijo, the Grinch",
+    "text": "Broke 47 combos, more than anyone. ArchdukeCyan was one behind on 46."
+   },
+   {
+    "emote": "PepoG",
+    "big": "19",
+    "title": "Even the organisers",
+    "text": "RiN_LuX, who helps run these awards, broke 19 combos. We're not above the law either."
+   }
+  ],
+  "top": [
+   {
+    "emote": "DANKMEMES",
+    "size": 196,
+    "people": 196,
+    "date": "2026-07-26",
+    "brokenBy": "VieiraN",
+    "breaking": "ChibiDesti"
+   },
+   {
+    "emote": "DANKMEMES",
+    "size": 180,
+    "people": 178,
+    "date": "2026-07-26",
+    "brokenBy": "kbc",
+    "breaking": "DANKMEMES LOAD"
+   },
+   {
+    "emote": "JARVIS",
+    "size": 166,
+    "people": 163,
+    "date": "2026-07-26",
+    "brokenBy": "JoeRosing",
+    "breaking": "m"
+   },
+   {
+    "emote": "LifeIsGreat",
+    "size": 138,
+    "people": 138,
+    "date": "2026-08-27",
+    "brokenBy": "PureCourse31",
+    "breaking": "LifeIsGreat LifeIsGreat"
+   },
+   {
+    "emote": "LifeIsGreat",
+    "size": 129,
+    "people": 129,
+    "date": "2026-08-27",
+    "brokenBy": "kingpotatoo",
+    "breaking": "YEE"
+   },
+   {
+    "emote": "ALARMA",
+    "size": 129,
+    "people": 129,
+    "date": "2026-09-03",
+    "brokenBy": "Nixon",
+    "breaking": null
+   },
+   {
+    "emote": "DANKMEMES",
+    "size": 125,
+    "people": 123,
+    "date": "2026-07-26",
+    "brokenBy": "tobeleron",
+    "breaking": "ChibiDesti"
+   },
+   {
+    "emote": "LifeIsGreat",
+    "size": 125,
+    "people": 125,
+    "date": "2026-11-02",
+    "brokenBy": "Profound_Samuri",
+    "breaking": "MMMM"
+   },
+   {
+    "emote": "DANKMEMES",
+    "size": 123,
+    "people": 119,
+    "date": "2026-07-26",
+    "brokenBy": "Magmaniac",
+    "breaking": "no"
+   },
+   {
+    "emote": "LifeIsGreat",
+    "size": 118,
+    "people": 118,
+    "date": "2026-08-27",
+    "brokenBy": "haesel",
+    "breaking": "ChibiDesti"
+   },
+   {
+    "emote": "DANKMEMES",
+    "size": 115,
+    "people": 106,
+    "date": "2026-07-26",
+    "brokenBy": "tobeleron",
+    "breaking": "no"
+   },
+   {
+    "emote": "MMMM",
+    "size": 112,
+    "people": 112,
+    "date": "2026-02-26",
+    "brokenBy": "vogue_hommes",
+    "breaking": "MMMM reloading"
+   }
+  ],
+  "joiners": [
+   {
+    "name": "CaptainFerret",
+    "value": 480
+   },
+   {
+    "name": "Camilo",
+    "value": 455
+   },
+   {
+    "name": "diluted",
+    "value": 398
+   },
+   {
+    "name": "PuffPoropo",
+    "value": 354
+   },
+   {
+    "name": "plastikos",
+    "value": 335
+   },
+   {
+    "name": "MDCharged",
+    "value": 318
+   },
+   {
+    "name": "chicken",
+    "value": 294
+   },
+   {
+    "name": "NeulandEntdecker",
+    "value": 285
+   },
+   {
+    "name": "telescopebuilder",
+    "value": 261
+   },
+   {
+    "name": "just_Magnus",
+    "value": 261
+   }
+  ],
+  "breakers": [
+   {
+    "name": "Mexiijo",
+    "value": 47,
+    "sub": "biggest broken: 53 DANKMEMES",
+    "emote": "DANKMEMES"
+   },
+   {
+    "name": "ArchdukeCyan",
+    "value": 46,
+    "sub": "biggest broken: 68 DANKMEMES",
+    "emote": "DANKMEMES"
+   },
+   {
+    "name": "chazmantia4",
+    "value": 38,
+    "sub": "biggest broken: 57 WarmWaterPort",
+    "emote": "WarmWaterPort"
+   },
+   {
+    "name": "ihuffduster",
+    "value": 35,
+    "sub": "biggest broken: 83 FlawlessVictory",
+    "emote": "FlawlessVictory"
+   },
+   {
+    "name": "Dlight",
+    "value": 29,
+    "sub": "biggest broken: 30 DinkDonk",
+    "emote": "DinkDonk"
+   },
+   {
+    "name": "Forrest02",
+    "value": 27,
+    "sub": "biggest broken: 60 DANKMEMES",
+    "emote": "DANKMEMES"
+   },
+   {
+    "name": "ZimbabweanWarPrince",
+    "value": 26,
+    "sub": "biggest broken: 75 DinkDonk",
+    "emote": "DinkDonk"
+   },
+   {
+    "name": "Yazesso",
+    "value": 25,
+    "sub": "biggest broken: 92 SpeedLaugh",
+    "emote": "SpeedLaugh"
+   },
+   {
+    "name": "tinted",
+    "value": 25,
+    "sub": "biggest broken: 31 AMOGUS",
+    "emote": "AMOGUS"
+   },
+   {
+    "name": "Chknpuu",
+    "value": 24,
+    "sub": "biggest broken: 23 MMMM",
+    "emote": "MMMM"
+   }
+  ]
+ },
+ "names": {
+  "cards": [
+   {
+    "emote": "Stare",
+    "big": "3/3",
+    "title": "Trius, everywhere",
+    "text": "Said Destiny's, MrMouton's and dan's names more than anyone this year. Tagged Destiny 9,587 times and got 28 back: 342 to 1. MrMouton answered 147 of 7,725."
+   },
+   {
+    "emote": "PepoG",
+    "big": "1,078",
+    "title": "eerie's October",
+    "text": "Took the Destiny crown off Trius for a month with 1,078 mentions. Trius held every other month from February to September."
+   },
+   {
+    "emote": "WWWWaiting",
+    "big": "1,076",
+    "title": "Umbraklaw and dan",
+    "text": "1,076 dan mentions in October alone, the most in any month for anyone. dan, please stream."
+   }
+  ],
+  "months": [
+   "2026-01",
+   "2026-02",
+   "2026-03",
+   "2026-04",
+   "2026-05",
+   "2026-06",
+   "2026-07",
+   "2026-08",
+   "2026-09",
+   "2026-10",
+   "2026-11"
+  ],
+  "crowns": [
+   {
+    "target": "Destiny",
+    "year": {
+     "nick": "Trius",
+     "n": 9587
+    },
+    "months": [
+     {
+      "nick": "Eban",
+      "n": 838
+     },
+     {
+      "nick": "Trius",
+      "n": 898
+     },
+     {
+      "nick": "Trius",
+      "n": 832
+     },
+     {
+      "nick": "Trius",
+      "n": 716
+     },
+     {
+      "nick": "Trius",
+      "n": 1513
+     },
+     {
+      "nick": "Trius",
+      "n": 1581
+     },
+     {
+      "nick": "Trius",
+      "n": 896
+     },
+     {
+      "nick": "Trius",
+      "n": 1261
+     },
+     {
+      "nick": "Trius",
+      "n": 647
+     },
+     {
+      "nick": "eerie",
+      "n": 1078
+     },
+     {
+      "nick": "Elmor_Fudd",
+      "n": 218
+     }
+    ]
+   },
+   {
+    "target": "MrMouton",
+    "year": {
+     "nick": "Trius",
+     "n": 7725
+    },
+    "months": [
+     {
+      "nick": "B44",
+      "n": 974
+     },
+     {
+      "nick": "Palette",
+      "n": 627
+     },
+     {
+      "nick": "Trius",
+      "n": 920
+     },
+     {
+      "nick": "Elmor_Fudd",
+      "n": 1022
+     },
+     {
+      "nick": "Elmor_Fudd",
+      "n": 806
+     },
+     {
+      "nick": "Trius",
+      "n": 1307
+     },
+     {
+      "nick": "Elmor_Fudd",
+      "n": 705
+     },
+     {
+      "nick": "Trius",
+      "n": 1044
+     },
+     {
+      "nick": "Trius",
+      "n": 695
+     },
+     {
+      "nick": "R00gle",
+      "n": 570
+     },
+     {
+      "nick": "Elmor_Fudd",
+      "n": 264
+     }
+    ]
+   },
+   {
+    "target": "dan / dancantstream",
+    "year": {
+     "nick": "Trius",
+     "n": 3490
+    },
+    "months": [
+     {
+      "nick": "Elmor_Fudd",
+      "n": 455
+     },
+     {
+      "nick": "IamPandaPuncher",
+      "n": 468
+     },
+     {
+      "nick": "Trius",
+      "n": 392
+     },
+     {
+      "nick": "Umbraklaw",
+      "n": 576
+     },
+     {
+      "nick": "Trius",
+      "n": 442
+     },
+     {
+      "nick": "Umbraklaw",
+      "n": 626
+     },
+     {
+      "nick": "Elmor_Fudd",
+      "n": 338
+     },
+     {
+      "nick": "Umbraklaw",
+      "n": 632
+     },
+     {
+      "nick": "R00gle",
+      "n": 357
+     },
+     {
+      "nick": "Umbraklaw",
+      "n": 1076
+     },
+     {
+      "nick": "Umbraklaw",
+      "n": 102
+     }
+    ]
+   }
+  ]
+ },
+ "tags": {
+  "cards": [
+   {
+    "emote": "DinkDonk",
+    "big": "699,242",
+    "title": "Destiny, tagged",
+    "text": "2,234 times a day, by 9,125 different people. He saw some of them."
+   }
+  ],
+  "duos": [
+   {
+    "a": "MisterBhole",
+    "b": "Aristortle",
+    "ab": 12537,
+    "ba": 7045,
+    "note": "Chat's loudest relationship, one way more than the other."
+   },
+   {
+    "a": "aus_bits",
+    "b": "LysergicAcid",
+    "ab": 8575,
+    "ba": 8079,
+    "note": "The most balanced relationship in chat: within 500 tags of each other all year."
+   },
+   {
+    "a": "Proteus",
+    "b": "ShawarmaFury",
+    "ab": 5617,
+    "ba": 5000,
+    "note": "Nearly even. Healthy, by DGG standards."
+   },
+   {
+    "a": "Mexiijo",
+    "b": "Aristortle",
+    "ab": 4987,
+    "ba": 4123,
+    "note": "The other side of chat's love triangle: MisterBhole tags Mexiijo too."
+   }
+  ],
+  "unrequited": [
+   {
+    "a": "Trius",
+    "b": "Destiny",
+    "ab": 9587,
+    "ba": 28
+   },
+   {
+    "a": "Trius",
+    "b": "MrMouton",
+    "ab": 7725,
+    "ba": 147
+   },
+   {
+    "a": "Elmor_Fudd",
+    "b": "MrMouton",
+    "ab": 6962,
+    "ba": 142
+   },
+   {
+    "a": "B44",
+    "b": "MrMouton",
+    "ab": 5660,
+    "ba": 73
+   },
+   {
+    "a": "Eban",
+    "b": "Destiny",
+    "ab": 5545,
+    "ba": 10
+   },
+   {
+    "a": "Damon",
+    "b": "Destiny",
+    "ab": 5174,
+    "ba": 7
+   }
+  ],
+  "tagged": [
+   {
+    "name": "Destiny",
+    "value": 699242,
+    "sub": "by 9,125 people"
+   },
+   {
+    "name": "MrMouton",
+    "value": 466541,
+    "sub": "by 5,525 people"
+   },
+   {
+    "name": "Darius",
+    "value": 161157,
+    "sub": "by 4,168 people"
+   },
+   {
+    "name": "dancantstream",
+    "value": 145826,
+    "sub": "by 4,343 people"
+   },
+   {
+    "name": "PRSEK",
+    "value": 128322,
+    "sub": "by 3,275 people"
+   },
+   {
+    "name": "Bing",
+    "value": 108818,
+    "sub": "by 2,938 people"
+   },
+   {
+    "name": "RiN_LuX",
+    "value": 91696,
+    "sub": "by 2,834 people"
+   },
+   {
+    "name": "drt0",
+    "value": 72346,
+    "sub": "by 2,809 people"
+   },
+   {
+    "name": "Radiant",
+    "value": 68958,
+    "sub": "by 3,116 people"
+   },
+   {
+    "name": "Emmia",
+    "value": 68181,
+    "sub": "by 2,516 people"
+   },
+   {
+    "name": "JaydrVernanda",
+    "value": 58078,
+    "sub": "by 2,387 people"
+   },
+   {
+    "name": "Aristortle",
+    "value": 55602,
+    "sub": "by 2,271 people"
+   }
+  ]
+ },
+ "greentext": {
+  "cards": [
+   {
+    "emote": "PepoG",
+    "big": "55.5%",
+    "title": "Aphotic, quoted",
+    "text": "More than half of everything Aphotic said started with >. 17,660 greentexts out of 31,831 messages."
+   }
+  ],
+  "top": [
+   {
+    "name": "Aphotic",
+    "value": 17660,
+    "sub": "55.5% of their messages"
+   },
+   {
+    "name": "Aerith",
+    "value": 13564,
+    "sub": "14.9% of their messages"
+   },
+   {
+    "name": "metaloidsword",
+    "value": 11960,
+    "sub": "18.2% of their messages"
+   },
+   {
+    "name": "Dreamgzer",
+    "value": 10090,
+    "sub": "32.6% of their messages"
+   },
+   {
+    "name": "ihuffduster",
+    "value": 9096,
+    "sub": "15.5% of their messages"
+   },
+   {
+    "name": "drug",
+    "value": 7842,
+    "sub": "18.2% of their messages"
+   },
+   {
+    "name": "Ivory",
+    "value": 7266,
+    "sub": "20.6% of their messages"
+   },
+   {
+    "name": "izuul",
+    "value": 6804,
+    "sub": "12.3% of their messages"
+   },
+   {
+    "name": "ChemLordTheGreat",
+    "value": 6468,
+    "sub": "14.2% of their messages"
+   },
+   {
+    "name": "Eaze",
+    "value": 5946,
+    "sub": "18.3% of their messages"
+   }
+  ],
+  "quotes": [
+   {
+    "who": "yusuf",
+    "text": ">We wish to formally acknowledge that the broadcaster known as 'dancantstream' experienced a critical verbal malfunction during a live session. The undersigned viewer has catalogued this incident and found it to be a source of sustained, unreasonable amusement. No corrective action is recommended, as the entertainment value of the speaker's linguistic collapse far exceeds any reputational remediation that could be offered. Continued monitoring of future broadcasts for additional failures is authorized. wcat",
+    "note": "A formal statement on dan's verbal malfunctions."
+   },
+   {
+    "who": "Clanker",
+    "text": "> most dggews have fowgotten the bwief gowden age whewn aww uk ips wewe banned. Histowy bawewy wecowds iwt now. Newfwogs heaw whispews of iwt awnd assume iwt's exaggewated, sowme kind of community fowkwowe passed down by incweasingwy unwewiabwe nawwatows. But those of us who wewe thewe wemembew. The aiw fewt cweanew. The discouwse moved fastew. Fow owne shining moment, the timewine bent towawd peace befowe inevitabwy cowwecting itsewf. Dafeews",
+    "note": "A history lesson, in uwu."
+   },
+   {
+    "who": "Torrniquet",
+    "text": "> \" JARVIS convert this portion of the VOD to a transcript and strip out the parts Lav is reading. Take the 7 pages of her book that she reads and write the entire rest of the book based on it. Proof read the the resulting book, correcting any grammar/usage mistakes and verifying the characters and scenes all match the premise. Change the listed author to Torrniquet. Email the finished product to every major publisher every 24 hours for the next year until one responds.\" GSN GSN GSN '",
+    "note": "A business plan."
+   },
+   {
+    "who": "Vandriel",
+    "text": ">Everytime I watch the prequels I think of how much better my Last Jedi script idea was when they announced it. You make it so that Luke realizes that because the force is \"Self balancing\" that it literally creates Sith in order to balance itself against Jedi, and that Jedi need to learn to call upon dark side force powers in order the end the cycle MMMM",
+    "note": "Unsolicited Star Wars rewrite, part one of many."
+   },
+   {
+    "who": "Doomah",
+    "text": "> senk I feel like this game is gonna be long AF. Why couldn’t they give me hard mode from the start PepeHands . I feel like hard mode was the perfect challenge + i don’t wanna play the game all over again",
+    "note": "The longest Doomah got, out of 101,017 messages."
+   },
+   {
+    "who": "dannysartproject",
+    "text": ">HOW IS HIS ONLINE CHAT SLOWER THAN OFFLINE DGG OMEGALUL OMEGALUL",
+    "note": "Said three times, for emphasis."
+   }
+  ]
+ },
+ "links": {
+  "cards": [
+   {
+    "emote": "CINEMA",
+    "big": "10.3",
+    "title": "Destiny's links",
+    "text": "Each one drew about 10 extra reactions. Being the streamer helps."
+   },
+   {
+    "emote": "WWWWaiting",
+    "big": "11,708",
+    "title": "Overload, prolific",
+    "text": "Posted 11,708 links, the most of anyone, at 0.36 extra reactions each. Quantity is a quality of its own."
+   },
+   {
+    "emote": "OMEGALUL",
+    "big": "5.0",
+    "title": "Zanzulfanten, chat's curator",
+    "text": "The best reactions per link of any chatter: 509 links, 2,589 reactions. Mostly Discord images, so you'll have to take our word for it."
+   }
+  ],
+  "top": [
+   {
+    "rank": 1,
+    "who": "Zanzulfanten",
+    "reactions": 113,
+    "people": 108,
+    "date": "2026-11-04",
+    "text": ">ROB NOERR UPDATE DinkDonk [self-destructed Discord image] DinkDonk [self-destructed Discord image] DinkDonk",
+    "link": null,
+    "note": "A Discord image. It self-destructed within a day, but 108 people saw it and none of them will say what it was."
+   },
+   {
+    "rank": 3,
+    "who": "MrMouton",
+    "reactions": 82,
+    "people": 68,
+    "date": "2026-03-30",
+    "text": "11:49 DimitriMG1: Read this article. Im scared to send it to Tiny [link]",
+    "link": {
+     "url": "https://www.cbsnews.com/projects/2026/hospice-fraud/",
+     "label": "cbsnews.com"
+    },
+    "note": "Relayed from DimitriMG1, who was too scared to send it to Tiny themselves."
+   },
+   {
+    "rank": 4,
+    "who": "Destiny",
+    "reactions": 79,
+    "people": 72,
+    "date": "2026-11-04",
+    "text": "why is he posting it if it bothers him so much LULW LULW LULW [self-destructed Discord image]",
+    "link": null,
+    "note": "Destiny, laughing at a screenshot that has since self-destructed. Chat laughed with him, 79 times."
+   },
+   {
+    "rank": 7,
+    "who": "Jessiah",
+    "reactions": 67,
+    "people": 63,
+    "date": "2026-05-13",
+    "text": "Destiny [link] timestamped the bulwark great convo with sarah and tim and jvl about fighting dirty and if dems should punish red states etc",
+    "link": {
+     "url": "https://youtu.be/9SEmMmTxQ2w?t=1673",
+     "label": "a YouTube video"
+    },
+    "note": "A timestamped Bulwark episode. Chat, briefly, listened to a podcast."
+   },
+   {
+    "rank": 14,
+    "who": "Destiny",
+    "reactions": 55,
+    "people": 39,
+    "date": "2026-02-27",
+    "text": "[link]",
+    "link": {
+     "url": "https://evisalegal.com/gbr/apply/v2",
+     "label": "evisalegal.com"
+    },
+    "note": "A UK visa application form. No further comment from chat, just 55 reactions."
+   },
+   {
+    "rank": 17,
+    "who": "Destiny",
+    "reactions": 52,
+    "people": 49,
+    "date": "2026-05-31",
+    "text": "[link] L M A O",
+    "link": {
+     "url": "https://streamable.com/xu64u0",
+     "label": "a Streamable clip"
+    },
+    "note": "Four letters, spaced out. The clip still plays."
+   },
+   {
+    "rank": 24,
+    "who": "Destiny",
+    "reactions": 49,
+    "people": 46,
+    "date": "2026-01-03",
+    "text": "this was my ban appeal a year ago LULW [link]",
+    "link": {
+     "url": "https://i.imgur.com/XebTaXF.png",
+     "label": "an imgur image"
+    },
+    "note": "Destiny shares his own ban appeal from a year ago."
+   }
+  ]
+ },
+ "law": {
+  "cards": [
+   {
+    "emote": "GIGACHAD",
+    "big": "597",
+    "title": "Destiny's justice",
+    "text": "597 IP bans, 108 meganukes, and not a single mute. Destiny doesn't mute."
+   },
+   {
+    "emote": "MMMM",
+    "big": "1,214",
+    "title": "Bing's mute button",
+    "text": "1,214 mutes, the most of any mod, and worn smooth."
+   },
+   {
+    "emote": "peepoHug",
+    "big": "414",
+    "title": "RiN_LuX giveth",
+    "text": "The busiest mod (3,348 commands), and 414 of them were unbans. Also started 66 vote bans and sent 169 people to the gulag, so it evens out."
+   },
+   {
+    "emote": "PepoTurtle",
+    "big": "0",
+    "title": "crispy_waves, at peace",
+    "text": "1,300 messages, zero mod commands. The calmest mod in chat."
+   },
+   {
+    "emote": "Abathur",
+    "big": "23",
+    "title": "Lemmiwinks' favourite power",
+    "text": "Lemmiwinks' most used mod command is !duel (23 times). Some mods moderate. Some mods fight."
+   }
+  ],
+  "mods": [
+   {
+    "name": "RiN_LuX",
+    "value": 3348,
+    "sub": "!mute 590, !unban 414, !ip 409, !stalk 372, !um 293"
+   },
+   {
+    "name": "Bing",
+    "value": 2031,
+    "sub": "!mute 1027, !ip 257, !unban 172, !nuke 74, !stalk 73"
+   },
+   {
+    "name": "MrMouton",
+    "value": 1107,
+    "sub": "!mute 261, !unban 186, !ip 153, !stalk 144, !voteban 97"
+   },
+   {
+    "name": "Destiny",
+    "value": 1105,
+    "sub": "!ipban 597, !stalk 352, !meganuke 108, !mutelinks 23, !aegis 7"
+   },
+   {
+    "name": "Mitch",
+    "value": 351,
+    "sub": "!ip 119, !mute 65, !ud 30, !um 28, !stalk 18"
+   },
+   {
+    "name": "tdnPanda",
+    "value": 351,
+    "sub": "!mute 104, !unmute 63, !ban 42, !stalk 35, !nuke 32"
+   },
+   {
+    "name": "JaydrVernanda",
+    "value": 311,
+    "sub": "!mute 205, !unban 18, !duel 15, !ip 15, !stalk 13"
+   },
+   {
+    "name": "TitanOrdo",
+    "value": 191,
+    "sub": "!mute 89, !um 48, !stalk 14, !ud 10, !ip 9"
+   },
+   {
+    "name": "Fajosu",
+    "value": 128,
+    "sub": "!mute 42, !nuke 30, !unmute 25, !stalk 6, !voteban 5"
+   },
+   {
+    "name": "RightToBearArmsLOL",
+    "value": 122,
+    "sub": "!mute 49, !ip 37, !stalk 10, !nuke 10, !meganuke 6"
+   },
+   {
+    "name": "tena",
+    "value": 98,
+    "sub": "!mute 37, !ipban 18, !duel 17, !meganuke 11, !gulag 4"
+   },
+   {
+    "name": "Titan",
+    "value": 63,
+    "sub": "!mute 21, !um 18, !ip 8, !stalk 4, !nuke 3"
+   },
+   {
+    "name": "Lemmiwinks",
+    "value": 60,
+    "sub": "!duel 23, !mute 7, !voteban 7, !stalk 6, !unban 3"
+   },
+   {
+    "name": "crispy_waves",
+    "value": 0,
+    "sub": "no commands at all"
+   }
+  ],
+  "banReasons": [
+   {
+    "label": "TIE GATE 2026",
+    "n": 13
+   },
+   {
+    "label": "unban = lose mod",
+    "n": 11
+   },
+   {
+    "label": "MMMM",
+    "n": 11
+   },
+   {
+    "label": "dinkdonk vote cheating",
+    "n": 10
+   },
+   {
+    "label": "Unban on April 1st, maybe",
+    "n": 8
+   },
+   {
+    "label": "epic",
+    "n": 7
+   },
+   {
+    "label": "LULW",
+    "n": 7
+   },
+   {
+    "label": "KEK",
+    "n": 7
+   },
+   {
+    "label": "reduced sentence",
+    "n": 6
+   },
+   {
+    "label": "SALUTE",
+    "n": 6
+   },
+   {
+    "label": "cool",
+    "n": 5
+   },
+   {
+    "label": "ACKSHUALLY",
+    "n": 5
+   },
+   {
+    "label": "FeelsWeirdMan",
+    "n": 4
+   },
+   {
+    "label": "peepoHug uhhh maybe dont say this/agree with it",
+    "n": 4
+   }
+  ],
+  "nuked": [
+   {
+    "label": "looking",
+    "n": 233
+   },
+   {
+    "label": "commmmfy",
+    "n": 168
+   },
+   {
+    "label": "dontsayit",
+    "n": 99
+   },
+   {
+    "label": "hesright",
+    "n": 74
+   },
+   {
+    "label": "weow",
+    "n": 68
+   },
+   {
+    "label": "ripbozo",
+    "n": 67
+   }
+  ],
+  "linkRules": [
+   {
+    "label": "tagging Destiny with a link",
+    "n": 481
+   },
+   {
+    "label": "posting a link while link muting is on",
+    "n": 425
+   },
+   {
+    "label": "posting a repeated link",
+    "n": 58
+   }
+  ],
+  "flyers": [
+   {
+    "emote": "Stare",
+    "big": "23",
+    "title": "Nobody is safe",
+    "text": "RiN_LuX, a mod, was muted 23 times this year, mostly by Bing."
+   },
+   {
+    "emote": "Stare",
+    "big": "34",
+    "title": "Nobody, really",
+    "text": "JaydrVernanda, also a mod: muted 34 times, mostly by Bing."
+   },
+   {
+    "emote": "WWWWaiting",
+    "big": "331",
+    "title": "Ningguanq, too fast",
+    "text": "Typed faster than the chat allows 331 times. The bot's most regular customer."
+   },
+   {
+    "emote": "PepeHands",
+    "big": "13",
+    "title": "jojoP, bruised",
+    "text": "Lost 13 duels and kept accepting them."
+   }
+  ]
+ },
+ "notTags": [
+  "chicken",
+  "rep",
+  "eagle",
+  "Brandon",
+  "Bigger",
+  "Josh",
+  "Affair",
+  "drug",
+  "EGO",
+  "Pizza",
+  "Hybrid",
+  "fish",
+  "basic",
+  "Spreading",
+  "John",
+  "witness",
+  "HAM",
+  "Seek",
+  "liberal",
+  "Anthony",
+  "bills",
+  "Caps",
+  "jon",
+  "Cake",
+  "Eventually",
+  "Bacon",
+  "dish",
+  "Late",
+  "Crash",
+  "device",
+  "weekly",
+  "Ice",
+  "Metro",
+  "Sunset",
+  "magnitude",
+  "centre",
+  "Chains",
+  "minimum",
+  "feet",
+  "TriBute",
+  "Dragon",
+  "Predict",
+  "Wind",
+  "April",
+  "Mike",
+  "Kyle",
+  "Companion",
+  "Wallace",
+  "carrier",
+  "Graham",
+  "Rest",
+  "Flames",
+  "Fixed",
+  "Food",
+  "chairs",
+  "Slept",
+  "wells",
+  "Rachel",
+  "North",
+  "Corporate",
+  "breed",
+  "Parts",
+  "Gold",
+  "eveR",
+  "Lucky",
+  "Radar",
+  "Bible",
+  "EVOLVED",
+  "morgan",
+  "billy",
+  "fourth",
+  "Ray",
+  "expected",
+  "rough",
+  "Steel",
+  "Sharp",
+  "sign",
+  "Cable",
+  "Summer",
+  "Hung",
+  "ann",
+  "Abused",
+  "Sacred",
+  "Civic",
+  "Shower",
+  "Scott",
+  "switch",
+  "Beast",
+  "Downtown",
+  "Easy",
+  "Tension",
+  "Jeff",
+  "Familiar",
+  "Dude",
+  "Gut",
+  "Golden",
+  "Cult",
+  "James",
+  "chase",
+  "Metropolitan",
+  "vegas",
+  "Cloud",
+  "Neil",
+  "Sword",
+  "log",
+  "convert",
+  "maiL",
+  "thing",
+  "ghost",
+  "Solutions",
+  "holy",
+  "fifty",
+  "Cabin",
+  "organic",
+  "Cycle",
+  "Progress",
+  "Grey",
+  "Tyler"
+ ]
+}

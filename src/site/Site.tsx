@@ -6,6 +6,7 @@ import { HeaderTools } from "@/lab/HeaderTools";
 import { type Stage, previewPath, stagePages, stages } from "@/lib/previews";
 import { useHoverMenu } from "@/lib/useHoverMenu";
 import { Summary, loadArchive2025 } from "@/lab/Summary";
+import { ChatReviewPage } from "@/site/ChatReviewPage";
 import { Countdown } from "@/site/Countdown";
 import { LabPage, type LabView, labViews } from "@/site/LabPage";
 import { ResultsPage } from "@/site/ResultsPage";
@@ -21,9 +22,9 @@ export type SiteConfig = {
 };
 export type Me = { uid: number; name: string; admin: boolean } | null;
 
-type Page = "home" | "2025" | "vote" | "results" | "lab";
-const order: Page[] = ["home", "vote", "results", "2025", "lab"];
-const paths: Record<Page, string> = { home: "/", "2025": "/2025", vote: "/vote", results: "/results", lab: "/lab" };
+type Page = "home" | "2025" | "vote" | "results" | "chat" | "lab";
+const order: Page[] = ["home", "vote", "results", "chat", "2025", "lab"];
+const paths: Record<Page, string> = { home: "/", "2025": "/2025", vote: "/vote", results: "/results", chat: "/chat", lab: "/lab" };
 
 /**
  * Where an address leads. Previews live under `/preview/<stage>/<page>`
@@ -134,6 +135,7 @@ export function Site() {
       home: `DGG Awards${year}`,
       vote: `Vote | DGG Awards${year}`,
       results: `Results | DGG Awards${year}`,
+      chat: `The year in chat | DGG Awards${year}`,
       "2025": "2025 results | DGG Awards",
       lab: "Lab | DGG Awards",
     }[page];
@@ -212,6 +214,7 @@ export function Site() {
     { page: "home", label: "Home" },
     ...(mode === "voting" || page === "vote" ? [{ page: "vote" as Page, label: "Vote" }] : []),
     ...(mode === "reviewing" || page === "results" ? [{ page: "results" as Page, label: "Results" }] : []),
+    ...(mode === "reviewing" || page === "chat" ? [{ page: "chat" as Page, label: "Year in chat" }] : []),
     { page: "2025", label: "2025 results" },
     ...(previewing ? [{ page: "lab" as Page, label: "Lab" }] : []),
   ];
@@ -242,7 +245,7 @@ export function Site() {
       <>
         {p === "home" && (
           <main className="mx-auto max-w-3xl px-4 py-10 sm:py-16">
-            <Countdown config={shown} onArchive={go("2025")} onVote={go("vote")} onResults={go("results")} />
+            <Countdown config={shown} onArchive={go("2025")} onVote={go("vote")} onResults={go("results")} onChat={go("chat")} />
           </main>
         )}
         {p === "vote" && (
@@ -253,6 +256,11 @@ export function Site() {
         {p === "results" && (
           <main className="mx-auto max-w-7xl px-4 py-6">
             <ResultsPage me={me} config={shown} preview={previewing && stage === "results"} onHome={go("home")} />
+          </main>
+        )}
+        {p === "chat" && (
+          <main className="mx-auto max-w-6xl px-4 py-6">
+            <ChatReviewPage me={me} config={shown} preview={previewing && stage === "results"} onHome={go("home")} />
           </main>
         )}
         {p === "2025" && (

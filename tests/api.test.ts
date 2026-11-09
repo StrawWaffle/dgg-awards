@@ -93,6 +93,8 @@ describe("static and public routes", () => {
       ["/vote", "DGG Awards"],
       ["/results", "DGG Awards"],
       ["/2025", "DGG Awards"],
+      ["/chat", "DGG Awards"],
+      ["/preview/results/chat", "DGG Awards"],
       ["/lab", "DGG Awards"],
       ["/preview", "DGG Awards"],
       ["/preview/before", "DGG Awards"],
@@ -771,6 +773,18 @@ describe("admin", () => {
     expect(Object.keys(tally).sort()).toEqual(["ballots", "days", "voters"]);
     expect(tally.voters).toBeGreaterThan(500);
     expect(tally.days.reduce((n: number, d: any) => n + d.ballots, 0)).toBe(tally.ballots);
+  });
+
+  test("the year in chat is public with the results, and for admins in preview", async () => {
+    expect((await req("/api/chat-review")).status).toBe(401);
+    expect((await req("/api/chat-review?preview=1", {}, user)).status).toBe(401);
+    const res = await req("/api/chat-review?preview=1", {}, admin);
+    expect(res.status).toBe(200);
+    const review = await res.json();
+    expect(review.year).toBe("2026");
+    expect(review.numbers.length).toBeGreaterThan(0);
+    // No Discord links: they expire.
+    expect(JSON.stringify(review)).not.toContain("discordapp");
   });
 
   test("make admin by uid", async () => {

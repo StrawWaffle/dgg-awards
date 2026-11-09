@@ -12,11 +12,12 @@ export const stages: { id: Stage; label: string }[] = [
 ];
 
 /** The pages a stage can be previewed on. */
-export type StagePage = "home" | "vote" | "results" | "2025";
+export type StagePage = "home" | "vote" | "results" | "chat" | "2025";
 export const stagePages: { page: StagePage; label: string }[] = [
   { page: "home", label: "Front page" },
   { page: "vote", label: "Vote" },
   { page: "results", label: "Results" },
+  { page: "chat", label: "Year in chat" },
   { page: "2025", label: "2025 results" },
 ];
 

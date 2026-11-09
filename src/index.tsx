@@ -21,6 +21,7 @@ const server = serve({
     "/vote": site,
     "/results": site,
     "/2025": site,
+    "/chat": site,
     "/lab": site,
     // Admins' previews of the site at each stage: /preview/<stage>/<page>.
     "/preview": site,

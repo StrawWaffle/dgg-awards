@@ -27,6 +27,8 @@
   --coral: #ef6b6b;
   --green: #74c291;
   --highlight: #e4f6f0;
+  /* Greentext, as chat shows it. */
+  --greentext: #5f8f1f;
   --sky-top: #a9d8ff;
   --sky-bottom: #ffe4c4;
   --ground: #b9df8f;
@@ -61,6 +63,7 @@
   --cream: #344052;
   --cream-shadow: #1c2533;
   --highlight: #2f4a4a;
+  --greentext: #9fd062;
   --sky-top: #1b1f4a;
   --sky-bottom: #6b3d8f;
   --ground: #2f4a3b;
@@ -485,4 +488,9 @@ input[type="range"].cozy-range {
   .cozy-btn {
     transition: none;
   }
+}
+
+/* A greentext quote on the year in chat. */
+.chat-greentext {
+  color: var(--greentext);
 }
