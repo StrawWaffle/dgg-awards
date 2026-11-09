@@ -5,6 +5,7 @@ import {
   getAllUsers,
   getAllVotes,
   getAllVotesFiltered,
+  getConfig,
   getNominees,
   insertCategory,
   insertNominee,
@@ -13,6 +14,7 @@ import {
   updateNominee,
   updateUserMakeAdmin,
 } from "@/lib/data/driver";
+import { checkAwards } from "@/lib/nominee-checks";
 import { type SessionEnv, rejectInvalid, requireAdmin, zValidator } from "@/server/middleware";
 import {
   categoryForm,
@@ -78,6 +80,10 @@ export const adminRoutes = new Hono<SessionEnv>()
       imageId: form.image_id ?? null,
       videoId: form.video_id ?? null,
       renderType: "default",
+      date: form.date ?? null,
+      linkType: form.link_type ?? null,
+      clipStart: form.clip_start ?? null,
+      clipEnd: form.clip_end ?? null,
     });
     return backToAdmin();
   })
@@ -92,6 +98,13 @@ export const adminRoutes = new Hono<SessionEnv>()
   })
 
   .get("/nominees", async (c) => c.json(await getNominees(), 200))
+  // Everything wrong with the nominees, for the admin editor. Problems come
+  // from src/lib/nominee-checks.ts; the year from the awardYear setting.
+  .get("/checks", async (c) => {
+    const config = await getConfig();
+    const year = config.awardYear ? Number(config.awardYear) : undefined;
+    return c.json(checkAwards(await getNominees(), year), 200);
+  })
   .get("/users", async (c) => c.json(await getAllUsers(), 200))
   .patch("/user", zValidator("json", userIdBody, rejectInvalid), async (c) => {
     await updateUserMakeAdmin(c.req.valid("json"));

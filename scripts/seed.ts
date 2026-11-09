@@ -28,6 +28,8 @@ if (!modes.includes(mode)) {
   process.exit(1);
 }
 const fakeVoters = Number(values["fake-votes"]);
+/** src/data.ts holds the 2025 nominees. */
+const AWARD_YEAR = "2025";
 
 const db = new Database(env("DB_FILE_NAME"));
 db.run("PRAGMA foreign_keys = ON;");
@@ -50,8 +52,9 @@ db.transaction(() => {
     "INSERT INTO categories (id, title, description) VALUES (?, ?, ?)",
   );
   const insOpt = db.prepare(
-    `INSERT INTO options (id, categoryId, title, description, url, imageId, videoId, renderType)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO options (id, categoryId, title, description, url, imageId, videoId, renderType,
+       date, linkType, clipStart, clipEnd)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   for (const c of Data) {
     insCat.run(c.id, c.title, c.description);
@@ -65,6 +68,10 @@ db.transaction(() => {
         o.imageId,
         o.videoId,
         o.renderType ?? "default",
+        o.date ?? null,
+        o.linkType ?? null,
+        o.clipStart ?? null,
+        o.clipEnd ?? null,
       );
     }
   }
@@ -112,6 +119,7 @@ db.transaction(() => {
   setCfg.run("startTime", String(start));
   setCfg.run("endTime", String(end));
   setCfg.run("viewingMode", mode);
+  setCfg.run("awardYear", AWARD_YEAR);
 })();
 
 const count = (t: string) =>

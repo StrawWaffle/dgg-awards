@@ -21,8 +21,12 @@ export type Session = InferSelectModel<typeof sessionsTable>;
 export type PublicSession = Pick<Session, "id" | "uid">;
 export type Option = InferSelectModel<typeof optionsTable>;
 export type Category = InferSelectModel<typeof categoriesTable>;
+/** Nominee fields added after 2025; optional in data files and imports. */
+export type NomineeDetails = "date" | "linkType" | "clipStart" | "clipEnd";
+
 export type ImportableData = (Category & {
-  options: Omit<Option, "categoryId">[];
+  options: (Omit<Option, "categoryId" | NomineeDetails> &
+    Partial<Pick<Option, NomineeDetails>>)[];
 })[];
 export type ViewingMode = "locked" | "voting" | "idle" | "reviewing";
 
@@ -116,34 +120,10 @@ export type Recognitions = Contribution[];
 export type Vote = InferSelectModel<typeof votesTable>;
 
 
-export type VoteEntry = {
-  id: string;
-  title: string;
-  description: string;
-  categoryId: string;
-  url: string | null;
-  imageId: string | null;
-  videoId: string | null;
-  renderType: "default" | "compact" | null;
-  category: {
-    id: string;
-    title: string;
-    description: string;
-  };
-  votes: {
-    at: Date;
-    uid: number;
-    categoryId: string;
-    optionId: string;
-    sessionSnapshot: {
-      uid: number;
-      id: string;
-      createdAt: Date;
-      expiresAt: Date;
-      ip: string;
-      agent: string;
-    };
-  }[];
+/** A nominee with its category and votes, as the results query loads it. */
+export type VoteEntry = Option & {
+  category: Category;
+  votes: Vote[];
 };
 
 export type ResultsData = {

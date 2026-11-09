@@ -7,6 +7,7 @@ import {
   sqliteTable,
   text,
 } from "drizzle-orm/sqlite-core";
+import type { LinkType } from "@/lib/links";
 import type { Session } from "@/lib/types";
 
 export const usersTable = sqliteTable("users", {
@@ -62,6 +63,13 @@ export const optionsTable = sqliteTable(
     renderType: text()
       .$type<"default" | "compact">()
       .$default(() => "default"),
+    /** When it happened, YYYY-MM-DD. Checked against the award year. */
+    date: text(),
+    /** What `url` points at. Null means work it out from the URL. */
+    linkType: text().$type<LinkType>(),
+    /** The clip's range within the source, in seconds. */
+    clipStart: int(),
+    clipEnd: int(),
   },
   (table) => [primaryKey({ columns: [table.id, table.categoryId] })],
 );

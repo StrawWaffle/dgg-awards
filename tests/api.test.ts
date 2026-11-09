@@ -121,8 +121,9 @@ describe("static and public routes", () => {
     const res = await req("/api/config");
     expect(res.status).toBe(200);
     const cfg = await res.json();
-    expect(Object.keys(cfg).sort()).toEqual(["endTime", "startTime", "viewingMode"]);
+    expect(Object.keys(cfg).sort()).toEqual(["awardYear", "endTime", "startTime", "viewingMode"]);
     expect(cfg.viewingMode).toBe("voting");
+    expect(cfg.awardYear).toBe("2025");
     expect(typeof cfg.startTime).toBe("string");
   });
 
@@ -380,6 +381,84 @@ describe("admin", () => {
     );
     expect(del.status).toBe(200);
     expect((await req("/api/admin/nominee?id=x", { method: "DELETE" }, admin)).status).toBe(400);
+  });
+
+  test("nominee details: date, link type and clip range", async () => {
+    const nominee = async () =>
+      (await (await req("/api/nominees")).json())
+        .find((c: any) => c.id === "ally")
+        .options.find((o: any) => o.id === "detailnom");
+    const post = (extra: Record<string, string>) =>
+      req(
+        "/api/admin/nominee",
+        {
+          method: "POST",
+          body: form({
+            nominee_id: "detailnom",
+            category_id: "ally",
+            nominee_title: "Detail Nom",
+            nominee_description: "d",
+            url: "https://www.youtube.com/watch?v=abc",
+            ...extra,
+          }),
+        },
+        admin,
+      );
+
+    // Shape is validated: bad date, unknown type, negative seconds.
+    expect((await post({ date: "June 2025" })).status).toBe(400);
+    expect((await post({ link_type: "myspace" })).status).toBe(400);
+    expect((await post({ clip_start: "-5" })).status).toBe(400);
+
+    // Blank form fields mean "not given".
+    const add = await post({ date: "2025-06-01", link_type: "", clip_start: "83", clip_end: "120" });
+    expect(add.status).toBe(302);
+    expect(await nominee()).toMatchObject({
+      date: "2025-06-01",
+      linkType: null,
+      clipStart: 83,
+      clipEnd: 120,
+    });
+
+    const patch = await req(
+      "/api/admin/nominee",
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: "detailnom", categoryId: "ally", linkType: "youtube-video", clipEnd: null }),
+      },
+      admin,
+    );
+    expect(patch.status).toBe(200);
+    expect(await nominee()).toMatchObject({ linkType: "youtube-video", clipStart: 83, clipEnd: null });
+
+    const badPatch = await req(
+      "/api/admin/nominee",
+      {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: "detailnom", categoryId: "ally", clipStart: 1.5 }),
+      },
+      admin,
+    );
+    expect(badPatch.status).toBe(400);
+
+    await req("/api/admin/nominee?categoryId=ally&id=detailnom", { method: "DELETE" }, admin);
+  });
+
+  test("checks list every problem with the nominees", async () => {
+    expect((await req("/api/admin/checks", {}, user)).status).toBe(401);
+    const res = await req("/api/admin/checks", {}, admin);
+    expect(res.status).toBe(200);
+    const issues = await res.json();
+    expect(Object.keys(issues[0]).sort()).toEqual(
+      ["categoryId", "code", "message", "nomineeId", "severity"],
+    );
+    const count = (code: string) => issues.filter((i: any) => i.code === code).length;
+    // The seeded 2025 data, as scored by scripts/check-nominees.ts.
+    expect(count("bare-link")).toBe(15);
+    expect(count("missing-media")).toBe(10);
+    expect(count("duplicate-title")).toBe(2);
   });
 
   test("make admin by uid", async () => {

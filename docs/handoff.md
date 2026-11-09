@@ -83,6 +83,7 @@ The source zip (`dgga25.zip`) was deleted at StrawWaffle's request, so commit 1 
 ## Open questions
 
 - **R2 bucket for clips:** StrawWaffle needs to create one on his Cloudflare account. Until then, clips can be stored locally behind the same storage interface.
+- **Real 2025 results for the archive:** ask rinlux whether they have the 2025 production database, an export or the final numbers. The zip had none, and the live site shows fake votes. Fallbacks are rebuilding from the stream (incomplete, with garbled captions) or archiving the nominees and winners only.
 - **What rinlux thinks is missing** compared with the live 2025 version.
 
 ## Stack upgrade (branch `stack-upgrade`, merged into `main` 2026-11-09)
@@ -145,6 +146,10 @@ Order StrawWaffle gave: preview to rinlux first, then discuss, then these.
 5. **Re-pull emotes from the DGG CDN:** `https://cdn.destiny.gg/emotes/emotes.json` and `emotes.css`. Some emotes are sprite sheets or animated by CSS transforms, so a plain `<img>` won't show them correctly. DGG-Radio's `emotes.md` explains this and has a working approach to reuse.
 6. **Privacy page** saying exactly what's collected (DGG id and name, IP and user agent per vote) and why, with a retention plan. Do this when StrawWaffle lifts the privacy deferral.
 7. **Cloudflare bot signals:** compare results with and without suspected bot votes (shared IPs, new DGG accounts) and show both.
+8. **Archive of past years** (StrawWaffle's idea, 2026-11-09).
+   - Serve `/archive/<year>` from a frozen file in the repo holding that year's nominees, images, final counts and winners. Render it with the results view, fully revealed.
+   - No live database or voting code is involved, so it keeps working as the site changes.
+   - Start with 2025 once its real results are found (see Open questions).
 
 ## Backlog: fixes from the 2025 stream
 

@@ -15,6 +15,13 @@
       "when": 1767155441748,
       "tag": "0001_clever_spacker_dave",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1794201552606,
+      "tag": "0002_nominee_details",
+      "breakpoints": true
     }
   ]
 }

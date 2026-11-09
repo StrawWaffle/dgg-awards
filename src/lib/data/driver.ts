@@ -215,6 +215,10 @@ export async function updateNominee(d: API.PATCH_NomineeRequest) {
       title: d.title,
       url: d.url,
       videoId: d.videoId,
+      date: d.date,
+      linkType: d.linkType,
+      clipStart: d.clipStart,
+      clipEnd: d.clipEnd,
     })
     .where(
       and(
@@ -231,7 +235,7 @@ export async function deleteCategory(id: string) {
 }
 
 export async function insertNominee(
-  nominee: InferSelectModel<typeof schema.optionsTable>,
+  nominee: InferInsertModel<typeof schema.optionsTable>,
 ) {
   return await db.insert(schema.optionsTable).values(nominee);
 }
@@ -245,6 +249,8 @@ export async function getConfig(): Promise<{
   endTime?: string;
   viewingMode?: ViewingMode;
   message?: string;
+  /** The year being awarded, e.g. "2025". Nominee dates are checked against it. */
+  awardYear?: string;
 }> {
   const arrayOfObjects = await db.query.configurationTable.findMany();
 

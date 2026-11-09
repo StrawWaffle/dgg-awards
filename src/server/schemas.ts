@@ -1,6 +1,7 @@
 // Request schemas. Each one is the single definition of what a route accepts:
 // the server validates with it and the client's request types come from it.
 import { z } from "zod";
+import { linkTypes } from "@/lib/links";
 import type { ImportableData, ViewingMode } from "@/lib/types";
 
 const required = z.string().min(1);
@@ -21,6 +22,21 @@ export const categoryForm = z.object({
   category_description: required,
 });
 
+// Nominee details added after 2025. The schemas check shape only; whether the
+// data is good (right year, specific link…) is src/lib/nominee-checks.ts.
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD");
+const seconds = z.number().int().min(0);
+const nomineeDetails = {
+  date: isoDate.nullable().optional(),
+  linkType: z.enum(linkTypes).nullable().optional(),
+  clipStart: seconds.nullable().optional(),
+  clipEnd: seconds.nullable().optional(),
+};
+
+/** An optional form field: blank means not given. */
+const blankable = <T extends z.ZodType>(schema: T) =>
+  z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? undefined : v), schema.optional());
+
 export const nomineeForm = z.object({
   nominee_id: required,
   category_id: required,
@@ -29,6 +45,10 @@ export const nomineeForm = z.object({
   url: required,
   image_id: z.string().optional(),
   video_id: z.string().optional(),
+  date: blankable(isoDate),
+  link_type: blankable(z.enum(linkTypes)),
+  clip_start: blankable(z.coerce.number().pipe(seconds)),
+  clip_end: blankable(z.coerce.number().pipe(seconds)),
 });
 
 /** Unix seconds; parsed the way parseInt always did ("12abc" is 12). */
@@ -57,6 +77,7 @@ export const nomineePatch = z.object({
   imageId: z.string().nullable().optional(),
   videoId: z.string().nullable().optional(),
   renderType: renderType.nullable().optional(),
+  ...nomineeDetails,
 });
 
 export const userIdBody = z.number().int();
@@ -85,6 +106,7 @@ export const importedData = z.array(
         imageId: z.string().nullable(),
         videoId: z.string().nullable(),
         renderType: renderType.nullable(),
+        ...nomineeDetails,
       }),
     ),
   }),
