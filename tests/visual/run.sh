@@ -13,7 +13,7 @@ deps="npm install --silent --no-save --prefix /tmp/pw playwright@1.56.1 pixelmat
 case $cmd in
   capture)
     app=${2:?app container}; name=${3:?output name}
-    docker exec "$app" bun scripts/seed.ts --mode voting --fake-votes 500 >/dev/null
+    "$(dirname "$0")/../reset.sh" "$app"
     docker run --rm --network dgga-test -v "$here:/v" -w /v --ipc=host $image \
       sh -c "$deps && cp capture.mjs /tmp/pw/ && node /tmp/pw/capture.mjs http://$app:3000 http://dgga-mock:8789 /v/out/$name"
     ;;

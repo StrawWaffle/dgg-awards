@@ -1,6 +1,11 @@
 @import "tailwindcss";
 
 @theme {
+  /* Tailwind 4.1's default stack. 4.3 changed the default, which changes the
+     look on some systems; pinned so the upgrade doesn't. */
+  --font-sans:
+    ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
   --color-blue-1: #0090ff;
   --color-blue-2: #0c1d40;
   --color-blue-2-light: #15326c;

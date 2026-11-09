@@ -8,7 +8,7 @@ app=${1:?app container name}
 shift
 here=$(cd "$(dirname "$0")/.." && (pwd -W 2>/dev/null || pwd))
 export MSYS_NO_PATHCONV=1
-docker exec "$app" bun scripts/seed.ts --mode voting --fake-votes 500 >/dev/null
+"$(dirname "$0")/reset.sh" "$app"
 docker run --rm --network dgga-test -v "$here:/w" -w /w \
   -e BASE_URL="http://$app:3000" -e MOCK_URL=http://dgga-mock:8789 \
-  oven/bun:1.3 bun test tests/api.test.ts "$@"
+  oven/bun:1.4 bun test tests/api.test.ts "$@"

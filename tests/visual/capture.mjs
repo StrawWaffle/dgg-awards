@@ -59,12 +59,17 @@ await fetch(`${BASE}/api/vote`, {
   body: JSON.stringify({ category_id: "ally", nominee_id: "zee" }),
 });
 
-const browser = await chromium.launch();
+// The browser reaches every app under one name, so pages that print their own
+// address (the vote summary share text) render the same for any container.
+const PAGE = "http://app.test:3000";
+const browser = await chromium.launch({
+  args: [`--host-resolver-rules=MAP app.test ${new URL(BASE).hostname}`],
+});
 
 async function shot(name, { path = "/", token, viewport = { width: 1440, height: 900 }, before } = {}) {
   const context = await browser.newContext({ viewport, deviceScaleFactor: 1 });
   if (token) {
-    await context.addCookies([{ name: "session", value: token, url: BASE }]);
+    await context.addCookies([{ name: "session", value: token, url: PAGE }]);
   }
   const page = await context.newPage();
   await page.clock.setFixedTime(FROZEN);
@@ -75,9 +80,10 @@ async function shot(name, { path = "/", token, viewport = { width: 1440, height:
     if (/\.gif($|\?)/i.test(url)) {
       return route.fulfill({ body: still, contentType: "image/png" });
     }
-    if (url.startsWith(`${BASE}/Media/`)) {
+    if (url.startsWith(`${PAGE}/Media/`)) {
       // Animated PNG (acTL chunk) and WebP (ANIM chunk) files get the still too.
-      return route.fetch({ maxRedirects: 0 }).then(async (res) => {
+      // route.fetch runs in Node, which doesn't know the app.test alias.
+      return route.fetch({ url: BASE + url.slice(PAGE.length), maxRedirects: 0 }).then(async (res) => {
         // Not stored locally: the app redirects to the dead CDN. Fail at once
         // so the broken image renders the same way every run.
         if (res.status() !== 200) return route.fulfill({ status: 404, body: "" });
@@ -89,8 +95,8 @@ async function shot(name, { path = "/", token, viewport = { width: 1440, height:
         return route.fulfill({ response: res, body });
       });
     }
-    if (url.startsWith(BASE)) return route.continue();
-    const fake = { title: "Video", thumbnail_url: `${BASE}/Media/coggers.png`, html: "<div></div>" };
+    if (url.startsWith(PAGE)) return route.continue();
+    const fake = { title: "Video", thumbnail_url: `${PAGE}/Media/coggers.png`, html: "<div></div>" };
     if (url.includes("youtube.com/oembed") || url.includes("api.streamable.com")) {
       return route.fulfill({ json: fake });
     }
@@ -103,7 +109,7 @@ async function shot(name, { path = "/", token, viewport = { width: 1440, height:
     if (m.type() !== "error" || /401|ERR_FAILED/.test(t)) return;
     errors.push(t);
   });
-  await page.goto(BASE + path, { waitUntil: "networkidle" });
+  await page.goto(PAGE + path, { waitUntil: "networkidle" });
   // Load lazy images and anything that appears on scroll.
   await page.evaluate(async () => {
     document.querySelectorAll("img[loading=lazy]").forEach((img) => (img.loading = "eager"));
