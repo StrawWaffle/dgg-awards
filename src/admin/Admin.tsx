@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { AdminsTab } from "@/admin/components/AdminsTab";
 import { HistoryTab } from "@/admin/components/history/HistoryTab";
 import { NomineeEditor } from "@/admin/components/editor/NomineeEditor";
+import { PreviewMenu } from "@/admin/components/PreviewMenu";
 import { SettingsTab } from "@/admin/components/SettingsTab";
 import { SideLabel, TabTrigger, sideItemClass } from "@/admin/components/TabTrigger";
 import { VotesTab } from "@/admin/components/VotesTab";
@@ -10,13 +11,11 @@ import { type Theme, useTheme } from "@/admin/theme";
 import { useStored } from "@/admin/useStored";
 import {
   BarChartIcon,
-  MagicWandIcon,
   CounterClockwiseClockIcon,
   DesktopIcon,
   DoubleArrowLeftIcon,
   DoubleArrowRightIcon,
   ExternalLinkIcon,
-  EyeOpenIcon,
   GearIcon,
   HomeIcon,
   MoonIcon,
@@ -110,7 +109,8 @@ function AdminPage() {
     >
       <aside
         className={clsx(
-          "flex shrink-0 flex-col gap-2 border-b border-neutral-200 bg-white p-2",
+          // Above the page, so the Preview menu opens over it.
+          "relative z-30 flex shrink-0 flex-col gap-2 border-b border-neutral-200 bg-white p-2",
           "md:sticky md:top-0 md:h-screen md:border-r md:border-b-0",
           collapsed ? "md:w-14" : "md:w-56",
         )}
@@ -149,20 +149,9 @@ function AdminPage() {
         </Tabs.List>
 
         <div className="flex flex-wrap items-center gap-1 border-t border-neutral-200 pt-2 md:mt-auto md:flex-col md:items-stretch">
-          <SideLink href="/preview" icon={<EyeOpenIcon />} collapsed={collapsed}>
-            Preview the site
-          </SideLink>
-          <SideLink href="/preview/voting/vote" icon={<EyeOpenIcon />} collapsed={collapsed}>
-            Preview voting
-          </SideLink>
-          <SideLink href="/preview/results/results" icon={<BarChartIcon />} collapsed={collapsed}>
-            Preview results
-          </SideLink>
+          <PreviewMenu collapsed={collapsed} />
           <SideLink href="/" icon={<HomeIcon />} collapsed={collapsed}>
             Open the site
-          </SideLink>
-          <SideLink href="/preview/lab" icon={<MagicWandIcon />} collapsed={collapsed}>
-            Open the lab
           </SideLink>
           <ThemeSwitch theme={theme} setTheme={setTheme} collapsed={collapsed} />
           <p

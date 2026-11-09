@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { useHoverMenu } from "@/lib/useHoverMenu";
 import type { Me } from "@/site/Site";
 
 type Profile = {
@@ -18,9 +19,7 @@ type Profile = {
  */
 export function UserMenu({ me }: { me: Me | undefined }) {
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [open, setOpen] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
-  const closeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const { open, setOpen, box, hover } = useHoverMenu();
 
   useEffect(() => {
     if (!me) return;
@@ -29,17 +28,6 @@ export function UserMenu({ me }: { me: Me | undefined }) {
       .then((d) => setProfile(d.profile))
       .catch(() => {});
   }, [me]);
-  useEffect(() => {
-    if (!open) return;
-    const outside = (e: PointerEvent) => !box.current?.contains(e.target as Node) && setOpen(false);
-    const escape = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    addEventListener("pointerdown", outside);
-    addEventListener("keydown", escape);
-    return () => {
-      removeEventListener("pointerdown", outside);
-      removeEventListener("keydown", escape);
-    };
-  }, [open]);
 
   if (me === undefined) return null;
   if (!me) {
@@ -50,19 +38,10 @@ export function UserMenu({ me }: { me: Me | undefined }) {
     );
   }
 
-  // Hover opens it; leaving closes it after a moment, so the gap to the menu can be crossed.
-  const enter = () => {
-    clearTimeout(closeTimer.current);
-    setOpen(true);
-  };
-  const leave = () => {
-    clearTimeout(closeTimer.current);
-    closeTimer.current = setTimeout(() => setOpen(false), 250);
-  };
   const photo = profile?.photoUrl;
 
   return (
-    <div ref={box} className="relative" onPointerEnter={(e) => e.pointerType === "mouse" && enter()} onPointerLeave={(e) => e.pointerType === "mouse" && leave()}>
+    <div ref={box} className="relative" {...hover}>
       <button
         type="button"
         className="cozy-btn h-10 gap-2 py-0! pr-3! pl-1!"

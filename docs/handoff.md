@@ -538,7 +538,9 @@ StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, an
   - **Voting open → Vote** is the voting preview (nothing saved). **Results out → Results** is the results preview with the simulated-votes switch. At other stages these pages show the notices visitors would see.
   - Non-admins on a preview address get "Previews are for admins" and a sign-in.
 - **Outside a preview, admins see the site as visitors do:** no Lab tab and no preview rows.
-- **The admin sidebar** links to Preview the site (`/preview`), Preview voting (`/preview/voting/vote`), Preview results (`/preview/results/results`), Open the site, and Open the lab (`/preview/lab`).
+- **Jumping between previews** (StrawWaffle): in a preview, hovering the "DGG Awards" logo (or tapping it on touch) opens a menu of every preview page: the four stages, each with Front page, Vote, Results and 2025 results, then Lab, Admin page and Leave preview. The page you're on is marked. Clicking the logo still goes to the stage's front page.
+- **The admin sidebar** has one "Preview" item instead of separate links. Hovering or clicking it opens the same list, beside the sidebar (under the top bar on phones), opening in a new tab. "Open the site" stays.
+- The list lives in `src/lib/previews.ts` (stages, pages, `previewPath()`), and the hover menus share `src/lib/useHoverMenu.ts` (the user menu uses it too).
 - **Simulated votes on the big screen:** the settings (gear) have "Votes: Real / Simulated". It starts on simulated when there are no real votes, using the same made-up numbers as the results preview (`loadSimulated()`), and a "Simulated votes" chip shows in the controls. The big screen's nominees now come from `/api/admin/nominees`, so pictures and clips show while the site is locked.
 - **The music started slowly.** The track opens with 2 s of silence and a 4 s fade-in (measured: silent to 2 s, −62 dB rising to −17 dB at 6 s). Loading wasn't the cause: the file is 2.5 MB with its index up front. Now:
   - The first start jumps to 6.02 s (a bar line on the beat map's grid), where the music is in fully, with a 0.4 s fade-in of our own.
@@ -547,7 +549,7 @@ StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, an
 - **Housekeeping:** the 23 merged worktrees were removed. The screenshot script now also captures the four stage previews. Its pictures aren't in git: two runs of this build match pixel for pixel, except the admin Votes tab (vote times).
 - Tested:
   - typecheck and 92 unit tests; 49 API tests, with the preview addresses added
-  - in the browser: every stage and page, a preview vote not saved, the old addresses rewritten, `/lab#sound` kept, non-admin and signed-out refusals, the big screen switched to simulated votes with the reveal running, and the music's first play starting at 6.02 s
+  - in the browser: both preview menus (hover, jump, close, current page marked, the admin one on a phone), every stage and page, a preview vote not saved, the old addresses rewritten, `/lab#sound` kept, non-admin and signed-out refusals, the big screen switched to simulated votes with the reveal running, and the music's first play starting at 6.02 s
 
 ### Next: the lab page (StrawWaffle's answers, 2026-11-09)
 

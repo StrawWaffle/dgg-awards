@@ -3,6 +3,8 @@ import { ChatBubbleIcon } from "@radix-ui/react-icons";
 import archive2025 from "@/archive/2025.json";
 import { EmoteBackdrop } from "@/lab/EmoteBackdrop";
 import { HeaderTools } from "@/lab/HeaderTools";
+import { type Stage, previewPath, stagePages, stages } from "@/lib/previews";
+import { useHoverMenu } from "@/lib/useHoverMenu";
 import { Summary, loadArchive2025 } from "@/lab/Summary";
 import { Countdown } from "@/site/Countdown";
 import { LabPage, type LabView, labViews } from "@/site/LabPage";
@@ -22,15 +24,6 @@ export type Me = { uid: number; name: string; admin: boolean } | null;
 type Page = "home" | "2025" | "vote" | "results" | "lab";
 const order: Page[] = ["home", "vote", "results", "2025", "lab"];
 const paths: Record<Page, string> = { home: "/", "2025": "/2025", vote: "/vote", results: "/results", lab: "/lab" };
-
-/** The site's stages through the year, which admins can preview. */
-export type Stage = "before" | "voting" | "closed" | "results";
-export const stages: { id: Stage; label: string }[] = [
-  { id: "before", label: "Before voting" },
-  { id: "voting", label: "Voting open" },
-  { id: "closed", label: "Voting closed" },
-  { id: "results", label: "Results out" },
-];
 
 /**
  * Where an address leads. Previews live under `/preview/<stage>/<page>`
@@ -57,8 +50,7 @@ function routeOf(loc: Location): Route {
   return { page: (Object.entries(paths).find(([, p]) => p === path)?.[0] as Page | undefined) ?? "home", preview: false, stage: null };
 }
 
-const pathOf = (page: Page, stage: Stage | null) =>
-  page === "lab" ? "/preview/lab" : stage ? `/preview/${stage}${page === "home" ? "" : `/${page}`}` : paths[page];
+const pathOf = (page: Page, stage: Stage | null) => (page === "lab" || stage ? previewPath(page, stage ?? "before") : paths[page]);
 
 /** The stage the site is in now, by its settings. */
 function stageNow(config: SiteConfig): Stage {
@@ -295,19 +287,96 @@ export function Site() {
     );
   };
 
+  // In a preview, the logo opens a menu of every preview page.
+  const jumpMenu = useHoverMenu();
+  const pointer = useRef("mouse");
+  const jump = (to: Page, toStage: Stage | null) => (e: React.MouseEvent) => {
+    go(to)(e, toStage);
+    jumpMenu.setOpen(false);
+  };
+
   return (
     <>
       <EmoteBackdrop />
       <header ref={header} className="sticky top-0 z-30 px-4 py-2.5" style={{ background: "var(--header)" }}>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <a
-            href={pathOf("home", stage)}
-            onClick={go("home")}
-            className="cozy-logo rounded-xl border-2 px-4 py-1 text-lg font-black tracking-widest uppercase"
-            style={{ background: "var(--cream)", borderColor: "var(--panel-border)", color: "var(--text)", boxShadow: "0 3px 0 rgb(0 0 0 / 0.15)" }}
-          >
-            DGG Awards
-          </a>
+          <div ref={jumpMenu.box} className="relative" {...(previewing ? jumpMenu.hover : {})}>
+            <a
+              href={pathOf("home", stage)}
+              onPointerDown={(e) => (pointer.current = e.pointerType)}
+              onClick={(e) => {
+                // On touch, the first tap opens the menu instead.
+                if (previewing && !jumpMenu.open && pointer.current !== "mouse") {
+                  e.preventDefault();
+                  jumpMenu.setOpen(true);
+                  return;
+                }
+                jump("home", stage)(e);
+              }}
+              className="cozy-logo block rounded-xl border-2 px-4 py-1 text-lg font-black tracking-widest uppercase"
+              style={{ background: "var(--cream)", borderColor: "var(--panel-border)", color: "var(--text)", boxShadow: "0 3px 0 rgb(0 0 0 / 0.15)" }}
+              aria-haspopup={previewing ? "menu" : undefined}
+              aria-expanded={previewing ? jumpMenu.open : undefined}
+            >
+              DGG Awards
+            </a>
+            {previewing && jumpMenu.open && (
+              <div role="menu" aria-label="Preview pages" className="cozy-panel absolute top-full left-0 z-40 mt-2 w-[min(44rem,calc(100vw-2rem))] p-4">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-4 sm:grid-cols-4">
+                  {stages.map((x) => (
+                    <div key={x.id}>
+                      <p className="px-2 pb-1 text-sm font-black">{x.label}</p>
+                      <ul className="space-y-0.5">
+                        {stagePages.map((p) => {
+                          const here = page === p.page && stage === x.id;
+                          return (
+                            <li key={p.page}>
+                              <a
+                                role="menuitem"
+                                href={previewPath(p.page, x.id)}
+                                onClick={jump(p.page, x.id)}
+                                className="cozy-row block rounded-xl px-2 py-1 text-sm font-bold"
+                                style={here ? { background: "var(--highlight)" } : undefined}
+                                aria-current={here ? "page" : undefined}
+                              >
+                                {p.label}
+                              </a>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 flex flex-wrap gap-1 border-t-2 pt-3 text-sm font-bold" style={{ borderColor: "var(--panel-border)" }}>
+                  <a
+                    role="menuitem"
+                    href="/preview/lab"
+                    onClick={jump("lab", stage)}
+                    className="cozy-row rounded-xl px-2 py-1"
+                    style={page === "lab" ? { background: "var(--highlight)" } : undefined}
+                    aria-current={page === "lab" ? "page" : undefined}
+                  >
+                    Lab
+                  </a>
+                  <a role="menuitem" href="/admin" className="cozy-row rounded-xl px-2 py-1">
+                    Admin page
+                  </a>
+                  <a
+                    role="menuitem"
+                    href={paths[page === "lab" ? "home" : page]}
+                    onClick={(e) => {
+                      leavePreview(e);
+                      jumpMenu.setOpen(false);
+                    }}
+                    className="cozy-row ml-auto rounded-xl px-2 py-1"
+                  >
+                    Leave preview
+                  </a>
+                </div>
+              </div>
+            )}
+          </div>
           <nav aria-label="Pages" className="flex flex-wrap gap-1">
             {tabs.map((t) => (
               <a key={t.page} href={pathOf(t.page, stage)} onClick={go(t.page)} className="cozy-tab" aria-current={page === t.page ? "page" : undefined}>
