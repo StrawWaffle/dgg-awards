@@ -1,25 +1,46 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { DesktopIcon, MoonIcon, SunIcon } from "@radix-ui/react-icons";
 import { Emote } from "@/lab/Emote";
+import { EmoteBackdrop } from "@/lab/EmoteBackdrop";
 import { MusicBar } from "@/lab/MusicBar";
 import { useSourceChoice, useStartOnFirstGesture } from "@/lab/music";
 import { Stage } from "@/lab/Stage";
+import { type Theme, useLabTheme } from "@/lab/theme";
 import { Visualizer } from "@/lab/Visualizer";
 import { VoteDemo } from "@/lab/VoteDemo";
 
+const views = [
+  { id: "voting", label: "Voting" },
+  { id: "stage", label: "Big screen" },
+  { id: "sound", label: "Sound check" },
+] as const;
+type View = (typeof views)[number]["id"];
+
+const themeCycle: Record<Theme, { next: Theme; icon: React.ReactNode; label: string }> = {
+  system: { next: "light", icon: <DesktopIcon />, label: "Theme: system" },
+  light: { next: "dark", icon: <SunIcon />, label: "Theme: light" },
+  dark: { next: "system", icon: <MoonIcon />, label: "Theme: dark" },
+};
+
 /**
- * The lab: ideas for a more fun front page and presentation, tried out here
- * before they go anywhere real. Admins only for now.
+ * The lab: a cozier voting page and presentation, tried out here before they
+ * go anywhere real. Admins only for now.
  */
 export function Lab() {
-  const [me, setMe] = useState<{ admin: boolean; name: string } | null | undefined>(undefined);
+  const [me, setMe] = useState<{ admin: boolean } | null | undefined>(undefined);
   const [emotes, setEmotes] = useState<string[]>([]);
   const [source, setSource] = useSourceChoice();
+  const [view, setView] = useState<View>(() => {
+    const hash = location.hash.slice(1);
+    return views.some((v) => v.id === hash) ? (hash as View) : "voting";
+  });
+  const { theme, setTheme } = useLabTheme();
   useStartOnFirstGesture();
 
   useEffect(() => {
     fetch("/api/me")
       .then((r) => (r.ok ? r.json() : null))
-      .then((data) => setMe(data))
+      .then(setMe)
       .catch(() => setMe(null));
   }, []);
   useEffect(() => {
@@ -30,59 +51,82 @@ export function Lab() {
       .catch(() => setEmotes([]));
   }, [me]);
 
-  if (me === undefined) return <p className="p-6">Loading…</p>;
-  if (!me?.admin) {
-    return (
-      <main className="mx-auto max-w-xl space-y-3 p-6 text-center">
-        <Emote name="PepoG" size={2} />
-        <p>The lab is for admins while we try things out.</p>
-        <a className="text-orange-1 underline" href="/signin">
-          Sign in
-        </a>
-      </main>
-    );
-  }
+  const show = (next: View) => {
+    setView(next);
+    history.replaceState(null, "", `#${next}`);
+  };
+  const cycle = themeCycle[theme];
 
   return (
-    <main className="mx-auto max-w-6xl space-y-8 px-4 py-6">
-      <header className="bg-blue-2 sticky top-0 z-20 -mx-4 flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-2">
-        <h1 className="flex items-center gap-3 text-2xl font-black">
-          <Emote name="PepoG" size={1.2} title="" /> The lab
-        </h1>
-        <MusicBar />
-      </header>
-      <p className="text-white-1/70 max-w-3xl text-sm">
-        Ideas for a more playful site and stream, to try before they go anywhere real: music that the page moves to,
-        emotes reacting to what you do, and chat walking around the stage during the presentation. Nothing here
-        affects the real site.
-      </p>
-
-      <Part title="Music" note="Starts on your first click at a low volume. The volume and mute are remembered.">
-        <Visualizer source={source} setSource={setSource} />
-      </Part>
-
-      <Part title="Emote reactions" note="Vote, skip, answer the question and finish to see each reaction.">
-        <VoteDemo />
-      </Part>
-
-      <Part
-        title="Presentation stage"
-        note="Chatters as their emotes. The simulator floods the same code the server uses; push it up to see how it holds."
+    <>
+      <EmoteBackdrop />
+      <header
+        className="sticky top-0 z-30 flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5"
+        style={{ background: "var(--header)" }}
       >
-        <Stage source={source} emotes={emotes} />
-      </Part>
-    </main>
-  );
-}
+        <a
+          href="/"
+          className="rounded-xl border-2 px-4 py-1 text-lg font-black tracking-widest uppercase"
+          style={{ background: "var(--cream)", borderColor: "var(--panel-border)", color: "var(--text)", boxShadow: "0 3px 0 rgb(0 0 0 / 0.15)" }}
+        >
+          DGG Awards
+        </a>
+        {me?.admin && (
+          <nav role="tablist" aria-label="Lab pages" className="flex flex-wrap gap-1">
+            {views.map((v) => (
+              <button key={v.id} type="button" role="tab" aria-selected={view === v.id} className="cozy-tab" onClick={() => show(v.id)}>
+                {v.label}
+              </button>
+            ))}
+          </nav>
+        )}
+        <div className="ml-auto flex items-center gap-2">
+          <MusicBar />
+          <button
+            type="button"
+            className="cozy-btn round h-10 w-10"
+            onClick={() => setTheme(cycle.next)}
+            aria-label={`${cycle.label}. Click for ${cycle.next}.`}
+            title={`${cycle.label}. Click for ${cycle.next}.`}
+          >
+            {cycle.icon}
+          </button>
+        </div>
+      </header>
 
-function Part({ title, note, children }: { title: string; note: string; children: ReactNode }) {
-  return (
-    <section className="space-y-3">
-      <div>
-        <h2 className="text-xl font-bold">{title}</h2>
-        <p className="text-white-1/60 text-sm">{note}</p>
-      </div>
-      {children}
-    </section>
+      {me === undefined && <p className="p-6">Loading…</p>}
+      {me !== undefined && !me?.admin && (
+        <main className="mx-auto mt-16 max-w-md px-4">
+          <div className="cozy-panel space-y-4 p-8 text-center">
+            <Emote name="PepoG" size={2} />
+            <p className="font-bold">The lab is for admins while we try things out.</p>
+            <a className="cozy-btn primary" href="/signin">
+              Sign in
+            </a>
+          </div>
+        </main>
+      )}
+
+      {me?.admin && (
+        <main className="mx-auto max-w-7xl space-y-5 px-4 py-6">
+          {view === "voting" && <VoteDemo />}
+          {view === "stage" && <Stage source={source} emotes={emotes} />}
+          {view === "sound" && <Visualizer source={source} setSource={setSource} />}
+          <p className="text-center text-xs" style={{ color: "var(--muted)" }}>
+            The lab: ideas being tried out, separate from the real site. Look inspired by a community destiny.gg skin.
+            Music:{" "}
+            <a
+              className="underline"
+              href="https://soundcloud.com/tinyghoststudios/black-lover-instrumental-only"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              black lover (instrumental) by Tiny Ghost Studios
+            </a>
+            .
+          </p>
+        </main>
+      )}
+    </>
   );
 }

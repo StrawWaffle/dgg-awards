@@ -232,6 +232,20 @@ StrawWaffle wants the front page and the presentation to feel fun, quirky and wh
 - **Measured:** the aggregator handles 100,000 messages in 171 ms (`tests/lab-chat.test.ts`, about 580k a second). In Chromium the stage holds **60 fps at 3,000 messages a second** with 150 characters, and the aggregator takes about 1 ms per quarter second. The live relay connected to the real chat.
 - **Still to do:** presentation mode for an allowlist (not just admins); deciding which emotes go where on the real pages; the real front page and presentation design (rinlux).
 
+### The lab, cozy redesign (2026-11-09, same branch)
+
+StrawWaffle's visual reference: screenshots of destiny.gg with a **community-made skin** (not the official design; StrawWaffle asked to treat it as a skin). Only the admin page keeps its own look.
+- **Look** (`src/lab/lab.css`): cream (light) or navy (dark), colours sampled from the screenshots. Soft panels have 22 px corners, a 2 px border and a solid 5 px shadow underneath. Chunky rounded buttons sit on a 4 px shadow and press down when clicked; the primary is teal. Small rounded chips (coral, green, cream), and the bundled Nunito font (`@fontsource-variable/nunito`, no Google request).
+  - **No leaf pattern** (StrawWaffle): faint emote silhouettes sit behind the page instead (`EmoteBackdrop.tsx`). They're real emotes from destiny.gg's stylesheet, flattened to one colour by a CSS filter, very faint, and frozen. Only transparent emotes are used; photo emotes would show as rectangles.
+- **Theme:** system, light or dark, remembered (`theme.ts`). The button cycles through them.
+- **Layout** (`Lab.tsx`): a blue header bar with a "DGG Awards" wordmark pill, tabs (Voting, Big screen, Sound check, kept in the URL hash), round music controls and the theme button. The music credit sits in the footer.
+- **Voting:** the real (sample) nominees with pictures, one award at a time, with "Your ballot" progress on the left (Klappa for voted, "skipped").
+- **Big screen:** laid out like the reference's stream and chat.
+  - The stage is framed and theme-aware: day sky and green hill in light, purple night in dark, with the award on a cream sign.
+  - Under it, an info card with chips (Presenting, msg/s, emote-only/s, feed, aggregator time), the award title, "Winner moment" and folding stage settings.
+  - On the right, a chat column: sampled characters as "nick: emote", verified messages highlighted, and the combo in coral italics.
+  - Names use per-theme flair colours. The stage starts at 60 characters, because 150 with names was a wall of text.
+
 **Ideas from StrawWaffle, not built.** Several need rinlux's say first, since they are in charge of these decisions:
 - **More roles** than admin, e.g. moderators or editors who can only edit nominees.
 - **Lock the site behind sign-in** before voting, with a countdown to the voting date.

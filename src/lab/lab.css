@@ -1,3 +1,228 @@
+@import "@fontsource-variable/nunito";
+
+/*
+ * The lab's cozy look, inspired by a community-made destiny.gg skin (StrawWaffle's
+ * reference screenshots): cream or navy, soft rounded
+ * panels, and chunky rounded buttons that sit on a solid shadow and press
+ * down when clicked. Colours are sampled from those screenshots. Instead of
+ * the skin's leaf pattern, faint emote silhouettes sit behind the page.
+ * Theme: `.lab` on <html>, `.lab-dark` for dark.
+ */
+.lab {
+  --bg: #efe9d2;
+  --panel: #faf8e8;
+  --panel-border: #e3dbc2;
+  --panel-shadow: #d7d0bb;
+  --text: #5a4a38;
+  --muted: #9c8d73;
+  --header: #6fb4ec;
+  --header-text: #ffffff;
+  --primary: #6de1c1;
+  --primary-shadow: #44bd9c;
+  --primary-text: #1d4c40;
+  --cream: #fffdf2;
+  --cream-shadow: #e2d9bf;
+  --coral: #ef6b6b;
+  --green: #74c291;
+  --highlight: #e4f6f0;
+  --sky-top: #a9d8ff;
+  --sky-bottom: #ffe4c4;
+  --ground: #b9df8f;
+  --ground-edge: #9fcd73;
+  /* Chat name colours, darker than chat's own so they read on cream. */
+  --nick: #5a4a38;
+  --nick-admin: #d63b3b;
+  --nick-moderator: #c98a00;
+  --nick-flair12: #a14fc4;
+  --nick-flair20: #1e86d1;
+  --nick-flair2: #2f8fbf;
+  --nick-flair42: #d7682a;
+  --nick-flair8: #8a5ad6;
+  --nick-flair3: #3a78d1;
+  --nick-flair1: #2d9a6b;
+  --nick-flair13: #3b8fc9;
+  --nick-subscriber: #4a74c9;
+  color-scheme: light;
+}
+.lab.lab-dark {
+  --bg: #1f2a3c;
+  --panel: #2b3444;
+  --panel-border: #384255;
+  --panel-shadow: #161e2b;
+  --text: #eef0f4;
+  --muted: #9aa6b8;
+  --header: #34557e;
+  --header-text: #ffffff;
+  --primary: #5fdcbb;
+  --primary-shadow: #3a9c83;
+  --primary-text: #0f3a30;
+  --cream: #344052;
+  --cream-shadow: #1c2533;
+  --highlight: #2f4a4a;
+  --sky-top: #1b1f4a;
+  --sky-bottom: #6b3d8f;
+  --ground: #2f4a3b;
+  --ground-edge: #3e6150;
+  --nick: #eef0f4;
+  --nick-admin: #ff6b6b;
+  --nick-moderator: #ffc94d;
+  --nick-flair12: #e9a8ff;
+  --nick-flair20: #6cc4ff;
+  --nick-flair2: #8fd3ff;
+  --nick-flair42: #ff9a52;
+  --nick-flair8: #c7a4ff;
+  --nick-flair3: #7fb3ff;
+  --nick-flair1: #7ee3b4;
+  --nick-flair13: #9ad7ff;
+  --nick-subscriber: #8db8ff;
+  color-scheme: dark;
+}
+
+.lab body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: "Nunito Variable", ui-rounded, system-ui, sans-serif;
+}
+
+/*
+ * The backdrop: faint emote silhouettes scattered behind everything
+ * (EmoteBackdrop.tsx). A filter flattens each emote to one colour, dark on
+ * cream and light on navy, and its animation is stopped so the page is calm.
+ */
+.lab-silhouette {
+  position: absolute;
+  opacity: 0.07;
+  filter: brightness(0);
+}
+.lab.lab-dark .lab-silhouette {
+  opacity: 0.06;
+  filter: brightness(0) invert(1);
+}
+.lab-silhouette,
+.lab-silhouette * {
+  animation: none !important;
+}
+
+/* A soft panel. */
+.cozy-panel {
+  background: var(--panel);
+  border: 2px solid var(--panel-border);
+  border-radius: 22px;
+  box-shadow: 0 5px 0 var(--panel-shadow);
+}
+
+/* A chunky button on its shadow; it presses down when clicked. */
+.cozy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  padding: 0.45rem 1.1rem;
+  font-weight: 800;
+  background: var(--cream);
+  color: var(--text);
+  border: 2px solid var(--panel-border);
+  box-shadow: 0 4px 0 var(--cream-shadow);
+  transition: translate 80ms ease, box-shadow 80ms ease, background-color 150ms ease;
+}
+.cozy-btn:hover {
+  background: color-mix(in oklab, var(--cream), var(--text) 5%);
+}
+.cozy-btn:active:not(:disabled) {
+  translate: 0 3px;
+  box-shadow: 0 1px 0 var(--cream-shadow);
+}
+.cozy-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.cozy-btn:focus-visible {
+  outline: 3px solid var(--header);
+  outline-offset: 2px;
+}
+.cozy-btn.primary {
+  background: var(--primary);
+  color: var(--primary-text);
+  border-color: var(--primary-shadow);
+  box-shadow: 0 4px 0 var(--primary-shadow);
+}
+.cozy-btn.primary:active:not(:disabled) {
+  box-shadow: 0 1px 0 var(--primary-shadow);
+}
+.cozy-btn.round {
+  padding: 0.45rem;
+  justify-content: center;
+}
+
+/* Header tabs: the active one is a cream pill. */
+.cozy-tab {
+  border-radius: 9999px;
+  padding: 0.35rem 1rem;
+  font-weight: 800;
+  color: var(--header-text);
+}
+.cozy-tab[aria-selected="true"] {
+  background: var(--cream);
+  color: var(--text);
+  box-shadow: 0 3px 0 rgb(0 0 0 / 0.12);
+}
+
+/* Small rounded labels. */
+.cozy-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 9999px;
+  padding: 0.15rem 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 800;
+  background: var(--cream);
+  border: 2px solid var(--panel-border);
+  color: var(--muted);
+}
+.cozy-chip.coral {
+  background: var(--coral);
+  border-color: var(--coral);
+  color: white;
+}
+.cozy-chip.green {
+  background: var(--green);
+  border-color: var(--green);
+  color: white;
+}
+
+.cozy-input {
+  border-radius: 14px;
+  border: 2px solid var(--panel-border);
+  background: var(--cream);
+  color: var(--text);
+  padding: 0.45rem 0.8rem;
+}
+.cozy-input:focus {
+  outline: none;
+  border-color: var(--header);
+}
+
+input[type="range"].cozy-range {
+  accent-color: var(--primary-shadow);
+}
+
+.nick {
+  font-weight: 800;
+  color: var(--nick);
+}
+.nick-admin { color: var(--nick-admin); }
+.nick-moderator { color: var(--nick-moderator); }
+.nick-flair12 { color: var(--nick-flair12); }
+.nick-flair20 { color: var(--nick-flair20); }
+.nick-flair2 { color: var(--nick-flair2); }
+.nick-flair42 { color: var(--nick-flair42); }
+.nick-flair8 { color: var(--nick-flair8); }
+.nick-flair3 { color: var(--nick-flair3); }
+.nick-flair1 { color: var(--nick-flair1); }
+.nick-flair13 { color: var(--nick-flair13); }
+.nick-subscriber { color: var(--nick-subscriber); }
+
 /*
  * The base rule destiny.gg's emotes.css leaves to chat's own stylesheet: each
  * emote is a background on an inline box, sized and animated by emotes.css.
@@ -35,7 +260,7 @@
   animation: lab-burst 1.6s ease-out forwards;
 }
 
-/* The DGG-style combo counter. */
+/* The combo counter, in the skin's coral italics. */
 @keyframes lab-combo-pop {
   0% {
     scale: 1.4;
@@ -46,10 +271,14 @@
 }
 .lab-combo {
   animation: lab-combo-pop 180ms ease-out;
+  color: var(--coral);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .lab-burst {
     animation-duration: 0.01s;
+  }
+  .cozy-btn {
+    transition: none;
   }
 }

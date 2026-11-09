@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Emote } from "@/lab/Emote";
 import { type FeedStatus, liveFeed, simulatedFeed } from "@/lab/chatFeed";
 import { type Levels, type Source, useFrame } from "@/lab/music";
 import type { ChatSummary } from "@/server/lab/chat-aggregator";
@@ -21,19 +22,8 @@ type Npc = {
   restore: string;
 };
 
-const FLAIR_COLOURS: Record<string, string> = {
-  admin: "#ff4b4b",
-  moderator: "#ffc000",
-  flair12: "#e9a8ff",
-  flair20: "#47b8ff",
-  flair2: "#89d0ff",
-  flair42: "#ff8a38",
-  flair8: "#bd8cff",
-  flair3: "#5fa8ff",
-  flair1: "#69e0a8",
-  flair13: "#8dd2ff",
-  subscriber: "#7fb2ff",
-};
+/** One line in the chat column. */
+type Line = { id: number; nick: string; flair: string | null; emote?: string; text?: string };
 
 function setEmote(npc: Npc, emote: string) {
   if (npc.emote === emote) return;
@@ -41,11 +31,14 @@ function setEmote(npc: Npc, emote: string) {
   npc.emoteEl.className = `emote ${emote}`;
 }
 
+const nickClass = (flair: string | null) => `nick${flair ? ` nick-${flair}` : ""}`;
+
 /**
- * The presentation stage: chatters as their emotes, walking about, hopping
- * to the music, clapping when someone wins. Characters are plain DOM elements
- * moved each frame, never React state, and there are at most `max` of them;
- * the busiest chat costs the same as a quiet one.
+ * The presentation's big screen: chatters as their emotes, walking about,
+ * hopping to the music, clapping when someone wins, beside a chat column.
+ * Characters are plain DOM elements moved each frame, never React state, and
+ * there are at most `max` of them; the busiest chat costs the same as a quiet
+ * one. The chat column and the numbers update four times a second.
  */
 export function Stage({ source, emotes }: { source: Source; emotes: string[] }) {
   const floor = useRef<HTMLDivElement>(null);
@@ -53,29 +46,31 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
   const [feed, setFeed] = useState<"sim" | "live">("sim");
   const [rate, setRate] = useState(300);
   const [emoteShare, setEmoteShare] = useState(0.5);
-  const [max, setMax] = useState(150);
+  const [max, setMax] = useState(60);
   const [names, setNames] = useState(true);
-  const [showSaid, setShowSaid] = useState(false);
+  const [showSaid, setShowSaid] = useState(true);
   const [status, setStatus] = useState<FeedStatus>({ connected: false, note: "" });
   const [stats, setStats] = useState({ fps: 0, npcs: 0, perSecond: 0, emoteOnly: 0, ingestMs: 0 });
   const [combo, setCombo] = useState<{ emote: string; count: number } | null>(null);
-  const [banner, setBanner] = useState<string | null>(null);
+  const [winner, setWinner] = useState<string | null>(null);
+  const [lines, setLines] = useState<Line[]>([]);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const settings = useRef({ rate, emoteShare, max, names, showSaid });
   settings.current = { rate, emoteShare, max, names, showSaid };
   const fps = useRef({ frames: 0, since: performance.now(), value: 0 });
   const clapUntil = useRef(0);
+  const lineId = useRef(0);
 
   const spawn = useCallback((nick: string, emote: string, flair: string | null) => {
     const box = floor.current!;
     const el = document.createElement("div");
     el.className = "absolute left-0 top-0 flex flex-col items-center will-change-transform";
     const bubble = document.createElement("div");
-    bubble.className = "bg-white-1 text-black-1 mb-1 hidden max-w-48 rounded-md px-2 py-1 text-xs";
+    bubble.className = "cozy-panel mb-1 hidden max-w-52 px-3 py-1.5 text-xs font-bold";
     const label = document.createElement("span");
-    label.className = "mb-0.5 whitespace-nowrap text-[11px] font-bold drop-shadow";
+    label.className = `${nickClass(flair)} mb-0.5 whitespace-nowrap rounded-full px-1.5 text-[11px]`;
+    label.style.background = "color-mix(in oklab, var(--panel) 75%, transparent)";
     label.textContent = nick;
-    label.style.color = (flair && FLAIR_COLOURS[flair]) || "#edeef0";
-    label.dataset.role = "name";
     const emoteEl = document.createElement("span");
     emoteEl.className = `emote ${emote}`;
     el.append(bubble, label, emoteEl);
@@ -104,7 +99,6 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
     npcs.current.delete(npc.nick);
   }, []);
 
-
   const onSummary = useCallback(
     (summary: ChatSummary, feedStatus: FeedStatus) => {
       setStatus(feedStatus);
@@ -128,21 +122,26 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
         npc.hop = 1;
         npc.lastSeen = now;
       }
-      if (settings.current.showSaid) {
-        for (const said of summary.said) {
-          const npc = all.get(said.nick) ?? spawn(said.nick, "PepoG", said.flair);
-          npc.bubble.textContent = said.text;
-          npc.bubble.classList.remove("hidden");
-          npc.bubbleUntil = now + 5000;
-          npc.lastSeen = now;
-        }
+      const said = settings.current.showSaid ? summary.said : [];
+      for (const s of said) {
+        const npc = all.get(s.nick) ?? spawn(s.nick, "PepoG", s.flair);
+        npc.bubble.textContent = s.text;
+        npc.bubble.classList.remove("hidden");
+        npc.bubbleUntil = now + 5000;
+        npc.lastSeen = now;
       }
+      // The chat column: a few of this window's characters, and what verified
+      // people said, newest at the bottom.
+      const added: Line[] = [
+        ...summary.events.slice(0, 6).map((e) => ({ id: lineId.current++, nick: e.nick, flair: e.flair, emote: e.emote })),
+        ...said.map((s) => ({ id: lineId.current++, nick: s.nick, flair: s.flair, text: s.text })),
+      ];
+      if (added.length > 0) setLines((l) => [...l, ...added].slice(-40));
       if (summary.combo && summary.combo.count >= 3) {
         setCombo(summary.combo);
-        // Everyone already on that emote jumps with the combo.
         for (const n of all.values()) if (n.emote === summary.combo.emote) n.hop = 1.4;
       } else setCombo(null);
-      // Characters fade out after a minute of silence.
+      // Characters leave after a minute of silence.
       for (const n of all.values()) if (now - n.lastSeen > 60_000) remove(n);
       setStats((s) => ({
         fps: fps.current.value,
@@ -161,10 +160,17 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
     return simulatedFeed(emotes, () => settings.current.rate, () => settings.current.emoteShare, onSummary);
   }, [feed, emotes, onSummary]);
 
-  // Clear the stage when switching feeds.
+  // A clean stage and chat when switching feeds.
   useEffect(() => {
     for (const n of [...npcs.current.values()]) remove(n);
+    setLines([]);
   }, [feed, remove]);
+
+  // Keep the chat column scrolled to the newest line.
+  const chat = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    chat.current?.scrollTo({ top: chat.current.scrollHeight });
+  }, [lines]);
 
   const sourceRef = useRef(source);
   sourceRef.current = source;
@@ -191,7 +197,8 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
         n.x = Math.max(0, Math.min(width - 40, n.x));
       }
       n.hop = Math.max(0, n.hop - dt * 3);
-      const y = height * 0.35 + n.depth * height * 0.5 - Math.sin(n.hop * Math.PI) * 26 * n.hop;
+      // On the grass: back row higher and smaller, front row lower and bigger.
+      const y = height * 0.42 + n.depth * height * 0.42 - Math.sin(n.hop * Math.PI) * 26 * n.hop;
       const scale = 0.7 + n.depth * 0.6;
       n.el.style.transform = `translate3d(${n.x}px, ${y}px, 0) scale(${scale})`;
       n.el.style.zIndex = String(Math.round(n.depth * 100));
@@ -209,7 +216,7 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
   useFrame(onFrame);
 
   const winnerMoment = () => {
-    setBanner("Winner: Destiny Makes a Joke");
+    setWinner("Destiny Makes a Joke");
     const until = performance.now() + 4000;
     clapUntil.current = until;
     for (const n of npcs.current.values()) {
@@ -218,74 +225,127 @@ export function Stage({ source, emotes }: { source: Source; emotes: string[] }) 
       n.clapUntil = until;
       n.hop = 1;
     }
-    setTimeout(() => setBanner(null), 4000);
+    setTimeout(() => setWinner(null), 4000);
   };
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
-        <label className="flex items-center gap-2">
-          Chat from
-          <select
-            value={feed}
-            onChange={(e) => setFeed(e.currentTarget.value as "sim" | "live")}
-            className="rounded border border-white/20 bg-black/40 px-2 py-1"
+    <div className="grid gap-5 lg:grid-cols-[1fr_340px]">
+      <div className="space-y-5">
+        {/* The stage, framed like a stream embed. */}
+        <div className="cozy-panel p-2">
+          <div
+            className="relative aspect-video w-full overflow-hidden rounded-[16px]"
+            style={{ background: "linear-gradient(to bottom, var(--sky-top), var(--sky-bottom))" }}
           >
-            <option value="sim">Simulator</option>
-            <option value="live">Live destiny.gg chat</option>
-          </select>
-        </label>
-        {feed === "sim" && (
-          <>
-            <label className="flex items-center gap-2">
-              Messages a second
-              <input type="range" min={1} max={5000} step={1} value={rate} onChange={(e) => setRate(Number(e.currentTarget.value))} />
-              <span className="w-12 tabular-nums">{rate}</span>
-            </label>
-            <label className="flex items-center gap-2">
-              Emote-only
-              <input type="range" min={0} max={1} step={0.05} value={emoteShare} onChange={(e) => setEmoteShare(Number(e.currentTarget.value))} />
-              <span className="w-10 tabular-nums">{Math.round(emoteShare * 100)}%</span>
-            </label>
-          </>
-        )}
-        <label className="flex items-center gap-2">
-          Characters at most
-          <input type="range" min={10} max={400} step={10} value={max} onChange={(e) => setMax(Number(e.currentTarget.value))} />
-          <span className="w-10 tabular-nums">{max}</span>
-        </label>
-        <label className="flex items-center gap-1.5">
-          <input type="checkbox" checked={names} onChange={(e) => setNames(e.currentTarget.checked)} /> Names
-        </label>
-        <label className="flex items-center gap-1.5" title="Messages from verified chatters (the Verified flair, mods and so on)">
-          <input type="checkbox" checked={showSaid} onChange={(e) => setShowSaid(e.currentTarget.checked)} /> Verified messages
-        </label>
-        <button type="button" onClick={winnerMoment} className="bg-orange-1 text-black-1 rounded px-3 py-1 font-bold">
-          Winner moment
-        </button>
-      </div>
-
-      <div className="relative aspect-video w-full overflow-hidden rounded-md border border-white/10 bg-gradient-to-b from-[#16264d] to-[#0a1430]">
-        <div className="absolute inset-x-0 top-[8%] text-center">
-          <div className="inline-block -rotate-2 rounded-md border-2 border-orange-1/60 bg-black/40 px-6 py-3 text-2xl font-bold sm:text-4xl">
-            {banner ?? "Omegalul of the Year"}
+            <div
+              className="absolute inset-x-0 bottom-0 h-[52%]"
+              style={{ background: "var(--ground)", borderTop: "6px solid var(--ground-edge)", borderRadius: "50% 50% 0 0 / 28px 28px 0 0" }}
+            />
+            <div className="absolute inset-x-0 top-[7%] z-[200] text-center">
+              <div className="cozy-panel inline-block px-7 py-3 text-2xl font-black sm:text-4xl">
+                {winner ? (
+                  <span className="flex items-center gap-3">
+                    <Emote name="CHEERSTINY" size={1.1} title="" /> {winner}
+                  </span>
+                ) : (
+                  "Omegalul of the Year"
+                )}
+              </div>
+            </div>
+            <div ref={floor} className="absolute inset-0" />
+            <div className="cozy-chip absolute top-3 left-3 z-[200] font-mono text-[11px]!">
+              {stats.fps} fps · {stats.npcs} on stage
+            </div>
           </div>
-          {combo && (
-            <div key={combo.count} className="lab-combo mt-3 text-xl font-black italic text-orange-1">
-              <span className={`emote ${combo.emote}`} /> ×{combo.count} C-C-C-COMBO
+        </div>
+
+        {/* Under the stage: what's on, and the controls. */}
+        <div className="cozy-panel space-y-4 p-5">
+          <div className="flex flex-wrap gap-2">
+            <span className="cozy-chip coral">Presenting</span>
+            <span className="cozy-chip">{stats.perSecond.toLocaleString()} msg/s</span>
+            <span className="cozy-chip">{stats.emoteOnly.toLocaleString()} emote-only/s</span>
+            <span className="cozy-chip green">{feed === "live" ? "Live chat" : "Simulator"}</span>
+            {feed === "sim" && <span className="cozy-chip">aggregator {stats.ingestMs.toFixed(1)} ms / ¼ s</span>}
+          </div>
+          <h2 className="text-3xl font-black">Omegalul of the Year</h2>
+          <div className="flex flex-wrap gap-3">
+            <button type="button" className="cozy-btn primary" onClick={winnerMoment}>
+              <Emote name="Klappa" size={0.6} title="" /> Winner moment
+            </button>
+            <button type="button" className="cozy-btn" onClick={() => setSettingsOpen(!settingsOpen)} aria-expanded={settingsOpen}>
+              Stage settings
+            </button>
+          </div>
+          {settingsOpen && (
+            <div className="grid gap-3 rounded-2xl p-4 text-sm font-bold sm:grid-cols-2" style={{ background: "var(--cream)" }}>
+              <label className="flex items-center gap-2">
+                Chat from
+                <select value={feed} onChange={(e) => setFeed(e.currentTarget.value as "sim" | "live")} className="cozy-input py-1!">
+                  <option value="sim">Simulator</option>
+                  <option value="live">Live destiny.gg chat</option>
+                </select>
+              </label>
+              <label className="flex items-center gap-2">
+                Characters at most
+                <input type="range" min={10} max={400} step={10} value={max} onChange={(e) => setMax(Number(e.currentTarget.value))} className="cozy-range" />
+                <span className="w-9 tabular-nums">{max}</span>
+              </label>
+              {feed === "sim" && (
+                <>
+                  <label className="flex items-center gap-2">
+                    Messages a second
+                    <input type="range" min={1} max={5000} step={1} value={rate} onChange={(e) => setRate(Number(e.currentTarget.value))} className="cozy-range" />
+                    <span className="w-12 tabular-nums">{rate}</span>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    Emote-only
+                    <input type="range" min={0} max={1} step={0.05} value={emoteShare} onChange={(e) => setEmoteShare(Number(e.currentTarget.value))} className="cozy-range" />
+                    <span className="w-10 tabular-nums">{Math.round(emoteShare * 100)}%</span>
+                  </label>
+                </>
+              )}
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={names} onChange={(e) => setNames(e.currentTarget.checked)} /> Names over characters
+              </label>
+              <label className="flex items-center gap-2" title="The Verified flair, Notable, Broadcaster and mods">
+                <input type="checkbox" checked={showSaid} onChange={(e) => setShowSaid(e.currentTarget.checked)} /> Verified messages
+              </label>
+              <p className="sm:col-span-2" style={{ color: "var(--muted)" }}>
+                {status.note}
+              </p>
             </div>
           )}
         </div>
-        <div className="absolute inset-x-0 bottom-0 h-[55%] bg-gradient-to-t from-black/40 to-transparent" />
-        <div ref={floor} className="absolute inset-0" />
-        <div className="absolute top-2 left-2 rounded bg-black/50 px-2 py-1 font-mono text-[11px] leading-tight">
-          <div>{status.note || "…"}</div>
-          <div>
-            {stats.fps} fps · {stats.npcs} characters · {stats.perSecond} msg/s · {stats.emoteOnly} emote-only/s
-            {feed === "sim" && ` · aggregator ${stats.ingestMs.toFixed(1)} ms per ¼ s`}
-          </div>
-        </div>
       </div>
+
+      {/* The chat column. */}
+      <aside className="cozy-panel flex h-[min(78vh,760px)] flex-col overflow-hidden">
+        <div className="flex items-center justify-between border-b-2 px-4 py-3" style={{ borderColor: "var(--panel-border)" }}>
+          <span className="font-black">Chat</span>
+          <span className={`cozy-chip ${status.connected ? "green" : ""}`}>{status.connected ? "connected" : "waiting"}</span>
+        </div>
+        <div ref={chat} className="flex-1 space-y-1 overflow-y-auto px-3 py-2 text-sm">
+          {lines.map((l) => (
+            <div
+              key={l.id}
+              className="rounded-lg px-1.5 py-0.5"
+              style={l.text ? { background: "var(--highlight)", borderLeft: "3px solid var(--primary-shadow)" } : undefined}
+            >
+              <span className={nickClass(l.flair)}>{l.nick}</span>:{" "}
+              {l.emote ? <Emote name={l.emote} size={0.85} /> : <span className="font-semibold">{l.text}</span>}
+            </div>
+          ))}
+        </div>
+        <div className="h-12 border-t-2 px-4 py-2" style={{ borderColor: "var(--panel-border)" }}>
+          {combo && (
+            <div key={combo.count} className="lab-combo flex items-center gap-2 text-xl font-black italic">
+              <Emote name={combo.emote} size={0.9} title="" />
+              <span className="text-sm not-italic">{combo.count}×</span> COMBO
+            </div>
+          )}
+        </div>
+      </aside>
     </div>
   );
 }
