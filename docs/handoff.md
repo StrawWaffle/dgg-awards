@@ -404,6 +404,13 @@ rinlux asked to preview the window they pick before building, to check the timec
   - Tested by an API test (`tests/run.sh` copies the sample video into the container's library first): the listing, private ranged serving, traversal refused, non-admins refused, a 1–3 s clip, and the file kept.
 - Not done: picking straight from Google Drive in the browser (use the import script instead). The site still loses its clip briefly while a rebuild is pending, as before.
 
+### Pictures from the library (branch `worktree-library-pictures`, 2026-11-09, not deployed)
+
+The Picture section has "From the library…" too: the library's pictures by folder, with the award's own folder first (`useLibrary()` and `sameAward()` are shared in `editor/library.ts`).
+- Animated ones (GIF, animated WebP or PNG, up to 5 MB) go up as they are. Stills open in the cropper.
+- The cropper now hides "Upload as it is" when the server wouldn't take the file unchanged: AVIF (3 in the library), or over 5 MB (one 7.8 MB JPEG). Instead it converts: AVIF and JPEG come out as JPEG, others as PNG. If the result is still over 5 MB, it says to pick a smaller size.
+- Tested in the browser on the live library's files: an AVIF converted and set as the picture, the 7.8 MB JPEG converted at full size under 5 MB, and the GIF went straight up.
+
 ### Next: the lab page (StrawWaffle's answers, 2026-11-09)
 
 StrawWaffle wants the front page and the presentation to feel fun, quirky and wholesome. It gets built on an experimental page first (`/lab`, admins only) until rinlux approves. Order: the follow-ups above, merge and deploy, then the lab.

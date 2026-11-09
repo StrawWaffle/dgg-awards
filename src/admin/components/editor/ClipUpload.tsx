@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, ErrorText, inputClass } from "@/admin/components/editor/fields";
+import { libraryUrl, useLibrary } from "@/admin/components/editor/library";
 import { formatTimestamp } from "@/lib/links";
-import { type LibraryItem, clipFromLibrary, fetchLibrary } from "@/lib/queries";
+import { clipFromLibrary } from "@/lib/queries";
 
 /** Matches the server's limit (the tunnel refuses requests over 100 MB). */
 const MAX_BYTES = 95 * 1024 * 1024;
@@ -12,15 +12,6 @@ const ENDING = 5;
 
 /** Seconds to "m:ss.s", for marks that fall between whole seconds. */
 const stamp = (s: number) => `${formatTimestamp(Math.floor(s))}${s % 1 >= 0.05 ? `.${Math.floor((s % 1) * 10)}` : ""}`;
-
-/** Folder names and award titles compared loosely ("DANKMEMES of the Year"). */
-const simple = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-/** Is this the award's folder? Whole words, either way round ("New Emote of the Year" / "Emote of the Year"). */
-const sameAward = (folder: string, award: string | undefined) => {
-  if (!award || !folder) return false;
-  const [f, a] = [` ${simple(folder)} `, ` ${simple(award)} `];
-  return a.includes(f) || f.includes(a);
-};
 
 /**
  * Make the clip from a video you already have: one from the library on the
@@ -44,11 +35,7 @@ export function ClipUpload({
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [libraryPath, setLibraryPath] = useState<string | null>(null);
-  const library = useQuery({ queryKey: ["library"], queryFn: fetchLibrary });
-  // The award's title, from the editor's list, to put its folder first.
-  const award = useQueryClient()
-    .getQueryData<{ id: string; title: string }[]>(["admin-nominees"])
-    ?.find((c) => c.id === categoryId)?.title;
+  const { items: videos, folders } = useLibrary("video", categoryId);
   const [src, setSrc] = useState<string | null>(null);
   const [length, setLength] = useState(0);
   const [start, setStart] = useState<number | null>(null);
@@ -156,13 +143,7 @@ export function ClipUpload({
     xhr.send(form);
   };
 
-  // Library videos by folder, this award's folder first.
-  const videos = (library.data ?? []).filter((v) => v.kind === "video");
-  const folders = [...new Set(videos.map((v) => v.folder))].sort((a, b) => {
-    const mine = (f: string) => (sameAward(f, award) ? 0 : 1);
-    return mine(a) - mine(b) || a.localeCompare(b);
-  });
-  const shownSrc = libraryPath ? `/api/admin/library/file?path=${encodeURIComponent(libraryPath)}` : src;
+  const shownSrc = libraryPath ? libraryUrl(libraryPath) : src;
   const chosen = !!file || !!libraryPath;
 
   return (
@@ -178,15 +159,13 @@ export function ClipUpload({
             aria-label="Video from the library"
           >
             <option value="">From the library…</option>
-            {folders.map((f) => (
-              <optgroup key={f} label={`${f || "Top level"}${sameAward(f, award) ? " (this award)" : ""}`}>
-                {videos
-                  .filter((v: LibraryItem) => v.folder === f)
-                  .map((v) => (
-                    <option key={v.path} value={v.path}>
-                      {v.name} ({Math.round(v.size / 1024 / 1024)} MB)
-                    </option>
-                  ))}
+            {folders.map((g) => (
+              <optgroup key={g.folder} label={`${g.folder || "Top level"}${g.mine ? " (this award)" : ""}`}>
+                {g.items.map((v) => (
+                  <option key={v.path} value={v.path}>
+                    {v.name} ({Math.round(v.size / 1024 / 1024)} MB)
+                  </option>
+                ))}
               </optgroup>
             ))}
           </select>

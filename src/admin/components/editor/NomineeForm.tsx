@@ -3,6 +3,7 @@ import { Section } from "@/admin/components/Section";
 import { PictureCropper } from "@/admin/components/editor/PictureCropper";
 import { ClipPreview } from "@/admin/components/editor/ClipPreview";
 import { ClipUpload } from "@/admin/components/editor/ClipUpload";
+import { libraryUrl, useLibrary } from "@/admin/components/editor/library";
 import { HistoryList } from "@/admin/components/history/HistoryList";
 import { Button, ErrorText, Field, TimeInput, inputClass } from "@/admin/components/editor/fields";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -290,6 +291,20 @@ function PictureSection({
   const upload = useMutation({
     mutationFn: (file: File) => uploadThumbnail(nominee.categoryId, nominee.id, file).then(refresh),
   });
+  const { items: pictures, folders } = useLibrary("image", nominee.categoryId);
+  /** Animated pictures go up as they are (if they fit); stills open in the cropper. */
+  const take = async (file: File) => {
+    if ((await isAnimated(file)) && file.size <= 5 * 1024 * 1024) upload.mutate(file);
+    else setCropping(file);
+  };
+  const fromLibrary = useMutation({
+    mutationFn: async (path: string) => {
+      const res = await fetch(libraryUrl(path));
+      if (!res.ok) throw new Error("Couldn't load that picture from the library.");
+      const blob = await res.blob();
+      await take(new File([blob], path.split("/").pop()!, { type: blob.type }));
+    },
+  });
   const remove = useMutation({
     mutationFn: () => removeThumbnail(nominee.categoryId, nominee.id).then(refresh),
   });
@@ -325,13 +340,32 @@ function PictureSection({
                   const file = e.currentTarget.files?.[0];
                   e.currentTarget.value = "";
                   if (!file) return;
-                  if (await isAnimated(file)) upload.mutate(file);
-                  else setCropping(file);
+                  await take(file);
                 }}
               />
               <Button onClick={() => fileInput.current?.click()} disabled={upload.isPending}>
                 {upload.isPending ? "Uploading…" : nominee.thumbnailUrl ? "Upload a new picture" : "Upload a picture"}
               </Button>
+              {pictures.length > 0 && (
+                <select
+                  className={`${inputClass} w-auto max-w-xs`}
+                  value=""
+                  disabled={upload.isPending || fromLibrary.isPending}
+                  onChange={(e) => e.currentTarget.value && fromLibrary.mutate(e.currentTarget.value)}
+                  aria-label="Picture from the library"
+                >
+                  <option value="">{fromLibrary.isPending ? "Loading…" : "From the library…"}</option>
+                  {folders.map((g) => (
+                    <optgroup key={g.folder} label={`${g.folder || "Top level"}${g.mine ? " (this award)" : ""}`}>
+                      {g.items.map((i) => (
+                        <option key={i.path} value={i.path}>
+                          {i.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              )}
               {nominee.thumbnailUrl && (
                 <Button variant="danger" onClick={() => remove.mutate()} disabled={remove.isPending}>
                   Remove picture
@@ -342,7 +376,7 @@ function PictureSection({
               PNG, JPEG, WebP or GIF, up to 5 MB, kept at full size unless you shrink it. Stills can be cropped
               first; animated GIFs and WebPs go up as they are, so emotes keep moving.
             </p>
-            <ErrorText>{upload.error?.message ?? remove.error?.message}</ErrorText>
+            <ErrorText>{upload.error?.message ?? remove.error?.message ?? fromLibrary.error?.message}</ErrorText>
             <Field label="Image file from the code (older nominees)" hint="A file in src/media, e.g. zee.jpg. Shows when there's no picture. Saved with Save above.">
               <input className={inputClass} value={imageId} onChange={(e) => setImageId(e.currentTarget.value)} />
             </Field>

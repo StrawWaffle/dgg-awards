@@ -15,12 +15,17 @@ const SIZES = [
   { id: "400", label: "400 px", max: 400 },
 ] as const;
 const FRAME_W = 440;
+/** The server's limit for pictures. */
+const MAX_BYTES = 5 * 1024 * 1024;
+/** What the server takes as it is; anything else (AVIF) has to be converted here. */
+const AS_IS_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 
 /**
  * Crop and shrink a still image in the browser before it's uploaded: pick a
  * shape, drag the picture into place, zoom, and pick a size. "Upload as it
- * is" skips all of it. JPEGs stay JPEG; anything else comes out as PNG, so
- * transparency survives.
+ * is" skips all of it, when the server can take the file unchanged (not for
+ * AVIF, or over 5 MB). JPEGs and AVIFs come out as JPEG; anything else as
+ * PNG, so transparency survives.
  */
 export function PictureCropper({
   file,
@@ -33,6 +38,8 @@ export function PictureCropper({
 }) {
   const [bitmap, setBitmap] = useState<ImageBitmap | null>(null);
   const [failed, setFailed] = useState(false);
+  const [tooBig, setTooBig] = useState<string | null>(null);
+  const asIs = AS_IS_TYPES.includes(file.type) && file.size <= MAX_BYTES;
   const [shape, setShape] = useState<(typeof SHAPES)[number]["id"]>("square");
   const [size, setSize] = useState<(typeof SIZES)[number]["id"]>("full");
   const [zoom, setZoom] = useState(1);
@@ -99,12 +106,16 @@ export function PictureCropper({
     const ctx = canvas.getContext("2d")!;
     ctx.imageSmoothingQuality = "high";
     ctx.drawImage(bitmap, out.sx, out.sy, out.sw, out.sh, 0, 0, out.w, out.h);
-    const jpeg = file.type === "image/jpeg";
+    const jpeg = file.type === "image/jpeg" || file.type === "image/avif";
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob(resolve, jpeg ? "image/jpeg" : "image/png", jpeg ? 0.92 : undefined),
     );
     setBusy(false);
     if (!blob) return setFailed(true);
+    if (blob.size > MAX_BYTES) {
+      return setTooBig(`That comes out at ${Math.round(blob.size / 1024 / 1024)} MB; the limit is 5 MB. Pick a smaller size.`);
+    }
+    setTooBig(null);
     const name = file.name.replace(/\.\w+$/, "") + (jpeg ? ".jpg" : ".png");
     onDone(new File([blob], name, { type: blob.type }));
   };
@@ -181,11 +192,18 @@ export function PictureCropper({
               )}
             </>
           )}
+          {tooBig && <p className="text-sm text-red-700">{tooBig}</p>}
           <div className="flex flex-wrap gap-2 border-t border-neutral-200 pt-4">
             <Button variant="primary" onClick={confirm} disabled={!bitmap || busy}>
               {busy ? "Preparing…" : "Upload this"}
             </Button>
-            <Button onClick={() => onDone(file)}>Upload as it is</Button>
+            {asIs ? (
+              <Button onClick={() => onDone(file)}>Upload as it is</Button>
+            ) : (
+              <span className="self-center text-xs text-neutral-500">
+                {AS_IS_TYPES.includes(file.type) ? "Over 5 MB, so it's converted" : "An AVIF, so it's converted to JPEG"}.
+              </span>
+            )}
             <span className="grow" />
             <Button onClick={onCancel}>Cancel</Button>
           </div>
