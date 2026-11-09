@@ -1,17 +1,55 @@
 import { useEffect, useRef, useState } from "react";
 import { EnterFullScreenIcon, PauseIcon, PlayIcon, SpeakerLoudIcon, SpeakerOffIcon } from "@radix-ui/react-icons";
-import { type LinkType, classifyLink, linkAt, linkLabel } from "@/lib/links";
+import { type LinkType, classifyLink, embedUrl, linkAt, linkLabel } from "@/lib/links";
 import { music } from "@/lab/music";
 import { Sketch } from "@/lab/sketch";
 
 export type Clip = {
   title: string;
-  clipUrl: string;
+  /** Our built clip (or a direct video file). */
+  clipUrl: string | null;
+  /** Otherwise, the source platform's own player. */
+  embedUrl: string | null;
   thumbnailUrl: string | null;
   url: string | null;
   linkType: LinkType | null;
   clipStart: number | null;
 };
+
+/**
+ * A nominee's clip: the one we built if there is one, else the source played
+ * in its platform's embed at the clip's times (YouTube, Twitch, Streamable),
+ * else a linked video file. Null when there's nothing to play.
+ */
+export function nomineeClip(
+  o: {
+    url?: string | null;
+    linkType?: LinkType | null;
+    clipUrl?: string | null;
+    thumbnailUrl?: string | null;
+    clipStart?: number | null;
+    clipEnd?: number | null;
+  },
+  title: string,
+): Clip | null {
+  const base = {
+    title,
+    thumbnailUrl: o.thumbnailUrl ?? null,
+    url: o.url ?? null,
+    linkType: o.linkType ?? null,
+    clipStart: o.clipStart ?? null,
+  };
+  if (o.clipUrl) return { ...base, clipUrl: o.clipUrl, embedUrl: null };
+  if (!o.url) return null;
+  const type = o.linkType ?? classifyLink(o.url).type;
+  if (type === "video-file") {
+    // A media fragment plays just the clip's part.
+    const part = o.clipStart != null ? `#t=${o.clipStart}${o.clipEnd != null ? `,${o.clipEnd}` : ""}` : "";
+    return { ...base, clipUrl: o.url + part, embedUrl: null };
+  }
+  const embed = embedUrl(o.url, { start: o.clipStart, end: o.clipEnd, parent: location.hostname });
+  return embed ? { ...base, clipUrl: null, embedUrl: embed } : null;
+}
 
 const clock = (s: number) => {
   if (!Number.isFinite(s)) return "0:00";
@@ -31,7 +69,54 @@ const CONTROLS_MS = 2000;
  * sound and full screen. They show while paused or when the pointer moves.
  * `fill` makes it fill its box's height (the big screen) instead of its width.
  */
-export function ClipPlayer({
+export function ClipPlayer(props: { clip: Clip; autoPlay?: boolean; fill?: boolean; onEnded?: () => void }) {
+  return props.clip.clipUrl ? <VideoPlayer key={props.clip.clipUrl} {...props} /> : <EmbedPlayer key={props.clip.embedUrl} {...props} />;
+}
+
+/** The title and the link to the full source, under the player. */
+function Caption({ clip, fill }: { clip: Clip; fill: boolean }) {
+  const type = clip.linkType ?? (clip.url ? classifyLink(clip.url)?.type : null) ?? null;
+  return (
+    <div className={`flex flex-wrap items-center justify-between gap-2 text-sm font-bold ${fill ? "cozy-panel px-4 py-1.5" : "px-1"}`}>
+      <span>{clip.title}</span>
+      {clip.url && type && (
+        <a className="underline" href={linkAt(clip.url, clip.clipStart ?? 0)} target="_blank" rel="noopener noreferrer">
+          ↗ Full context: {linkLabel(type, clip.clipStart ?? undefined)}
+        </a>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The source's own player, for a clip we haven't built. Its controls are the
+ * platform's, and we can't tell when it ends, so the music stays faded out
+ * while it's open.
+ */
+function EmbedPlayer({ clip, fill = false }: { clip: Clip; fill?: boolean }) {
+  useEffect(() => {
+    music.setDucked(true);
+    return () => music.setDucked(false);
+  }, []);
+  return (
+    <div className={fill ? "flex h-full flex-col gap-2" : "space-y-2"}>
+      <Sketch pad={5} radius={18} strokeWidth={3} boil drawOn className={fill ? "min-h-0 flex-1" : ""}>
+        <div className={`overflow-hidden rounded-[16px] bg-black ${fill ? "h-full" : "aspect-video"}`}>
+          <iframe
+            src={clip.embedUrl!}
+            title={clip.title}
+            className="block h-full w-full"
+            allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
+      </Sketch>
+      <Caption clip={clip} fill={fill} />
+    </div>
+  );
+}
+
+function VideoPlayer({
   clip,
   autoPlay = true,
   fill = false,
@@ -62,7 +147,6 @@ export function ClipPlayer({
     clearTimeout(sleep.current);
     sleep.current = setTimeout(() => setAwake(false), CONTROLS_MS);
   };
-  const type = clip.linkType ?? (clip.url ? classifyLink(clip.url)?.type : null) ?? null;
   const v = () => video.current!;
   const toggle = () => (v().paused || v().ended ? v().play().catch(() => {}) : v().pause());
   const showControls = paused || awake;
@@ -75,7 +159,7 @@ export function ClipPlayer({
           <video
             ref={video}
             className={`block w-full ${fill ? "h-full object-contain" : "aspect-video"}`}
-            src={clip.clipUrl}
+            src={clip.clipUrl!}
             poster={clip.thumbnailUrl ?? undefined}
             autoPlay={autoPlay}
             playsInline
@@ -149,14 +233,7 @@ export function ClipPlayer({
           </div>
         </div>
       </Sketch>
-      <div className={`flex flex-wrap items-center justify-between gap-2 text-sm font-bold ${fill ? "cozy-panel px-4 py-1.5" : "px-1"}`}>
-        <span>{clip.title}</span>
-        {clip.url && type && (
-          <a className="underline" href={linkAt(clip.url, clip.clipStart ?? 0)} target="_blank" rel="noopener noreferrer">
-            ↗ Full context: {linkLabel(type, clip.clipStart ?? undefined)}
-          </a>
-        )}
-      </div>
+      <Caption clip={clip} fill={fill} />
     </div>
   );
 }

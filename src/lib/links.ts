@@ -171,6 +171,55 @@ export function linkAt(raw: string, start: number | null | undefined): string {
   return url.toString();
 }
 
+/**
+ * A player for the source itself, for nominees whose clip hasn't been built:
+ * the platform's embed, starting (and on YouTube, ending) at the clip's
+ * times. Twitch needs the page's hostname as `parent`. Null for links that
+ * can't be embedded (Kick, X and Reddit have no player to embed, and a
+ * YouTube clip link doesn't say which video it's from).
+ */
+export function embedUrl(
+  raw: string,
+  { start, end, parent }: { start?: number | null; end?: number | null; parent: string },
+): string | null {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return null;
+  }
+  const { type, start: linked } = classifyLink(raw);
+  const from = Math.floor(start ?? linked ?? 0);
+  const parts = url.pathname.split("/").filter(Boolean);
+  const host = hostOf(url);
+  if (type === "youtube-video") {
+    const id = host === "youtu.be" ? parts[0] : parts[0] === "watch" ? url.searchParams.get("v") : parts[1];
+    if (!id) return null;
+    const embed = new URL(`https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}`);
+    embed.searchParams.set("autoplay", "1");
+    embed.searchParams.set("rel", "0");
+    if (from > 0) embed.searchParams.set("start", String(from));
+    if (end && end > from) embed.searchParams.set("end", String(Math.ceil(end)));
+    return embed.toString();
+  }
+  if (type === "twitch-clip") {
+    const slug = host === "clips.twitch.tv" ? parts[0] : parts[2];
+    if (!slug) return null;
+    return `https://clips.twitch.tv/embed?clip=${encodeURIComponent(slug)}&parent=${encodeURIComponent(parent)}&autoplay=true`;
+  }
+  if (type === "twitch-vod") {
+    const id = parts[1];
+    if (!id) return null;
+    const time = `${Math.floor(from / 3600)}h${Math.floor((from % 3600) / 60)}m${from % 60}s`;
+    return `https://player.twitch.tv/?video=v${encodeURIComponent(id)}&parent=${encodeURIComponent(parent)}&autoplay=true&time=${time}`;
+  }
+  if (type === "streamable") {
+    const id = parts[0] === "e" || parts[0] === "o" ? parts[1] : parts[0];
+    return id ? `https://streamable.com/e/${encodeURIComponent(id)}?autoplay=1` : null;
+  }
+  return null;
+}
+
 const platformLabels: Record<LinkType, string> = {
   "youtube-video": "YouTube video",
   "youtube-clip": "YouTube clip",

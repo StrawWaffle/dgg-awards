@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { PlayIcon } from "@radix-ui/react-icons";
 import { Dialog } from "radix-ui";
-import { type Clip, ClipPlayer } from "@/lab/ClipPlayer";
+import { type Clip, ClipPlayer, nomineeClip } from "@/lab/ClipPlayer";
 import { Emote } from "@/lab/Emote";
 
 type Standing = {
@@ -41,16 +41,7 @@ async function loadSummary(): Promise<AwardResult[]> {
       percentage: o.percentage,
       isWinner: o.isWinner,
       image: o.payload?.thumbnailUrl ?? (o.payload?.imageId ? `/Media/${o.payload.imageId}` : null),
-      clip: o.payload?.clipUrl
-        ? {
-            title: `${o.title} · ${c.categoryTitle}`,
-            clipUrl: o.payload.clipUrl,
-            thumbnailUrl: o.payload.thumbnailUrl,
-            url: o.payload.url,
-            linkType: o.payload.linkType,
-            clipStart: o.payload.clipStart,
-          }
-        : null,
+      clip: o.payload ? nomineeClip(o.payload, `${o.title} · ${c.categoryTitle}`) : null,
     })),
     rounds: c.runoff?.rounds ?? null,
   }));

@@ -352,6 +352,18 @@ The big screen does the live reveal now, so the lab's Results tab became a page 
 
 On the big screen's results scene, the last two rows go together (`duelPlan` in `Results.tsx`). One "Reveal next" starts both once only they are left. Their bars grow side by side and swap the lead five times over about 5 s (six lead changes measured), level at the end of the race. Then the runner-up stops at its count while the winner pulls ahead to its own. The sway is small enough that neither bar shrinks. Both bars keep the plain colour and hatching until the race is over, and only then does the winner turn coral and cross-hatched and get circled. This replaced the winner's solo race against the runner-up.
 
+### Clips that haven't been built play from the source (same branch, 2026-11-09, not deployed)
+
+In the lab (voting, big screen, results summary), a nominee without a built clip now plays its source link in the platform's own player:
+- **YouTube** (`youtube-nocookie.com`) starts and ends at the clip's times, from `clipStart`/`clipEnd` or the link's own timestamp.
+- **Twitch** clips and VODs (a VOD starts at the clip's start). Twitch requires the page's hostname as `parent`, so that's passed in.
+- **Streamable** plays from the start.
+- A **direct video file** plays in our own player, limited to the clip's part with a media fragment (`#t=start,end`).
+- Kick, X, Reddit and YouTube "clip" links have no embeddable player, so they still need a built clip.
+- `embedUrl()` in `src/lib/links.ts` (unit-tested) builds the URLs, and `nomineeClip()` in `src/lab/ClipPlayer.tsx` picks a built clip first, then an embed. Embeds use the platform's own controls. We can't tell when one ends, so the music stays faded out while it's open, and on the big screen it's closed by hand.
+- With the sample data, 68 nominees now have something to play on the summary.
+- **For rinlux, before this reaches the real site:** an embed loads YouTube or Twitch in visitors' browsers (the no-cookie YouTube domain is used), which is a privacy point.
+
 ### Next: the lab page (StrawWaffle's answers, 2026-11-09)
 
 StrawWaffle wants the front page and the presentation to feel fun, quirky and wholesome. It gets built on an experimental page first (`/lab`, admins only) until rinlux approves. Order: the follow-ups above, merge and deploy, then the lab.

@@ -633,7 +633,7 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
             style={{ top: "calc(5% + 100px)", bottom: controlsHeight + 32 }}
           >
             <div
-              key={shownClip.clipUrl}
+              key={shownClip.clipUrl ?? shownClip.embedUrl}
               ref={clipBox}
               className={`pointer-events-auto aspect-[16/10] h-full max-w-full ${playing ? "lab-lower" : "lab-raise"}`}
             >

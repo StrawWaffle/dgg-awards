@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { originOf, useBursts } from "@/lab/Bursts";
 import { Emote } from "@/lab/Emote";
 import { Dialog } from "radix-ui";
-import { type Clip, ClipPlayer } from "@/lab/ClipPlayer";
+import { type Clip, ClipPlayer, nomineeClip } from "@/lab/ClipPlayer";
 import { cssVar, useDrawnLook } from "@/lab/sketch";
 import { annotate } from "rough-notation";
 
@@ -55,9 +55,7 @@ export function VoteDemo() {
               id: o.id,
               title: o.title,
               image: o.thumbnailUrl ?? (o.imageId ? `/Media/${o.imageId}` : null),
-              clip: o.clipUrl
-                ? { title: o.title, clipUrl: o.clipUrl, thumbnailUrl: o.thumbnailUrl, url: o.url, linkType: o.linkType, clipStart: o.clipStart }
-                : null,
+              clip: nomineeClip(o, o.title),
             })),
           })),
         );

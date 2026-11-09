@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { PlayIcon } from "@radix-ui/react-icons";
-import type { Clip } from "@/lab/ClipPlayer";
+import { type Clip, nomineeClip } from "@/lab/ClipPlayer";
 import { Emote } from "@/lab/Emote";
 import type { Award } from "@/lab/Results";
 
@@ -18,9 +18,7 @@ export async function loadShow(results: Award[]): Promise<ShowAward[]> {
       id: o.id,
       title: o.title,
       image: o.thumbnailUrl ?? (o.imageId ? `/Media/${o.imageId}` : null),
-      clip: o.clipUrl
-        ? { title: `${o.title} · ${award.title}`, clipUrl: o.clipUrl, thumbnailUrl: o.thumbnailUrl, url: o.url, linkType: o.linkType, clipStart: o.clipStart }
-        : null,
+      clip: nomineeClip(o, `${o.title} · ${award.title}`),
     }));
     return { ...award, description: category?.description ?? "", nominees };
   });
@@ -100,10 +98,11 @@ export function DvdMenu({ award, onPlay, keys }: { award: ShowAward; onPlay: (cl
               }}
             >
               <div className="relative aspect-video overflow-hidden rounded-[13px] bg-black">
-                {on && nominee.clip ? (
+                {on && nominee.clip?.clipUrl ? (
                   <video
                     className="h-full w-full object-cover"
                     src={nominee.clip.clipUrl}
+                    // A moving thumbnail, like a DVD menu; embeds show their picture.
                     poster={nominee.image ?? undefined}
                     muted
                     autoPlay

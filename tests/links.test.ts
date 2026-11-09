@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { classifyLink, formatTimestamp, linkAt, linkLabel, parseTimestamp } from "@/lib/links";
+import { classifyLink, embedUrl, formatTimestamp, linkAt, linkLabel, parseTimestamp } from "@/lib/links";
 
 describe("classifyLink", () => {
   const cases: [string, string, number?][] = [
@@ -80,4 +80,38 @@ describe("linkAt", () => {
 test("labels say what a link is", () => {
   expect(linkLabel("reddit-post")).toBe("Reddit post");
   expect(linkLabel("youtube-video", 83)).toBe("YouTube video at 1:23");
+});
+
+describe("embedUrl", () => {
+  const parent = "dgg-awards.example";
+  test("YouTube starts and ends at the clip's times", () => {
+    expect(embedUrl("https://www.youtube.com/watch?v=abc123&t=90", { parent, end: 120 })).toBe(
+      "https://www.youtube-nocookie.com/embed/abc123?autoplay=1&rel=0&start=90&end=120",
+    );
+    expect(embedUrl("https://youtu.be/abc123", { parent, start: 5 })).toBe(
+      "https://www.youtube-nocookie.com/embed/abc123?autoplay=1&rel=0&start=5",
+    );
+    expect(embedUrl("https://www.youtube.com/shorts/xyz", { parent })).toBe(
+      "https://www.youtube-nocookie.com/embed/xyz?autoplay=1&rel=0",
+    );
+  });
+  test("Twitch clips and VODs name the parent page", () => {
+    expect(embedUrl("https://clips.twitch.tv/FunnyClipSlug", { parent })).toBe(
+      "https://clips.twitch.tv/embed?clip=FunnyClipSlug&parent=dgg-awards.example&autoplay=true",
+    );
+    expect(embedUrl("https://www.twitch.tv/destiny/clip/OtherSlug-ab12", { parent })).toBe(
+      "https://clips.twitch.tv/embed?clip=OtherSlug-ab12&parent=dgg-awards.example&autoplay=true",
+    );
+    expect(embedUrl("https://www.twitch.tv/videos/2233445566", { parent, start: 3725 })).toBe(
+      "https://player.twitch.tv/?video=v2233445566&parent=dgg-awards.example&autoplay=true&time=1h2m5s",
+    );
+  });
+  test("Streamable", () => {
+    expect(embedUrl("https://streamable.com/abcd12", { parent })).toBe("https://streamable.com/e/abcd12?autoplay=1");
+  });
+  test("links with no player to embed", () => {
+    for (const url of ["https://kick.com/destiny/clips/clip_1", "https://x.com/a/status/1", "https://www.youtube.com/clip/Ugkx", "not a url"]) {
+      expect(embedUrl(url, { parent })).toBeNull();
+    }
+  });
 });
