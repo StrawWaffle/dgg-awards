@@ -731,7 +731,8 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
                   <button
                     type="button"
                     className="cozy-btn"
-                    onClick={() => setTarget((t) => Math.min(award.results.length, t + 1))}
+                    // The last two are revealed together, so one click asks for both.
+                    onClick={() => setTarget((t) => (t + 1 >= award.results.length - 1 ? award.results.length : t + 1))}
                     disabled={target >= award.results.length}
                   >
                     Reveal next

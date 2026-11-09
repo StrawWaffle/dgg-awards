@@ -38,26 +38,32 @@ const PAUSE_MS = 900;
 const easeOut = (t: number) => 1 - (1 - t) ** 3;
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2);
 
+/** How a bar's value grows over time: a quick scribble that eases out. */
+function plan(count: number): { ms: number; at: (ms: number) => number } {
+  const ms = 1100 + Math.min(900, count * 4);
+  return { ms, at: (t) => count * easeOut(Math.min(1, t / ms)) };
+}
+
 /**
- * How a bar's value grows over time. Most bars: a quick scribble that eases
- * out. The winner: races to just short of the runner-up, creeps past it,
- * then finishes quickly.
+ * The last two, revealed together: their bars grow side by side and take
+ * turns in the lead (five swaps), level again at the end of the race; then
+ * the runner-up stops at its count and the winner pulls ahead to its own.
+ * The lead's sway is kept small enough that neither bar ever shrinks.
  */
-function plan(count: number, rival: number | null): { ms: number; at: (ms: number) => number } {
-  if (rival === null || rival <= 0 || count <= rival) {
-    const ms = 1100 + Math.min(900, count * 4);
-    return { ms, at: (t) => count * easeOut(Math.min(1, t / ms)) };
-  }
-  const a = rival * 0.9;
-  const b = Math.min(count, rival * 1.04);
-  const [ta, tb, tc] = [1100, 2800, count > b ? 900 : 0];
+function duelPlan(top: number, second: number): { ms: number; at: [(ms: number) => number, (ms: number) => number] } {
+  const race = 5200;
+  const settleSecond = 900;
+  const settleTop = 1600;
+  const level = second * 0.88;
+  const sway = second * 0.045;
+  const during = (t: number, sign: number) => level * (t / race) + sign * sway * Math.sin((2 * Math.PI * 2.5 * t) / race) * Math.min(1, t / 600);
+  const after = (t: number, from: number, to: number, ms: number) => from + (to - from) * easeInOut(Math.min(1, t / ms));
   return {
-    ms: ta + tb + tc,
-    at: (t) => {
-      if (t < ta) return a * easeOut(t / ta);
-      if (t < ta + tb) return a + (b - a) * easeInOut((t - ta) / tb);
-      return b + (count - b) * easeInOut(Math.min(1, (t - ta - tb) / Math.max(1, tc)));
-    },
+    ms: race + settleTop,
+    at: [
+      (t) => (t < race ? during(t, 1) : after(t - race, level, top, settleTop)),
+      (t) => (t < race ? during(t, -1) : after(t - race, level, second, settleSecond)),
+    ],
   };
 }
 
@@ -91,8 +97,9 @@ type RowEls = {
  *   then the row slides into its ranked place, so it ends sorted.
  * - The longest bar so far fills the width, so earlier bars squish as bigger
  *   ones come in, and the winner's length is no giveaway.
- * - The winner's scribble races to just short of second place, creeps past
- *   it, then finishes quickly.
+ * - First and second place are revealed together: they trade the lead a few
+ *   times, then the winner pulls ahead. The winner's colour only shows once
+ *   it's settled, so the bars don't give it away.
  */
 export function Board({
   award,
@@ -139,6 +146,7 @@ export function Board({
   // Slots: finished rows sorted best first at the top; the rest keep their
   // scrambled order underneath.
   const finished = byRank.slice(0, done);
+  const settled = done === n;
   const finishedIds = new Set(finished.map((r) => r.id));
   const slots = [
     ...[...finished].sort((a, b) => b.count - a.count).map((r) => r.id),
@@ -194,7 +202,7 @@ export function Board({
               roughness: 1.3,
               stroke: "none",
               fill: "currentColor",
-              fillStyle: r.isWinner ? "cross-hatch" : "hachure",
+              fillStyle: r.isWinner && settled ? "cross-hatch" : "hachure",
               hachureGap: 6,
               fillWeight: 1.6,
             })
@@ -209,51 +217,69 @@ export function Board({
       if (e.outline) delete e.outline.dataset.w;
     }
     paint();
-  }, [award, barW, drawn, paint]);
+  }, [award, barW, drawn, paint, settled]);
 
-  // Work through the reveals one at a time until `target` are done.
+  // Work through the reveals one at a time until `target` are done; the last
+  // two go together, as soon as either is asked for.
   useEffect(() => {
     if (busy.current || done >= target || barW === 0) return;
     busy.current = true;
-    const r = byRank[done]!;
-    const s = state.current.get(r.id)!;
-    const final = done === n - 1;
-    // The winner's race is against the best of the rest.
-    const rival = final && done > 0 ? Math.max(...byRank.slice(0, done).map((x) => x.count)) : null;
-    const { ms, at } = plan(r.count, rival);
-    s.phase = "scribble";
-    setActive(r.id);
-    let raf = 0;
+    const duel = n >= 2 && done === n - 2;
+    const rows = duel ? [byRank[n - 1]!, byRank[n - 2]!] : [byRank[done]!];
+    const final = done + rows.length === n;
+    const timing = duel
+      ? (() => {
+          const d = duelPlan(rows[0]!.count, rows[1]!.count);
+          return { ms: d.ms, at: d.at };
+        })()
+      : (() => {
+          const p = plan(rows[0]!.count);
+          return { ms: p.ms, at: [p.at] };
+        })();
+    const states = rows.map((r) => state.current.get(r.id)!);
+    for (const s of states) {
+      s.phase = "scribble";
+      s.v = 0;
+    }
+    setActive(rows.map((r) => r.id).join(" "));
+    const timers: ReturnType<typeof setTimeout>[] = [];
     const began = performance.now();
     const tick = (now: number) => {
       const t = now - began;
-      s.v = at(t);
+      // Never backwards: a scribble only grows.
+      states.forEach((s, i) => (s.v = Math.max(s.v, timing.at[i]!(t))));
       paint();
-      if (t < ms) {
-        raf = requestAnimationFrame(tick);
+      if (t < timing.ms) {
+        requestAnimationFrame(tick);
         return;
       }
-      s.v = r.count;
-      s.phase = "box";
-      paint();
-      // Then the box round it, drawn like a pen.
-      const outline = els.current.get(r.id)?.outline;
-      outline?.querySelectorAll("path").forEach((p) => {
-        const length = p.getTotalLength();
-        p.style.strokeDasharray = `${length}`;
-        p.animate([{ strokeDashoffset: length }, { strokeDashoffset: 0 }], { duration: BOX_MS, easing: "ease-in-out" });
+      states.forEach((s, i) => {
+        s.v = rows[i]!.count;
+        s.phase = "box";
       });
+      paint();
+      // Then the box round each, drawn like a pen.
+      for (const r of rows) {
+        els.current.get(r.id)?.outline?.querySelectorAll("path").forEach((p) => {
+          const length = p.getTotalLength();
+          p.style.strokeDasharray = `${length}`;
+          p.animate([{ strokeDashoffset: length }, { strokeDashoffset: 0 }], { duration: BOX_MS, easing: "ease-in-out" });
+        });
+      }
       timers.push(
         setTimeout(() => {
-          s.phase = "done";
-          setDone((d) => d + 1);
-          const name = els.current.get(r.id)?.name;
-          if (final && r.isWinner && name) {
+          for (const s of states) s.phase = "done";
+          setDone((d) => d + rows.length);
+          for (const r of rows) {
+            const name = els.current.get(r.id)?.name;
+            if (!final || !r.isWinner || !name) continue;
             const a = annotate(name, { type: drawn ? "circle" : "highlight", color: cssVar("--coral"), strokeWidth: 3, padding: drawn ? 10 : 2, animationDuration: 800 });
-            timers.push(setTimeout(() => {
-              a.show();
-              onWinner(name);
-            }, 700));
+            timers.push(
+              setTimeout(() => {
+                a.show();
+                onWinner(name);
+              }, 700),
+            );
           }
           // After a pause, on to the next one (if there's one to reveal).
           timers.push(
@@ -265,21 +291,19 @@ export function Board({
         }, BOX_MS),
       );
     };
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    raf = requestAnimationFrame(tick);
     // A reveal runs to the end; only a new Board (Start over, another award)
     // stops one midway, and that throws this one's elements away.
-    void raf;
+    requestAnimationFrame(tick);
   }, [done, target, barW, byRank, n, paint, drawn, onWinner, wake]);
 
   return (
     <div className="relative mt-8" style={{ height: n * ROW_H }}>
       {award.results.map((r) => {
         const slot = slots.indexOf(r.id);
-        const colour = r.isWinner ? "var(--coral)" : "var(--primary-shadow)";
+        const colour = r.isWinner && settled ? "var(--coral)" : "var(--primary-shadow)";
         const e = els.current.get(r.id) ?? { clip: null, fill: null, outline: null, count: null, name: null };
         els.current.set(r.id, e);
-        const hidden = state.current.get(r.id)!.phase === "hidden" && active !== r.id;
+        const hidden = state.current.get(r.id)!.phase === "hidden" && !active?.split(" ").includes(r.id);
         return (
           <div
             key={r.id}

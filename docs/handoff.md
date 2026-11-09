@@ -348,6 +348,10 @@ The big screen does the live reveal now, so the lab's Results tab became a page 
 - The old reveal page (`Results()`) is gone; `Results.tsx` keeps the `Board` the big screen uses.
 - Not included, since it needs rinlux's say: overall unique voters and votes per day (the admin stats have them). Ballots cast is the sum over awards.
 
+### First and second revealed together (branch `worktree-duel-reveal`, 2026-11-09, not deployed)
+
+On the big screen's results scene, the last two rows go together (`duelPlan` in `Results.tsx`). One "Reveal next" starts both once only they are left. Their bars grow side by side and swap the lead five times over about 5 s (six lead changes measured), level at the end of the race. Then the runner-up stops at its count while the winner pulls ahead to its own. The sway is small enough that neither bar shrinks. Both bars keep the plain colour and hatching until the race is over, and only then does the winner turn coral and cross-hatched and get circled. This replaced the winner's solo race against the runner-up.
+
 ### Next: the lab page (StrawWaffle's answers, 2026-11-09)
 
 StrawWaffle wants the front page and the presentation to feel fun, quirky and wholesome. It gets built on an experimental page first (`/lab`, admins only) until rinlux approves. Order: the follow-ups above, merge and deploy, then the lab.
