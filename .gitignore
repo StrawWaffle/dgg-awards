@@ -39,3 +39,6 @@ sqlite.db-wal
 drizzle/
 
 scripts/*.json
+# test output and agent worktrees
+tests/visual/out/
+.claude/worktrees/
