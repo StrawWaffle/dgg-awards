@@ -1,0 +1,55 @@
+/*
+ * The base rule destiny.gg's emotes.css leaves to chat's own stylesheet: each
+ * emote is a background on an inline box, sized and animated by emotes.css.
+ * Resize with `zoom` or `scale`, never width or background-size, or sprite
+ * sheets step out of frame (see dgg-radio's emotes.md).
+ */
+.emote {
+  display: inline-block;
+  position: relative;
+  overflow: hidden;
+  vertical-align: middle;
+  background-repeat: no-repeat;
+  background-position: 0 0;
+  flex: none;
+}
+
+/* An emote burst: rises, wobbles and fades. */
+@keyframes lab-burst {
+  0% {
+    opacity: 0;
+    translate: 0 10px;
+  }
+  12% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    translate: var(--dx, 0) -140px;
+    rotate: var(--rot, 0deg);
+  }
+}
+.lab-burst {
+  position: absolute;
+  pointer-events: none;
+  animation: lab-burst 1.6s ease-out forwards;
+}
+
+/* The DGG-style combo counter. */
+@keyframes lab-combo-pop {
+  0% {
+    scale: 1.4;
+  }
+  100% {
+    scale: 1;
+  }
+}
+.lab-combo {
+  animation: lab-combo-pop 180ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lab-burst {
+    animation-duration: 0.01s;
+  }
+}

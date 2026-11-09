@@ -45,6 +45,7 @@ Voting and results site for the yearly destiny.gg community awards (DGG Awards).
 - `src/admin/`: the admin page. `Admin.tsx` is the sidebar shell (sections are tabs, kept in the URL hash), `components/editor/` the nominee editor, `components/Section.tsx` the collapsible block and `components/Sortable.tsx` drag-to-reorder (dnd-kit). The dark theme is `admin.css`: it remaps Tailwind's neutral scale under `.admin-dark`, so build admin UI from `neutral-*`, `white` and the existing accents, and it works in both themes without `dark:` classes. `src/components/`: public UI (`ClipEmbed.tsx` is our clip player).
 - **Edit history:** every admin route that changes data records it through `src/server/history.ts` (`record`, `recordNomineeUpdate`, …), and `undo()` there knows how to reverse each kind. A new admin write needs both. Clip and thumbnail files are never deleted, so history can restore them.
 - Categories and nominees are ordered by their `position` column (drag order). Queries that list them must order by it. It isn't sent in API responses.
+- `src/lab/` and `src/server/lab/`: the experimental `/lab` page (music, emote reactions, the chat stage) and its chat relay. See the handoff's lab section. Unit test: `tests/lab-chat.test.ts`.
 - `drizzle/`: migrations, applied at container start by `scripts/migrate.ts`. **Always read a generated migration before committing.** drizzle-kit once generated a copy step that selected a column which didn't exist yet (0003, fixed by hand).
 - `src/data.ts`: last year's (2025) nominees, used as sample data by `scripts/seed.ts`.
 
@@ -60,7 +61,7 @@ The live `.env` holds the real DGG OAuth app, `AUTH_SECRET`, the tunnel token, `
 ## Testing
 
 - `bun run typecheck` must pass.
-- **Unit tests** (no server): `tests/{links,checks,data,dgg-profile,voting,storage,ids}.test.ts`. Run on Linux, since `data.test.ts` checks filename case.
+- **Unit tests** (no server): `tests/{links,checks,data,dgg-profile,voting,storage,ids,lab-chat}.test.ts`. Run on Linux, since `data.test.ts` checks filename case.
 - **API tests:** `bash tests/run.sh <app-container> --ci`. 36 characterization tests with snapshots, run over HTTP against a running app on the Docker network `dgga-test`. `tests/reset.sh` reseeds first.
 - **Screenshots:** `bash tests/visual/run.sh capture <container> <name>`, then `… compare <a> <b>`. These are full-page Playwright screenshots, pinned so two runs of the same code are pixel-identical.
 - **Data score:** `bun scripts/check-nominees.ts` (exits 1 while there are errors).

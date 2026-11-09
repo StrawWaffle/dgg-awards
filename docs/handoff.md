@@ -208,6 +208,30 @@ StrawWaffle wants the front page and the presentation to feel fun, quirky and wh
   - **Built for a flood:** chat gets extremely busy during the awards. The server holds one connection to `wss://chat.destiny.gg/ws` (browsers are refused, so it's a relay, as in dgg-radio's `src/server/dgg-socket.ts` and `dgg-chat.ts`) and sends the page a small summary a few times a second. The page draws a capped number of characters on a canvas. Stress test it by replaying recorded chat at many times the speed.
 - **Music-reactive animation** from the analysis: things on the page move to the track.
 
+### The lab, first version (branch `worktree-lab`, 2026-11-09, not merged)
+
+`/lab`, admins only: the page checks `/api/me`, and the chat socket and emote list check the session on the server. Test container `dgga-lab` (port 3600, image `dgga:lab`).
+- **Music** (`src/lab/music.ts`, `MusicBar.tsx`):
+  - The track is in `src/lab/assets/`, served at `/lab/black-lover.m4a` with byte ranges. An MP3 copy is used where the browser has no AAC (`canPlayType`).
+  - It starts on the first click or key press at 25%. Volume, mute and "switched off" are remembered in localStorage.
+  - The credit links the SoundCloud page. Visuals read the music before the volume, so they keep moving when muted.
+- **Beat map:** `scripts/analyze-track.ts` (needs ffmpeg, so run it in the app image) works out per-band energy from an FFT, onsets from spectral flux, and the tempo. The result is `black-lover.beats.json` (26 KB, bundled into the page).
+  - Autocorrelation alone favoured 80.7 bpm, with 117.5 and 123 close behind: a triplet feel at a coarse step. Fitting a beat grid to the onsets settles it at **120.0 bpm**, with 209 of 249 beats landing on an onset.
+  - The page can animate from the map or the live analyser (`AnalyserNode`). Both are shown side by side to compare.
+- **Emotes** come from destiny.gg's own `emotes.css` (linked from the CDN), as `<span class="emote NAME">` with dgg-radio's base rule and looping fix (`Emote.tsx`). All the names used exist in the catalogue.
+- **Reactions** (`VoteDemo.tsx`, `Bursts.tsx`): a mock voting flow. Klappa bursts when you pick, Skip when you skip, PepoG heads the survey question, and CHEERSTINY plus Klappa when you finish. A row of dancing emotes (catJAM, AlienPls, pepeJAM, RainbowPls, GatoPls, RaveDoge, YAM, Listening) hops on the beat and swells with the bass.
+- **Chat relay** (`src/server/lab/`):
+  - One server connection to `wss://chat.destiny.gg/ws` with no Origin header (Bun's WebSocket client). It's opened only while a stage listens, closed a minute after the last one leaves, and reconnects with jittered backoff and a 30 s silence check.
+  - `ChatAggregator` turns each quarter second into a fixed-size summary: message count, emote-only count, a reservoir sample of 40 emote-only messages (nick, emote, flair), the top 8 emotes, the running combo, and up to 3 messages from verified people.
+  - Emote matching follows chat's rules (whole words, case-sensitive, the author's sub tier). Bots (`bot`, `flair11`) are ignored.
+  - "Verified" = destiny.gg's **Verified** flair (`flair20`), Notable (`flair2`), Broadcaster (`flair12`), moderators, admins and the head mod (`VERIFIED_FLAIRS`).
+- **Stage** (`Stage.tsx`, `chatFeed.ts`): chatters as their emotes with names in their flair colour. They walk at different depths, hop on the beat, and jump with combos ("×N C-C-C-COMBO").
+  - "Winner moment" turns everyone into Klappa for 4 seconds. Verified messages show as speech bubbles when that option is on.
+  - Characters are plain DOM elements moved per frame, never React state, capped (default 150). Whoever has been quiet longest makes room, and characters leave after a minute of silence.
+  - The simulator floods the same aggregator in the browser at up to 5,000 messages a second, with combos and the odd verified message.
+- **Measured:** the aggregator handles 100,000 messages in 171 ms (`tests/lab-chat.test.ts`, about 580k a second). In Chromium the stage holds **60 fps at 3,000 messages a second** with 150 characters, and the aggregator takes about 1 ms per quarter second. The live relay connected to the real chat.
+- **Still to do:** presentation mode for an allowlist (not just admins); deciding which emotes go where on the real pages; the real front page and presentation design (rinlux).
+
 **Ideas from StrawWaffle, not built.** Several need rinlux's say first, since they are in charge of these decisions:
 - **More roles** than admin, e.g. moderators or editors who can only edit nominees.
 - **Lock the site behind sign-in** before voting, with a countdown to the voting date.

@@ -7,6 +7,7 @@ import { env } from "@/lib/util";
 import { SESSION_COOKIE } from "@/server/middleware";
 import { adminRoutes } from "@/server/routes/admin";
 import { authRoutes } from "@/server/routes/auth";
+import { labRoutes } from "@/server/routes/lab";
 import { publicRoutes } from "@/server/routes/public";
 import { MEDIA_KEY, serveFile, storage } from "@/server/storage";
 
@@ -38,6 +39,7 @@ export function createApp(adminPath: string) {
     .route("/", authRoutes)
     .route("/", publicRoutes)
     .route("/api/admin", adminRoutes)
+    .route("/", labRoutes)
 
     .get("/admin", async (c) => {
       const session = await verifyAdminSession(getCookie(c, SESSION_COOKIE));
