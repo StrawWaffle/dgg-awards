@@ -27,7 +27,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 
 ### At a glance (end of session 2, 2026-11-09)
 
-**Live** (`main` at `eebe32f`, deployed and pushed):
+**Live** (`main` at `bac7396`, deployed and pushed):
 - **Infrastructure:** the Docker preview behind a Cloudflare tunnel, real destiny.gg sign-in, the stack upgrade (Bun 1.4, Hono, Zod, TS 7), and clips into Cloudflare R2 at 1080p.
 - **Admin page:**
   - a left sidebar, dark theme, drag to reorder, and collapsible sections
@@ -40,15 +40,9 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
   - a cozy look after a community destiny.gg skin, light and dark, a hand-drawn "drawn look" switch, and drifting emote silhouettes in the background
   - music ("black lover", with permission) and a beat map
   - emote reactions, and the big screen with chat characters (a live relay or the simulator)
-  - clips, and the results reveal
-
-**Built, waiting for StrawWaffle's go-ahead to deploy:** branch `worktree-lab-polish-2` (one commit on top of `main`):
-- the results reveal drawn like a person would, with rows starting scrambled and a race for the winner
-- a calmer stage cast
-- combos in the chat column
-- the beat as a shared gust on the background emotes
-
-It's tested: 83 unit tests and 42 API tests pass, with both snapshots unchanged, and it was checked in the browser. To deploy it: rebase it onto `main` if `main` has moved (it touches no docs, so that is clean), then fast-forward `main`, after the usual backup (see "Deploying" below).
+  - clips, and the results reveal: drawn by hand, rows starting scrambled, and a race for the winner
+  - a calmer stage cast, combos in the chat column, and the beat as a shared gust on the background emotes
+  - the music button shows the volume while it changes (MMMM, or OOOO at a speed that follows the volume), on a perceptual volume curve
 
 **Waiting on rinlux** (StrawWaffle is asking):
 - What they think of the lab. It's the candidate design for the 2026 voting page and presentation.
@@ -64,12 +58,11 @@ It's tested: 83 unit tests and 42 API tests pass, with both snapshots unchanged,
 - **Archive:** wait for the full 2025 votes; the wiki has only percentages.
 
 **Next, roughly in StrawWaffle's order:**
-1. Deploy `worktree-lab-polish-2` when StrawWaffle says so.
-2. Bring the lab's voting page and presentation into the real site, once rinlux approves.
+1. Bring the lab's voting page and presentation into the real site, once rinlux approves.
    - Voting: the one-award-at-a-time flow with ballot progress, and a ranked-voting interface.
    - Presentation: the big screen and the results reveal. Room for the stream camera, and showing the instant-runoff rounds, are still open.
-3. Re-check the double-count fix against the original code (`dgga-base`), and against the real 2025 votes if they turn up.
-4. Smaller items:
+2. Re-check the double-count fix against the original code (`dgga-base`), and against the real 2025 votes if they turn up.
+3. Smaller items:
    - re-pull emotes from the DGG CDN
    - a privacy page (deferred until StrawWaffle lifts it)
    - a bot-vote comparison
@@ -81,7 +74,7 @@ It's tested: 83 unit tests and 42 API tests pass, with both snapshots unchanged,
 - Fast-forward `main`, run `docker compose --profile tunnel up -d --build app`, then check `/`, `/api/config`, `/lab` (200), `/api/admin/checks` and `/api/lab/emotes` (401), and `/signin` (to destiny.gg).
 - Push `main`.
 
-**Worktrees:** everything under `.claude/worktrees/` is merged except `lab-polish-2`. The others (`admin-pass`, `editor-scroll`, `lab`, `lab-polish`, `nominee-images`, `sketchy`) can be removed.
+**Worktrees:** everything under `.claude/worktrees/` is merged (`admin-pass`, `editor-scroll`, `lab`, `lab-polish`, `lab-polish-2`, `nominee-images`, `sketchy`) and can be removed.
 
 **Test containers**, on network `dgga-test`, all kept running:
 
@@ -93,7 +86,7 @@ It's tested: 83 unit tests and 42 API tests pass, with both snapshots unchanged,
 | `dgga-new` | 3200 | an older build under test |
 | `dgga-main` | 3400 | an old live image, from before the editor. Rebuild it, or ignore it. |
 | `dgga-review` | 3500 | used for the admin work (`dgga:review`) |
-| `dgga-lab` | 3600 | the latest lab build (`dgga:lab`, currently `lab-polish-2`) |
+| `dgga-lab` | 3600 | the latest lab build (`dgga:lab`, same as live) |
 
 **Browser testing without the T3 preview** (it hung this session): Playwright in Docker (`mcr.microsoft.com/playwright:v1.56.1-noble`) on network `dgga-test`, signing in through the mock as in `tests/visual/capture.mjs`.
 - Plain Chromium there has no H.264, so test clip playback in Playwright's Firefox.
@@ -293,7 +286,7 @@ StrawWaffle's notes after trying the lab:
 - **Checked:** clips play in Firefox. Plain Chromium (the test browser) has no H.264 (error 4), unlike real Chrome and Edge.
 - **Drifting silhouettes.** The backdrop emotes float slowly right and up like leaves on a breeze, swaying and turning, and wrap round at the edges. They sway up to half again more with the bass, and stay still for reduced motion. Also fixed: they were bunched on the right, because the `.emote` base rule (`position: relative`, later in the file) overrode their `position: absolute`. Measured: evenly spread across the window, and 38 of 40 moved within 3 s.
 
-### Lab polish, round 2 (branch `worktree-lab-polish-2`, 2026-11-09, not deployed)
+### Lab polish, round 2 (2026-11-09, deployed)
 
 StrawWaffle's notes after the last deploy, built:
 - **Results drawn like a person would** (`Results.tsx`, rewritten).
@@ -310,6 +303,7 @@ StrawWaffle's notes after the last deploy, built:
   - The aggregator now also reports combos that ended within a window (`ended`), which were lost before.
   - The simulator makes combos real runs of back-to-back messages.
   - The column shows 2 character lines per quarter second (8 a second) and keeps 60 lines, so it can be read.
+- **Volume:** while the volume changes (held slider, and 1.2 s after), the music button shows MMMM under 10%, otherwise OOOO animating at 0–150% speed with the slider (`Emote` takes a `rate`). The slider is now loudness as heard: gain = slider³ (−18 dB at half, −60 dB at 10%; sources suggested powers of 3–4, a square was too gentle at the low end). Saved volumes from before are moved so the music stays as loud (`curve` in the saved prefs).
 - **Background emotes:** the beat is now one shared gust in screen directions (right and a little up, harder on the one) with a spring back, applied before each emote's own turn. Each one keeps a gentle sway of its own.
 
 ### Next: the lab page (StrawWaffle's answers, 2026-11-09)
