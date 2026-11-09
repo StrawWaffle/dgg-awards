@@ -603,7 +603,7 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
         {/* The award's name along the top, except on its own title scene. */}
         {award && (scene !== "title" || winner) && (
           <div className="absolute inset-x-0 top-[5%] z-[200] text-center">
-            <Sketch className="inline-block" pad={3} radius={20} boil={!!winner} drawOn>
+            <Sketch className="inline-block" pad={3} radius={20} boil drawOn>
               <div
                 key={winner ?? award.id}
                 className="lab-pop inline-block rounded-[20px] px-7 py-3 text-2xl font-black sm:text-4xl"

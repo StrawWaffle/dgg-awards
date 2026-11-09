@@ -560,6 +560,7 @@ rinlux on `/chat`: "cute! but maybe a bit busy … the sketch style … updates 
 - The live `/chat` page is unchanged until one is picked. Both drafts read the data through `/api/chat-review?preview=1`, so admins only.
 - **The drawn frames' wobble follows the music now** (StrawWaffle: "could it match the beat of the music?"). `useBoil` in `sketch.tsx` moves to the next wobble on each beat of the beat map (about twice a second) and holds still between beats and when the music is off. It used to redraw 8 times a second all the time. This is everywhere a frame boils: the front page countdown, the year in chat's cover, the big screen's sign and clips. Measured: one shape over 2 s with the music off, three with it on.
 - The lab now follows changes to its `#` address (typing `#chat-story` switches view).
+- **Later the same day (StrawWaffle):** the big screen's award sign now always wobbles on the beat (it used to only during a winner moment), and so do the boxes drawn round the results bars (`Board` in `Results.tsx` redraws them with the next seed on each beat). The circle round the winner and the box round a voting pick stay still, so they stay readable. Muted music still plays silently, so the wobble carries on when muted; it stops only when the music is off.
 
 ### The year in DGG chat (2026-11-09, deployed)
 

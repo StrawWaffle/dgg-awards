@@ -52,7 +52,7 @@ function useBoil(on: boolean) {
   return seed;
 }
 
-const reducedMotion = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+export const reducedMotion = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /** The size of an element, kept up to date. */
 function useSize<T extends HTMLElement>() {

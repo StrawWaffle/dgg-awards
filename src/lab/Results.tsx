@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import rough from "roughjs";
 import { annotate } from "rough-notation";
-import { cssVar } from "@/lab/sketch";
+import { type Levels, type Source, useFrame } from "@/lab/music";
+import { cssVar, reducedMotion } from "@/lab/sketch";
 
 export type Result = { id: string; title: string; count: number; percentage: number; isWinner: boolean };
 export type Award = { id: string; title: string; total: number; results: Result[] };
@@ -131,6 +132,8 @@ export function Board({
   const busy = useRef(false);
   /** Bumped when a pause ends, to start the next reveal. */
   const [wake, setWake] = useState(0);
+  /** Which wobble the boxes round the bars are on: the next one on each beat of the music. */
+  const wobble = useRef(1);
   /** The row being scribbled, so its placeholder dashes go as it starts. */
   const [active, setActive] = useState<string | null>(null);
 
@@ -167,13 +170,15 @@ export function Board({
         e.count.textContent =
           s.phase === "hidden" ? "?" : `${Math.round(s.v).toLocaleString()} · ${((s.v / Math.max(1, award.total)) * 100).toFixed(1)}%`;
       }
-      // The box follows the bar's length as later bars squish it.
+      // The box follows the bar's length as later bars squish it, and
+      // wobbles on the beat like the other drawn frames.
       if (e.outline && (s.phase === "box" || s.phase === "done")) {
         const last = Number(e.outline.dataset.w ?? -1);
-        if (Math.abs(last - w) > 0.5) {
+        const seed = r.id.length * 7 + 3 + wobble.current * 101;
+        if (Math.abs(last - w) > 0.5 || Number(e.outline.dataset.seed) !== seed) {
           e.outline.replaceChildren(
             rough.svg(e.outline.ownerSVGElement!).rectangle(3, 4, Math.max(4, w), BAR_H, {
-              seed: r.id.length * 7 + 3,
+              seed,
               roughness: 1.2,
               bowing: 1,
               strokeWidth: 2.2,
@@ -181,10 +186,21 @@ export function Board({
             }),
           );
           e.outline.dataset.w = String(w);
+          e.outline.dataset.seed = String(seed);
         }
       }
     }
   }, [award, barW]);
+
+  const onBeat = useCallback(
+    (levels: Record<Source, Levels>) => {
+      if (!levels.map.beat || reducedMotion()) return;
+      wobble.current = (wobble.current % 3) + 1;
+      paint();
+    },
+    [paint],
+  );
+  useFrame(onBeat);
 
   // The scribble fill of every bar, drawn once at full width and revealed
   // through a clip as the bar grows.
