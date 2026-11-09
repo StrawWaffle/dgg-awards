@@ -82,9 +82,7 @@ The source zip (`dgga25.zip`) was deleted at StrawWaffle's request, so commit 1 
 
 ## Open questions
 
-- **Voting style:** one pick per category (as in 2025), or ranked like jadseya.com? StrawWaffle wants it as an **admin setting**. Still open: per category or site-wide, and the counting method for ranked votes (instant runoff vs. Borda).
-- **Clip downloads:** see planned feature 4b. Still open: where clips are stored and served from, given the home connection and Cloudflare's rules on video.
-- **When nominations for 2026 open.** This decides how to order the planned features.
+- **R2 bucket for clips:** StrawWaffle needs to create one on his Cloudflare account. Until then, clips can be stored locally behind the same storage interface.
 - **What rinlux thinks is missing** compared with the live 2025 version.
 
 ## Stack upgrade (branch `stack-upgrade`, merged into `main` 2026-11-09)
@@ -132,8 +130,18 @@ Order StrawWaffle gave: preview to rinlux first, then discuss, then these.
 2. ~~**Dependency upgrades.**~~ Done on `stack-upgrade`.
 3. ~~**Regression tests, then end-to-end type safety.**~~ Done on `stack-upgrade`.
 4. **Admin editing with preview**, for an allowlist of DGG accounts. It should cover editing nominees and categories, previewing how the site looks, and previewing the results reveal. StrawWaffle wants this to make setup easy for the organizers. Build it on a reworked nominee model that adds a date, a link type and clip start and end times, plus checks that reject bad links, wrong-year dates and duplicates. This is the first hill-climbing step.
-   - **4a. Voting style as an admin setting:** single pick or ranked. Needs a schema change: votes get a rank, and the primary key becomes (uid, categoryId, optionId). Lock the setting once a category has votes.
-   - **4b. Downloaded clips.** An admin enters the source URL plus start and end times. The server downloads just that segment, with yt-dlp (`--download-sections`) or StrawWaffle's Cobalt instance, turns it into an mp4 with a thumbnail, and the site plays it in its own `<video>`. That means no looping, the right segment, and nothing breaks if the source is deleted. Keep the original link as "source". The 2025 site never did this: it embedded YouTube and Streamable by id.
+   - **4a. Voting style, decided 2026-11-09.** Single pick or ranked, set **per category**, with a **site-wide default** for new categories. Ranked votes are counted by **instant runoff**, and the results page can show the rounds. This needs a schema change: votes get a rank, and the primary key becomes (uid, categoryId, optionId). Lock a category's style once it has votes.
+   - **4b. Downloaded clips, decided 2026-11-09.**
+     - Use **yt-dlp**, not Cobalt. An admin enters the source URL plus start and end times, and the server downloads just that segment (`--download-sections`) and converts it to an mp4.
+     - **Admins can choose the thumbnail**, either a frame from the clip or an uploaded image.
+     - The site plays clips in its own `<video>`: no looping, and it stops at the end.
+     - **Always link the original source at the clip's start time** (e.g. `&t=83`), so viewers can get the full context.
+     - The 2025 site never did this. It embedded YouTube and Streamable by id.
+   - **Scale.** 2025 had about 67,000 votes in 3.5 days (stream at 3:53, the caption is garbled as "67,44"), so roughly 3,000 voters.
+     - Serve clips from **Cloudflare R2**, not the home tunnel. Cloudflare's free CDN terms restrict video, and the home upload couldn't handle hundreds of GB.
+     - Compute results once when voting closes and serve that copy. Today every request recounts all votes.
+     - Stored thumbnails also remove the per-visitor YouTube oEmbed calls, which get rate-limited.
+   - Nomination timing isn't urgent (StrawWaffle, 2026-11-09).
 5. **Re-pull emotes from the DGG CDN:** `https://cdn.destiny.gg/emotes/emotes.json` and `emotes.css`. Some emotes are sprite sheets or animated by CSS transforms, so a plain `<img>` won't show them correctly. DGG-Radio's `emotes.md` explains this and has a working approach to reuse.
 6. **Privacy page** saying exactly what's collected (DGG id and name, IP and user agent per vote) and why, with a retention plan. Do this when StrawWaffle lifts the privacy deferral.
 7. **Cloudflare bot signals:** compare results with and without suspected bot votes (shared IPs, new DGG accounts) and show both.
