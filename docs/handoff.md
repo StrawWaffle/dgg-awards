@@ -552,7 +552,7 @@ StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, an
   - typecheck and 92 unit tests; 49 API tests, with the preview addresses added
   - in the browser: both preview menus (hover, jump, close, current page marked, the admin one on a phone), every stage and page, a preview vote not saved, the old addresses rewritten, `/lab#sound` kept, non-admin and signed-out refusals, the big screen switched to simulated votes with the reveal running, and the music's first play starting at 6.02 s
 
-### Ranking, fifth take: swipe first, compare only the finalists (2026-11-10, built, not deployed)
+### Ranking, fifth take: swipe first, compare only the finalists (2026-11-10, deployed)
 
 StrawWaffle, after the knockout: still too many choices; the aim is least effort (decision fatigue), not fewest comparisons; he suggested a quick yes/no pass first. Research backs it: per item, paired comparisons take about four times as long as a rating (Touchstone's comparison of 8 scaling techniques); ratings are best for broad coverage and comparisons for the top tier, and mixing the two beats either alone ("The Benefits of Diversity", 2026); Q-sorts start by splitting the cards into three rough piles before any fine ordering.
 
