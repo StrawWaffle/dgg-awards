@@ -11,7 +11,7 @@ import { type Award, boardOf, decidedByRunoff, loadResults } from "@/lab/Results
 import { DvdMenu, type ShowAward, TitleCard, WinnerCard, loadShow } from "@/lab/Scenes";
 import { ResultsBoard } from "@/lab/StageRunoff";
 import { loadSimulated } from "@/lab/Summary";
-import { type Box, type Layout, Movable, defaultLayout, loadLayout, saveLayout } from "@/lab/StageLayout";
+import { type Box, type Layout, Movable, defaultLayout, loadLayout, rectStyle, saveLayout } from "@/lab/StageLayout";
 import { SCENES, type Scene, type ShowCommand, ShowControls, type ShowState, popOutControls, useStageChannel } from "@/lab/StageControls";
 import type { ChatSummary } from "@/server/lab/chat-aggregator";
 
@@ -1036,10 +1036,10 @@ export function Stage({
           </div>
         )}
       </Movable>
-      {/* A clip, lowered in to fit its box, and raised away. */}
-      {(shownClip || arranging) && (
-        <Movable box="clip" rect={layout.clip} arranging={arranging} frame={screen} onChange={moveBox("clip")} className="pointer-events-none z-[155]">
-          {shownClip && (
+      {/* A clip, lowered into the show's box (over the scene), and raised away. */}
+      {shownClip && (
+        <div className="pointer-events-none absolute z-[155]" style={rectStyle(layout.show)}>
+          {(
             <div className="flex h-full justify-center">
               <div
                 key={shownClip.clipUrl ?? shownClip.embedUrl}
@@ -1050,7 +1050,7 @@ export function Stage({
               </div>
             </div>
           )}
-        </Movable>
+        </div>
       )}
       <div
         ref={floor}

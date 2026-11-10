@@ -8,7 +8,7 @@ import { type ReactNode, useRef, useState } from "react";
  * speakers) are left to the stage's characters, since his overlay goes there.
  */
 export type Rect = { x: number; y: number; w: number; h: number };
-export type Box = "chat" | "camera" | "show" | "clip";
+export type Box = "chat" | "camera" | "show";
 export type Layout = Record<Box, Rect>;
 
 const COLUMN = 1 / 3;
@@ -17,15 +17,14 @@ const RIGHT: Rect = { x: COLUMN + 0.015, y: 0.15, w: 1 - COLUMN - 0.03, h: 0.69 
 export const DEFAULT_LAYOUT: Layout = {
   chat: { x: 0, y: 0, w: COLUMN, h: 1 - CAMERA_H },
   camera: { x: 0, y: 1 - CAMERA_H, w: COLUMN, h: CAMERA_H },
-  // The scenes (title, nominees, results, winner) and clips: both on the right.
+  // The show: the scenes (title, nominees, results, winner), and clips lowered into the same place.
   show: RIGHT,
-  clip: RIGHT,
 };
 /** The defaults for this chat setting: with no chat, the scenes centre, above the camera slot. */
 export function defaultLayout(chatOpen: boolean): Layout {
   return chatOpen ? DEFAULT_LAYOUT : { ...DEFAULT_LAYOUT, show: { x: 0.18, y: 0.15, w: 0.64, h: 1 - CAMERA_H - 0.17 } };
 }
-export const BOX_LABEL: Record<Box, string> = { chat: "Chat", camera: "Camera", show: "Scenes and results", clip: "Clips" };
+export const BOX_LABEL: Record<Box, string> = { chat: "Chat", camera: "Camera", show: "Show: scenes, results and clips" };
 
 const KEY = "lab.stage.layout";
 /** The boxes moved in this browser; the rest follow the defaults. */
@@ -122,7 +121,7 @@ export function Movable({
       {children}
       {arranging && (
         <div
-          className="absolute inset-0 z-[500] cursor-move touch-none select-none"
+          className="pointer-events-auto absolute inset-0 z-[500] cursor-move touch-none select-none"
           style={{
             border: "2px dashed var(--header)",
             background: active ? "color-mix(in oklab, var(--header) 18%, transparent)" : "color-mix(in oklab, var(--header) 8%, transparent)",
@@ -132,9 +131,8 @@ export function Movable({
           onPointerUp={end}
           onPointerCancel={end}
         >
-          {/* Clips share the scenes' box by default, so their name goes in the other corner. */}
           <span
-            className={`absolute top-1.5 rounded-md px-2 py-0.5 text-sm font-extrabold text-white ${box === "clip" ? "right-1.5" : "left-1.5"}`}
+            className="absolute top-1.5 left-1.5 rounded-md px-2 py-0.5 text-sm font-extrabold text-white"
             style={{ background: "var(--header)" }}
           >
             {BOX_LABEL[box]}

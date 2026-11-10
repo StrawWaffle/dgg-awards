@@ -44,11 +44,33 @@ const split = (title: string) => {
   const m = title.match(/^(\d+)\.\s*(.+)$/);
   return m ? { title: m[2]!.trim(), listNumber: Number(m[1]) } : null;
 };
+/**
+ * The fields a wildcard changes on the way: the title loses its number, and
+ * the description loses DGGer's old group note ("Wildcards, 67 to choose
+ * from, top 5 advance:"), which the new award's rules replace.
+ */
+function changes(o: (typeof wildcards)[number]) {
+  const s = split(o.title);
+  const description = (o.description ?? "").replace(/\s*Wildcards?,.*$/i, "").trim() || null;
+  const before: Record<string, unknown> = {};
+  const after: Record<string, unknown> = {};
+  if (s) {
+    Object.assign(before, { title: o.title, listNumber: o.listNumber });
+    Object.assign(after, s);
+  }
+  if (description !== o.description) {
+    before.description = o.description;
+    after.description = description;
+  }
+  return Object.keys(after).length ? { before, after } : undefined;
+}
 console.log(`${dry ? "Would create" : "Creating"} "${TO}" after "${from.title}" and move ${wildcards.length} nominees:`);
 for (const o of wildcards) {
   const s = split(o.title);
   console.log(`  ${o.title.padEnd(26)} → ${s ? `${s.title} (#${s.listNumber} on the list, admins only)` : "title kept"}`);
 }
+const sample = wildcards[0] && changes(wildcards[0])?.after.description;
+if (sample !== undefined) console.log(`descriptions: "${wildcards[0]!.description}" → "${sample ?? ""}"`);
 if (dry) process.exit(0);
 
 console.log("backup:", await backupDatabase("before-split-wildcards"));
@@ -69,8 +91,7 @@ try {
   await reorderCategories(order);
   for (const o of wildcards) {
     await moveNominee(FROM, o.id, TO);
-    const s = split(o.title);
-    const fields = s ? { before: { title: o.title, listNumber: o.listNumber }, after: s } : undefined;
+    const fields = changes(o) as MovedNominee["fields"];
     if (fields) await setNomineeFields(TO, o.id, fields.after);
     moved.push({ id: o.id, from: FROM, to: TO, position: o.position, ...(fields ? { fields } : {}) });
   }
@@ -79,7 +100,7 @@ try {
     await record(serverActor, {
       kind: "import",
       action: "create",
-      label: `Moved ${moved.length} DGGer wildcards into their own award, "DGGer wildcards" (top 10 by points), their list numbers kept for admins`,
+      label: `Moved ${moved.length} DGGer wildcards into their own award, "DGGer wildcards" (top 10 by points), their list numbers kept for admins and DGGer's group note taken off their descriptions`,
       categoryId: TO,
       after: { categories: [TO], added: [], nominees: moved.length, pictures: [], emotes: [], moved },
     });
