@@ -552,7 +552,7 @@ StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, an
   - typecheck and 92 unit tests; 49 API tests, with the preview addresses added
   - in the browser: both preview menus (hover, jump, close, current page marked, the admin one on a phone), every stage and page, a preview vote not saved, the old addresses rewritten, `/lab#sound` kept, non-admin and signed-out refusals, the big screen switched to simulated votes with the reveal running, and the music's first play starting at 6.02 s
 
-### The wildcard cards, polished, with motion and sound (2026-11-10, built, not deployed)
+### The wildcard cards, polished, with motion and sound (2026-11-10, deployed)
 
 StrawWaffle liked swipe then compare, and asked for polish: the swipe card has one person, so more room; cleaner, labelled cards; checked against every chatter; cute animation and sound effects.
 
