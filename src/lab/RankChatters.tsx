@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Emote } from "@/lab/Emote";
-import { type Choice, type Ranking, type RankState, type Step, apply, crossing, current, expectedLeft, mostLeft, phase, points, start } from "@/lab/rank";
+import { type Choice, type Ranking, type RankState, type Step, apply, choicesLeft, crossing, current, inPlay, phase, points, start } from "@/lab/rank";
 
 /** A wildcard chatter: the DGGer nominee, its name without the list number. */
 type Chatter = { id: string; name: string; emote: string | null; image: string | null };
@@ -17,8 +17,9 @@ type Profile = {
 /** What's saved: the order dealt, and every answer, replayed to get back to where you were. */
 type Saved = { order: string[]; steps: Step[] };
 
-// v3, insertion, from 2026-11-10 (v1 started from batches of five; v2 was merge sort).
-const keyOf = (top: number | null) => (top ? `lab.rank.wildcards.v3.top${top}` : "lab.rank.wildcards.v3");
+// v4, a knockout, from 2026-11-10 (v1 ranked batches, v2 was merge sort, v3 insertion).
+const KEY = "lab.rank.wildcards.v4";
+const TOP = 10;
 const load = (key: string): Saved | null => {
   try {
     return JSON.parse(localStorage.getItem(key) ?? "null");
@@ -40,8 +41,8 @@ const shuffled = <T,>(xs: T[]) => {
   }
   return a;
 };
-function replay({ order, steps }: Saved, top: number | null): RankState {
-  let s = start(order, top);
+function replay({ order, steps }: Saved): RankState {
+  let s = start(order, TOP);
   for (const step of steps) s = apply(s, step);
   return s;
 }
@@ -97,21 +98,17 @@ function useProfile(name: string) {
 }
 
 /**
- * Experiment: ranking the 67 DGGer wildcards by hand, with ties. Chatters are
- * placed one at a time into the list so far: the newcomer on the left, and on
- * the right whoever holds the midpoint of where they could still land, so each
- * choice halves what's left to learn (src/lab/rank.ts). "Equal" puts them in
- * that group. Everything on the destiny.gg profile is shown, since more to go
- * on makes the choice easier. Saved in this browser as you go; nothing is a
- * vote.
- *
- * With `top` (10), only your best ten: a newcomer is first measured against
- * your current 10th, and if worse drops out after that one choice, never asked
- * about again. The ten get points (10 down to 1, shared by equals). If a group
- * of equals crosses the line, you pick exactly the ones that fit.
+ * Experiment: your top ten of the 67 DGGer wildcards, as a knockout (see
+ * src/lab/rank.ts). Everyone is paired off; winners meet winners; the last one
+ * standing is first place. Then the people they beat play off for second, and
+ * so on: about 123 choices in all. Equal sends both on together, sharing their
+ * places and points (10 down to 1). A group of equals crossing the line is
+ * split by picking exactly those who fit. Everything on the destiny.gg profile
+ * is shown. Saved in this browser as you go; nothing is a vote.
  */
-export function RankChatters({ top = null }: { top?: number | null }) {
-  const key = keyOf(top);
+export function RankChatters() {
+  const key = KEY;
+  const top = TOP;
   const chatters = useWildcards();
   const [saved, setSaved] = useState<Saved | null>(() => load(key));
   const byId = useMemo(() => new Map(chatters && chatters !== "missing" ? chatters.map((c) => [c.id, c]) : []), [chatters]);
@@ -130,11 +127,11 @@ export function RankChatters({ top = null }: { top?: number | null }) {
   const state = useMemo(() => {
     if (!saved || !byId.size || !saved.order.every((id) => byId.has(id))) return null;
     try {
-      return replay(saved, top);
+      return replay(saved);
     } catch {
       return null;
     }
-  }, [saved, byId, top]);
+  }, [saved, byId]);
 
   const step = (s: Step) => {
     const nextSaved = { ...saved!, steps: [...saved!.steps, s] };
@@ -159,21 +156,21 @@ export function RankChatters({ top = null }: { top?: number | null }) {
   if (chatters === "missing") return <Shell>No wildcards found in DGGer of the Year.</Shell>;
   if (!state) return <Shell>Loading…</Shell>;
 
-  const left = mostLeft(state);
+  const left = choicesLeft(state);
   const at = phase(state);
-  const question = current(state);
+  const match = current(state);
   const cross = crossing(state);
   return (
     <main className="mx-auto max-w-[110rem] space-y-5 px-4 py-6">
       <header className="cozy-panel flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4">
-        <h1 className="text-2xl font-black">{top ? `Your top ${top} of the wildcards` : "Rank the wildcards"}</h1>
+        <h1 className="text-2xl font-black">Your top {top} of the wildcards</h1>
         <span className="cozy-chip">{chatters.length} chatters</span>
         <span className="text-sm font-semibold" style={{ color: "var(--muted)" }}>
           {at === "done"
             ? `Done in ${state.asked} choices.`
             : at === "pick"
               ? `Choice ${state.asked + 1} · the last one`
-              : `Choice ${state.asked + 1} · about ${expectedLeft(state)} to go, at most ${left} · every Equal means fewer`}
+              : `Choice ${state.asked + 1} · about ${left.about} to go, at most ${left.most} · every Equal means fewer`}
         </span>
         <span className="ml-auto flex gap-2">
           <button type="button" className="cozy-btn" onClick={back} disabled={!saved?.steps.length}>
@@ -184,9 +181,9 @@ export function RankChatters({ top = null }: { top?: number | null }) {
           </button>
         </span>
       </header>
-      {question && <Compare state={state} id={question.id} group={question.group} place={question.place} byId={byId} onChoose={step} />}
-      {at === "pick" && cross && <Pick group={cross.group} need={cross.need} place={cross.place} top={top!} byId={byId} onKeep={(ids) => step({ keep: ids })} />}
-      {at === "done" && <Final result={state.ranked} byId={byId} top={top} />}
+      {match && <Compare state={state} match={match} byId={byId} onChoose={step} />}
+      {at === "pick" && cross && <Pick group={cross.group} need={cross.need} place={cross.place} top={top} byId={byId} onKeep={(ids) => step({ keep: ids })} />}
+      {at === "done" && <Final result={state.placed} byId={byId} top={top} />}
       {at !== "done" && <Standings state={state} byId={byId} />}
     </main>
   );
@@ -206,30 +203,18 @@ function Face({ chatter, size }: { chatter: Chatter; size: number }) {
   return null;
 }
 
-/**
- * The newcomer (left) against the group holding the place they're measured
- * at (right): pick one, or equal. A group of equals spreads into columns.
- */
+/** A match: two sides still in the running (each may be a group of equals). Pick one, or equal. */
 function Compare({
   state,
-  id,
-  group,
-  place,
+  match,
   byId,
   onChoose,
 }: {
   state: RankState;
-  id: string;
-  group: string[];
-  place: number;
+  match: NonNullable<ReturnType<typeof current>>;
   byId: Map<string, Chatter>;
   onChoose: (c: Choice) => void;
 }) {
-  // Load the next newcomer's profile while this question is up.
-  useEffect(() => {
-    const nextId = state.queue[0];
-    if (nextId) profileOf(byId.get(nextId)!.name);
-  }, [state.queue[0], byId]);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       // One choice per press: holding a key down doesn't keep answering.
@@ -243,38 +228,46 @@ function Compare({
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   }, [onChoose]);
-  const cols = Math.min(group.length, 3);
-  const last = place + group.length - 1;
-  const atCutoff = state.top !== null && place <= state.top && last >= state.top;
-  const where =
-    group.length === 1 ? `Currently ${ordinal(place)}` : `Currently equal, places ${place} to ${last}`;
-  const side = (ids: string[], c: Choice, label: string, strong: boolean) => (
+  const placeOf = (id: string) => state.placed.findIndex((g) => g.includes(id)) + 1;
+  /** "Unbeaten", or who they lost to, by place. */
+  const record = (g: string[]) => {
+    const beatenBy = [...new Set(g.flatMap((id) => state.lostTo[id] ?? []))];
+    if (!beatenBy.length) return "Unbeaten";
+    return `Lost to ${beatenBy.map((id) => `#${placeOf(id)} ${byId.get(id)!.name}`).join(", ")}`;
+  };
+  const cols = (g: string[]) => Math.min(g.length, 3);
+  const side = (g: string[], c: Choice) => (
     <button
       type="button"
       onClick={() => onChoose(c)}
       className="cozy-card block w-full space-y-2 rounded-[20px] border-2 p-3 text-left"
       style={{ background: "var(--cream)", borderColor: "var(--panel-border)", boxShadow: "0 5px 0 var(--cream-shadow)" }}
     >
-      <span className={`cozy-chip ${strong ? "coral" : ""}`}>{label}</span>
+      <span className="flex flex-wrap gap-1.5">
+        <span className="cozy-chip">{record(g)}</span>
+        {g.length > 1 && <span className="cozy-chip green">{g.length} equal</span>}
+      </span>
       <div className="grid gap-x-5 gap-y-5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(15rem, 1fr))" }}>
-        {ids.map((x) => (
+        {g.map((x) => (
           <ProfileCard key={x} chatter={byId.get(x)!} />
         ))}
       </div>
     </button>
   );
+  const heading =
+    match.placing === 1
+      ? `Round ${match.round} of ${match.rounds}: who's better?`
+      : `Finding ${ordinal(match.placing)} place: who's better?`;
   return (
     <section className="space-y-4">
-      <p className="text-center text-lg font-black">
-        {atCutoff ? `Does ${byId.get(id)!.name} make your top ${state.top}?` : `Where does ${byId.get(id)!.name} go?`}
-      </p>
+      <p className="text-center text-lg font-black">{heading}</p>
       <div
         className="rank-pair mx-auto grid items-start gap-4"
         // As wide as the chatters showing need: two alone stay readable, groups spread out.
-        style={{ ["--cols" as string]: `1fr ${cols}fr`, maxWidth: `${(1 + cols) * 24}rem` }}
+        style={{ ["--cols" as string]: `${cols(match.left)}fr ${cols(match.right)}fr`, maxWidth: `${(cols(match.left) + cols(match.right)) * 24}rem` }}
       >
-        {side([id], "left", "Placing", false)}
-        {side(group, "right", atCutoff ? `${where} · the cutoff` : where, atCutoff)}
+        {side(match.left, "left")}
+        {side(match.right, "right")}
       </div>
       <div className="flex flex-wrap items-center justify-center gap-3">
         <button type="button" className="cozy-btn" onClick={() => onChoose("left")}>
@@ -288,8 +281,8 @@ function Compare({
         </button>
       </div>
       <p className="text-center text-xs font-semibold" style={{ color: "var(--muted)" }}>
-        Keys: ← and → pick a side, ↓ or = for equal. Equal ones stay together from here on, so every Equal means fewer
-        choices later.
+        Keys: ← and → pick a side, ↓ or = for equal. Equal ones go on together from here, so every Equal means fewer
+        choices later. Whoever loses to a loser is never asked about again.
       </p>
     </section>
   );
@@ -359,43 +352,42 @@ function Pick({
   );
 }
 
-/** The list so far, small, with the cutoff marked and who's out. */
+/** Placed so far, small, and how many are still in the running. */
 function Standings({ state, byId }: { state: RankState; byId: Map<string, Chatter> }) {
-  const { top } = state;
   let place = 1;
-  const rows = state.ranked.map((g) => {
+  const rows = state.placed.map((g) => {
     const row = { place, ids: g };
     place += g.length;
     return row;
   });
+  const placedCount = state.placed.flat().length;
+  const playing = inPlay(state).length;
+  const out = byId.size - placedCount - playing;
   return (
     <section className="cozy-panel space-y-2 p-4">
       <p className="text-sm font-black">
-        So far: {state.ranked.flat().length} placed, {state.queue.length + (state.cur ? 1 : 0)} to go
-        {top !== null && state.out.length > 0 && `, ${state.out.length} out`}
+        So far: {placedCount} placed, {playing} still in the running{out > 0 && `, ${out} out`}
       </p>
-      <ol className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm">
-        {rows.map((r) => (
-          <li
-            key={r.ids[0]}
-            className="flex items-center gap-1.5 rounded-md px-1.5 py-0.5"
-            style={{ background: top !== null && r.place <= top && r.place + r.ids.length - 1 >= top ? "var(--highlight)" : undefined }}
-          >
-            <span className="hand font-bold" style={{ color: "var(--muted)" }}>
-              {r.place}
-            </span>
-            {r.ids.map((id, i) => (
-              <span key={id} className="flex items-center gap-1">
-                {i > 0 && <span style={{ color: "var(--muted)" }}>=</span>}
-                <span className="flex h-6 w-8 items-center justify-center overflow-hidden rounded" style={{ background: "var(--cream)" }}>
-                  <Face chatter={byId.get(id)!} size={0.65} />
-                </span>
-                <span className="font-bold">{byId.get(id)!.name}</span>
+      {rows.length > 0 && (
+        <ol className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm">
+          {rows.map((r) => (
+            <li key={r.ids[0]} className="flex items-center gap-1.5 rounded-md px-1.5 py-0.5">
+              <span className="hand font-bold" style={{ color: "var(--muted)" }}>
+                {r.place}
               </span>
-            ))}
-          </li>
-        ))}
-      </ol>
+              {r.ids.map((id, i) => (
+                <span key={id} className="flex items-center gap-1">
+                  {i > 0 && <span style={{ color: "var(--muted)" }}>=</span>}
+                  <span className="flex h-6 w-8 items-center justify-center overflow-hidden rounded" style={{ background: "var(--cream)" }}>
+                    <Face chatter={byId.get(id)!} size={0.65} />
+                  </span>
+                  <span className="font-bold">{byId.get(id)!.name}</span>
+                </span>
+              ))}
+            </li>
+          ))}
+        </ol>
+      )}
     </section>
   );
 }
@@ -454,24 +446,24 @@ function ProfileCard({ chatter }: { chatter: Chatter }) {
 }
 
 /**
- * The final list: places shared by equals (1, 2, 2, 4). The whole ranking marks
- * the top five; a top ten shows each one's points, and who didn't make it.
+ * The final list: places shared by equals (1, 2, 2, 4), each one's points, and
+ * who didn't make it.
  */
-function Final({ result, byId, top }: { result: Ranking; byId: Map<string, Chatter>; top: number | null }) {
-  const rows = points(result, top ?? 0).map((r) => ({ place: r.place, ids: r.group, points: top ? r.points : null }));
+function Final({ result, byId, top }: { result: Ranking; byId: Map<string, Chatter>; top: number }) {
+  const rows = points(result, top).map((r) => ({ place: r.place, ids: r.group, points: r.points }));
   const shown = new Set(result.flat());
   const rest = [...byId.values()].filter((c) => !shown.has(c.id)).sort((a, b) => a.name.localeCompare(b.name));
   const pts = (n: number) => `${Number.isInteger(n) ? n : n.toFixed(2).replace(/0$/, "")} point${n === 1 ? "" : "s"}`;
   const text = rows
-    .map((r) => `${r.place}. ${r.ids.map((id) => byId.get(id)!.name).join(" = ")}${r.points !== null ? ` (${pts(r.points)}${r.ids.length > 1 ? " each" : ""})` : ""}`)
+    .map((r) => `${r.place}. ${r.ids.map((id) => byId.get(id)!.name).join(" = ")} (${pts(r.points)}${r.ids.length > 1 ? " each" : ""})`)
     .join("\n");
   const [copied, setCopied] = useState(false);
   return (
     <section className="cozy-panel space-y-4 p-5">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 className="text-xl font-black">{top ? `Your top ${top}` : "Your ranking"}</h2>
+        <h2 className="text-xl font-black">Your top {top}</h2>
         <span className="text-sm font-semibold" style={{ color: "var(--muted)" }}>
-          {top ? `Points: ${top} for 1st down to 1 for ${top}th. Equals share the points of the places they take.` : "The top 5 advance."}
+          Points: {top} for 1st down to 1 for {top}th. Equals share the points of the places they take.
         </span>
         <button
           type="button"
@@ -486,7 +478,6 @@ function Final({ result, byId, top }: { result: Ranking; byId: Map<string, Chatt
           <li
             key={r.ids[0]}
             className="grid grid-cols-[2.5rem_1fr_auto] items-center gap-3 rounded-[14px] px-2 py-1.5"
-            style={{ background: !top && r.place <= 5 ? "var(--highlight)" : undefined }}
           >
             <span className="hand text-right text-2xl font-bold" style={{ color: "var(--muted)" }}>
               {r.place}
@@ -506,12 +497,13 @@ function Final({ result, byId, top }: { result: Ranking; byId: Map<string, Chatt
               })}
             </span>
             <span className="text-sm font-bold tabular-nums" style={{ color: "var(--muted)" }}>
-              {r.points !== null && `${pts(r.points)}${r.ids.length > 1 ? " each" : ""}`}
+              {pts(r.points)}
+              {r.ids.length > 1 && " each"}
             </span>
           </li>
         ))}
       </ol>
-      {top && rest.length > 0 && (
+      {rest.length > 0 && (
         <p className="text-sm font-semibold" style={{ color: "var(--muted)" }}>
           Not in your top {top} ({rest.length}): {rest.map((c) => c.name).join(", ")}.
         </p>

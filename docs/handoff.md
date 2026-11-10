@@ -552,6 +552,15 @@ StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, an
   - typecheck and 92 unit tests; 49 API tests, with the preview addresses added
   - in the browser: both preview menus (hover, jump, close, current page marked, the admin one on a phone), every stage and page, a preview vote not saved, the old addresses rewritten, `/lab#sound` kept, non-admin and signed-out refusals, the big screen switched to simulated votes with the reveal running, and the music's first play starting at 6.02 s
 
+### Ranking, fourth take: a knockout for the top 10 (2026-11-10, built, not deployed)
+
+StrawWaffle, after the insertion take: don't bother with splits until they're an issue; a newcomer is most likely not top 10, so comparing them with the top 9 teaches little; he proposed comparing every uncompared person with first place, and asked for research. A simulation (3,000 runs, ordered top 10 of 67; the script is in the session scratchpad, `topk-sim.ts`): knockout tournament 123 average, 126 worst; insertion with the cutoff first (then live) 143 / 183; replacement selection with a heap 182 / 238; comparing everyone with first place 345 / 531. The floor is about 60 bits. Comparing with first place is costly because losing to the first says almost nothing, while losing to the 10th settles it; and after the sweep only #1 is known. StrawWaffle agreed to the knockout and to dropping the whole-ranking view.
+
+- **`src/lab/rank.ts` is a knockout** (Knuth 5.3.3): a bracket of 128 with byes; round 1 pairs everyone off (33 matches), winners meet winners; after n − 1 = 66 matches the winner is first place. Then their spots empty and only their matches replay (about log2 n = 6 or 7), finding second among those who lost to them, and so on: 111 to 129 choices for 67 and a top 10, no bad runs. Whoever loses to a loser is never asked about again.
+- Equal sends both on as one unit; a unit that wins holds that many places. A group crossing the line at the end is one pick of exactly those who fit, as before. `lostTo` records who beat whom, so a card says "Lost to #1 Trio" in the later rounds, or "Unbeaten".
+- **The page** (`RankChatters`, now top 10 only): "Round 3 of 7: who's better?", then "Finding 2nd place: who's better?"; standings so far with how many are still in the running and out. The whole-ranking lab view is gone; the view is "Wildcards: top 10" (`/preview/lab#rank-top`). New saved key `lab.rank.wildcards.v4`.
+- Tests rewritten (`tests/rank.test.ts`: first place in exactly 66, 111–129 in all, ties, one pick, lostTo, estimates). A browser run on the live wildcards with 8% Equals: first place after 66, done in 106.
+
 ### Ranking, third take: insertion, and picking exactly who fits (2026-11-10, deployed)
 
 StrawWaffle, after trying the top 10: splitting a group cost far too many choices (it ranked the group all over again), and the comparisons felt random; he asked for midpoints. So `src/lab/rank.ts` is now **insertion**, for both views (`/preview/lab#rank` and `#rank-top`):

@@ -1,90 +1,107 @@
-// Ranking many things by hand, with ties: insertion, asking a person. The
-// items are placed one at a time into the list ranked so far, each by
-// comparing with the midpoint of where it could still land (binary search),
-// so every question halves what's left to learn about it. "Equal" puts it in
-// that group: ties cost nothing extra, and if A = B and B = C, then A = C.
+// Finding a person's top `top` of many, by asking them to pick between two,
+// as a knockout tournament (Knuth, Sorting and Searching, 5.3.3). Everyone is
+// paired off; winners meet winners; after n - 1 matches the winner is first
+// place, which is the fewest choices any method can take for that. Second
+// place can only be someone who lost to the first, and in a bracket that's
+// about log2 n people, so the first's matches are replayed without them: a
+// handful of choices per place. Those who lost to a loser are never asked
+// about again. For 67 and a top 10: 123 to 126 choices, almost always.
 //
-// With `top` (say 10), only the best that many matter. Once ten are placed, a
-// newcomer is first compared with whoever holds 10th place: worse, and they're
-// out after one question, never asked about again; better, and the midpoint
-// questions place them among the top. Equals may share places in the top, but
-// if a group of equals ends up crossing the line (four tied for places 8 to
-// 11), the person picks exactly the ones that fit (three); those stay equal.
+// "Equal" merges the two into one unit, which goes on as one; a unit that
+// wins holds that many places. If equals end up crossing the line (four tied
+// for places 8 to 11), the person picks exactly the ones that fit.
 //
-// (Merge sort was tried first: its comparisons felt random, and splitting a
-// group meant ranking it all over again.)
+// (Insertion against the cutoff was tried before: about 143 choices and up
+// to 183; merge sort, 207. Comparing everyone with first place, as proposed,
+// would be about 345: losing to the first tells almost nothing.)
 //
 // The state is plain data (JSON), so it can be saved and stepped back.
 
-/** Things ranked equal. */
+/** Equals, going on together. */
 export type Group = string[];
 /** Best first. */
 export type Ranking = Group[];
 
 export type RankState = {
-  top: number | null;
-  /** Not placed yet, in the order they'll come. */
-  queue: string[];
+  top: number;
+  /**
+   * The bracket, 1-based like a heap: node i's children are 2i and 2i+1;
+   * leaves are size..2*size-1. A group is who's won there; null a bye or a
+   * spot emptied by placing; undefined means it's not decided yet.
+   */
+  tree: (Group | null | undefined)[];
+  size: number;
   /** Placed so far, best first. */
-  ranked: Ranking;
-  /** Dropped: can't make the top any more. */
-  out: string[];
-  /** The one being placed, and the groups (by index) it could still land among: [lo, hi). */
-  cur: string | null;
-  lo: number;
-  hi: number;
-  /** The group it's compared with now. */
-  probe: number;
+  placed: Ranking;
+  /** Whoever beat each one, in order, so a card can say who they lost to. */
+  lostTo: Record<string, string[]>;
   asked: number;
 };
 
 export type Choice = "left" | "right" | "tie";
-/** Answers, as saved: a comparison, or the ones kept out of a group crossing the line. */
+/** Answers, as saved: a match, or the ones kept out of a group crossing the line. */
 export type Step = Choice | { keep: string[] };
 
 const count = (r: Ranking) => r.reduce((n, g) => n + g.length, 0);
+const depth = (i: number) => Math.floor(Math.log2(i));
 
-/** Start: the items in the order given (shuffle them first for a fair mix). */
-export function start(ids: string[], top: number | null = null): RankState {
-  return next({ top, queue: ids, ranked: [], out: [], cur: null, lo: 0, hi: 0, probe: 0, asked: 0 });
+/** Start: the people in the order given (shuffle them first for a fair draw). */
+export function start(ids: string[], top = 10): RankState {
+  let size = 1;
+  while (size < ids.length) size *= 2;
+  const tree: (Group | null | undefined)[] = new Array(2 * size).fill(undefined);
+  for (let i = 0; i < size; i++) tree[size + i] = i < ids.length ? [ids[i]!] : null;
+  return settle({ top, tree, size, placed: [], lostTo: {}, asked: 0 });
 }
 
 export type Phase = "compare" | "pick" | "done";
 export function phase(s: RankState): Phase {
-  if (s.cur) return "compare";
+  if (current(s)) return "compare";
   return crossing(s) ? "pick" : "done";
 }
 
-/** The comparison being asked: the newcomer and the group it's measured against, with that group's first place. */
+/** The match being asked: its two sides and where it is in the bracket. */
 export function current(s: RankState) {
-  if (!s.cur) return null;
-  const group = s.ranked[s.probe]!;
-  let place = 1;
-  for (let i = 0; i < s.probe; i++) place += s.ranked[i]!.length;
-  return { id: s.cur, group, place };
+  const i = pending(s);
+  if (i === null) return null;
+  const left = s.tree[2 * i] as Group;
+  const right = s.tree[2 * i + 1] as Group;
+  // Rounds count from the leaves: the first round is the deepest matches.
+  const round = Math.log2(s.size) - depth(i);
+  return { node: i, left, right, round, rounds: Math.log2(s.size), placing: s.placed.length + 1 };
+}
+
+/** The deepest undecided match whose sides are both known (bracket order: round by round). */
+function pending(s: RankState): number | null {
+  for (let i = s.size - 1; i >= 1; i--) {
+    if (s.tree[i] === undefined && s.tree[2 * i] && s.tree[2 * i + 1]) return i;
+  }
+  return null;
 }
 
 /** The group of equals crossing the top line, and how many of them fit. */
 export function crossing(s: RankState): { group: Group; need: number; place: number } | null {
-  if (s.top === null || s.cur || count(s.ranked) <= s.top) return null;
-  const group = s.ranked.at(-1)!;
-  const before = count(s.ranked) - group.length;
+  if (count(s.placed) <= s.top) return null;
+  const group = s.placed.at(-1)!;
+  const before = count(s.placed) - group.length;
   return { group, need: s.top - before, place: before + 1 };
 }
 
-/** Pick between the newcomer (left) and the group it's compared with (right). */
+/** Decide the match on the table. */
 export function choose(s: RankState, choice: Choice): RankState {
-  if (!s.cur) throw new Error("Nothing to compare.");
-  const asked = s.asked + 1;
-  if (choice === "tie") {
-    const ranked = s.ranked.map((g, i) => (i === s.probe ? [...g, s.cur!] : g));
-    return next(trim({ ...s, ranked, cur: null, asked }));
+  const i = pending(s);
+  if (i === null) throw new Error("No match to decide.");
+  const left = s.tree[2 * i] as Group;
+  const right = s.tree[2 * i + 1] as Group;
+  const tree = [...s.tree];
+  const lostTo = { ...s.lostTo };
+  if (choice === "tie") tree[i] = [...left, ...right];
+  else {
+    const [winner, loser] = choice === "left" ? [left, right] : [right, left];
+    tree[i] = winner;
+    for (const id of loser) lostTo[id] = [...(lostTo[id] ?? []), ...winner];
   }
-  const lo = choice === "left" ? s.lo : s.probe + 1;
-  const hi = choice === "left" ? s.probe : s.hi;
-  if (lo < hi) return { ...s, lo, hi, probe: Math.floor((lo + hi) / 2), asked };
-  const ranked = [...s.ranked.slice(0, lo), [s.cur], ...s.ranked.slice(lo)];
-  return next(trim({ ...s, ranked, cur: null, asked }));
+  return settle({ ...s, tree, lostTo, asked: s.asked + 1 });
 }
 
 /** Keep exactly the ones that fit out of the group crossing the line; the rest drop out. They stay equal. */
@@ -92,48 +109,56 @@ export function keep(s: RankState, ids: string[]): RankState {
   const x = crossing(s);
   if (!x) throw new Error("No group to split.");
   if (ids.length !== x.need || !ids.every((id) => x.group.includes(id))) throw new Error(`Keep exactly ${x.need} of them.`);
-  const rest = x.group.filter((id) => !ids.includes(id));
-  return { ...s, ranked: [...s.ranked.slice(0, -1), ids], out: [...s.out, ...rest], asked: s.asked + 1 };
+  return { ...s, placed: [...s.placed.slice(0, -1), ids], asked: s.asked + 1 };
 }
 
 export function apply(s: RankState, step: Step): RankState {
   return typeof step === "string" ? choose(s, step) : keep(s, step.keep);
 }
 
-/** With a top: groups that start past the line drop out (one crossing it stays, to be split at the end). */
-function trim(s: RankState): RankState {
-  if (s.top === null) return s;
-  const ranked: Ranking = [];
-  const out = [...s.out];
-  let before = 0;
-  for (const g of s.ranked) {
-    if (before >= s.top) out.push(...g);
-    else ranked.push(g);
-    before += g.length;
+/**
+ * Walk the bracket on: byes go through without a match, a decided final
+ * places the winner (and empties their spots, so their matches replay), until
+ * a real match is waiting, or the top is full.
+ */
+function settle(s: RankState): RankState {
+  const tree = [...s.tree];
+  let placed = s.placed;
+  for (;;) {
+    let moved = false;
+    for (let i = s.size - 1; i >= 1; i--) {
+      if (tree[i] !== undefined) continue;
+      const a = tree[2 * i];
+      const b = tree[2 * i + 1];
+      if (a === undefined || b === undefined) continue;
+      if (a && b) continue; // a real match: wait for the answer
+      tree[i] = a ?? b ?? null;
+      moved = true;
+    }
+    if (tree[1] === undefined) {
+      if (!moved) break;
+      continue;
+    }
+    const winner = tree[1];
+    if (winner === null || count(placed) >= s.top) break;
+    placed = [...placed, winner];
+    // Take the winner out: their leaves empty, and every match above replays.
+    for (let leaf = s.size; leaf < 2 * s.size; leaf++) {
+      const g = tree[leaf];
+      if (g && g.every((id) => winner.includes(id))) {
+        tree[leaf] = null;
+        for (let i = leaf >> 1; i >= 1; i >>= 1) tree[i] = undefined;
+      }
+    }
   }
-  return { ...s, ranked, out };
+  return { ...s, tree, placed };
 }
 
-/** Take the next one from the queue and set up its first question. */
-function next(s: RankState): RankState {
-  if (s.cur || !s.queue.length) return s;
-  const [cur, ...queue] = s.queue;
-  if (!s.ranked.length) return next({ ...s, queue, ranked: [[cur!]] });
-  const c = cutoff(s);
-  // Once the top is full, the first question is against whoever holds the last place.
-  if (c !== null) return { ...s, queue, cur: cur!, lo: 0, hi: c + 1, probe: c };
-  return { ...s, queue, cur: cur!, lo: 0, hi: s.ranked.length, probe: Math.floor(s.ranked.length / 2) };
-}
-
-/** The index of the group holding the last place of the top, once that many are placed. */
-function cutoff(s: RankState): number | null {
-  if (s.top === null || count(s.ranked) < s.top) return null;
-  let before = 0;
-  for (let i = 0; i < s.ranked.length; i++) {
-    before += s.ranked[i]!.length;
-    if (before >= s.top) return i;
-  }
-  return null;
+/** Still in the running: in the bracket, not placed. */
+export function inPlay(s: RankState): string[] {
+  const out: string[] = [];
+  for (let leaf = s.size; leaf < 2 * s.size; leaf++) for (const id of s.tree[leaf] ?? []) out.push(id);
+  return out;
 }
 
 /**
@@ -152,40 +177,18 @@ export function points(result: Ranking, top: number): { place: number; group: Gr
   return rows;
 }
 
-/** The most questions still to come (fewer with ties). */
-export function mostLeft(s: RankState): number {
-  return questionsLeft(s, (n) => Math.ceil(Math.log2(n + 1)), () => 1);
-}
-
 /**
- * About how many questions are still to come, with no more ties. In a top,
- * the k-th newcomer beats the cutoff with about top/k odds (random order), and
- * only then needs the midpoint questions.
+ * Choices still to come, if nobody ties: the matches left to decide the
+ * bracket (units in play minus one), then about log2 of the bracket per
+ * further place (`most` takes the full height each time).
  */
-export function expectedLeft(s: RankState): number {
-  return Math.round(questionsLeft(s, (n) => Math.log2(n + 1), (k) => Math.min(1, (s.top ?? 0) / k)));
-}
-
-/** `search(n)`: questions to place among n groups; `odds(k)`: that the k-th newcomer beats the cutoff. */
-function questionsLeft(s: RankState, search: (n: number) => number, odds: (k: number) => number): number {
-  let now = 0;
-  let groups = s.ranked.length;
-  let seen = count(s.ranked) + s.out.length;
-  if (s.cur) {
-    // The one on the table: however many of the groups it could still land among.
-    now += Math.max(1, search(s.hi - s.lo) - 0) * (s.hi - s.lo > 0 ? 1 : 0);
-    groups++;
-    seen++;
-  }
-  for (let i = 0; i < s.queue.length; i++) {
-    seen++;
-    if (s.top !== null && seen - 1 >= s.top) {
-      now += 1 + odds(seen) * search(Math.min(groups, s.top) - 1);
-      groups = Math.min(groups + 1, s.top);
-    } else {
-      now += search(groups);
-      groups++;
-    }
-  }
-  return now;
+export function choicesLeft(s: RankState): { about: number; most: number } {
+  if (count(s.placed) >= s.top) return { about: 0, most: 0 };
+  // Units at the frontier: decided, with an undecided parent.
+  let units = 0;
+  for (let i = 2; i < 2 * s.size; i++) if (s.tree[i] && s.tree[i >> 1] === undefined) units++;
+  const bracket = Math.max(0, units - 1);
+  const places = s.top - count(s.placed) - 1;
+  const height = Math.log2(s.size);
+  return { about: Math.round(bracket + Math.max(0, places) * (height - 1.5)), most: bracket + Math.max(0, places) * height };
 }

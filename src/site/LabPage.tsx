@@ -17,9 +17,7 @@ export const labViews = [
   // Two takes on the year in chat (the live one is /chat), to pick from.
   { id: "chat-calm", label: "Year in chat: calm" },
   { id: "chat-story", label: "Year in chat: story" },
-  // Ranking the DGGer wildcards by hand, with ties (src/lab/rank.ts).
-  { id: "rank", label: "Rank the wildcards" },
-  // The same, for your top 10 only, with points.
+  // Your top 10 of the DGGer wildcards, as a knockout (src/lab/rank.ts).
   { id: "rank-top", label: "Wildcards: top 10" },
 ] as const;
 export type LabView = (typeof labViews)[number]["id"];
@@ -55,8 +53,7 @@ function Experiments({ view, chatOpen, onView }: { view: LabView; chatOpen: bool
       .catch(() => setEmotes([]));
   }, []);
   if (view === "stage") return <Stage source={source} emotes={emotes} chatOpen={chatOpen} />;
-  if (view === "rank") return <RankChatters />;
-  if (view === "rank-top") return <RankChatters key="top" top={10} />;
+  if (view === "rank-top") return <RankChatters />;
   if (view === "chat-story") return <ChatStory onCalm={() => onView("chat-calm")} />;
   if (view === "chat-calm") {
     return (
