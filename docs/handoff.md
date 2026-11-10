@@ -552,6 +552,16 @@ StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, an
   - typecheck and 92 unit tests; 49 API tests, with the preview addresses added
   - in the browser: both preview menus (hover, jump, close, current page marked, the admin one on a phone), every stage and page, a preview vote not saved, the old addresses rewritten, `/lab#sound` kept, non-admin and signed-out refusals, the big screen switched to simulated votes with the reveal running, and the music's first play starting at 6.02 s
 
+### Wildcards: top 10, with points (2026-11-10, built, not deployed)
+
+A copy of the ranking for StrawWaffle's next idea: only each person's top 10 matters. Lab view "Wildcards: top 10" (`/preview/lab#rank-top`), next to the whole ranking, which is unchanged. Same page (`RankChatters top={10}`), saved under its own key (`lab.rank.wildcards.top10`).
+
+- **Only the top 10:** a merge stops once it has 10 (`top` in `src/lab/rank.ts`), and the rest drop out, never asked about again. For 67: about 207 choices, at most 218 (a whole ranking: about 325).
+- **Equals may share places in the top 10, and points:** 10 for 1st down to 1 for 10th; equals share the points of the places they take (tied for 8th to 10th: (3 + 2 + 1) / 3 = 2 each). `points()` in `rank.ts`; shown in the final list and in "Copy as text".
+- **A group crossing the line is split:** if equals run past 10th (four tied for 8th to 11th), you rank just that group for the places left (three), with Equal still allowed; if it still crosses, it's split again. A note above the pair says which places. The "to go" estimate doesn't foresee a split: it rises when one starts.
+- The final list also names everyone not in the top 10.
+- Tests: `tests/rank.test.ts` (the top 10 in order in far fewer questions; equals inside the top and their points; a crossing group split until it fits).
+
 ### Ranking the wildcards, second take: two at a time, the whole profile (2026-11-10, deployed)
 
 StrawWaffle tried the first take: the more there is to go on, the easier the choice, and keys are the quick way. Ranking batches by clicking places felt slow, so:

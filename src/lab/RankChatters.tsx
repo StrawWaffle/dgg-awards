@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Emote } from "@/lab/Emote";
-import { type Choice, type Ranking, type RankState, choose, expectedLeft, mostLeft, rankBatch, start } from "@/lab/rank";
+import { type Choice, type MergeState, type Ranking, type RankState, choose, currentMerge, currentSplit, expectedLeft, mostLeft, points, rankBatch, start } from "@/lab/rank";
 
 /** A wildcard chatter: the DGGer nominee, its name without the list number. */
 type Chatter = { id: string; name: string; emote: string | null; image: string | null };
@@ -17,19 +17,19 @@ type Profile = {
 /** What's saved: the order dealt, and every answer, replayed to get back to where you were. */
 type Saved = { order: string[]; steps: (Ranking | Choice)[] };
 
-// v2: one by one, from 2026-11-10 (v1 started from batches of five).
-const KEY = "lab.rank.wildcards.v2";
-const load = (): Saved | null => {
+// The whole ranking: v2, one by one, from 2026-11-10 (v1 started from batches of five).
+const keyOf = (top: number | null) => (top ? `lab.rank.wildcards.top${top}` : "lab.rank.wildcards.v2");
+const load = (key: string): Saved | null => {
   try {
-    return JSON.parse(localStorage.getItem(KEY) ?? "null");
+    return JSON.parse(localStorage.getItem(key) ?? "null");
   } catch {
     return null;
   }
 };
-const save = (s: Saved | null) => {
+const save = (key: string, s: Saved | null) => {
   try {
-    if (s) localStorage.setItem(KEY, JSON.stringify(s));
-    else localStorage.removeItem(KEY);
+    if (s) localStorage.setItem(key, JSON.stringify(s));
+    else localStorage.removeItem(key);
   } catch {}
 };
 const shuffled = <T,>(xs: T[]) => {
@@ -40,8 +40,8 @@ const shuffled = <T,>(xs: T[]) => {
   }
   return a;
 };
-function replay({ order, steps }: Saved): RankState {
-  let s = start(order);
+function replay({ order, steps }: Saved, top: number | null): RankState {
+  let s = start(order, 1, top);
   for (const step of steps) s = typeof step === "string" ? choose(s, step) : rankBatch(s, step);
   return s;
 }
@@ -102,10 +102,15 @@ function useProfile(name: string) {
  * together from then on, which saves questions. Everything on the destiny.gg
  * profile is shown, since more to go on makes the choice easier. Saved in this
  * browser as you go; nothing is a vote.
+ *
+ * With `top` (10), only your best ten: anyone who can't make it any more
+ * drops out, never asked about again, and the ten get points (10 down to 1,
+ * shared by equals). A group of equals crossing the line is split.
  */
-export function RankChatters() {
+export function RankChatters({ top = null }: { top?: number | null }) {
+  const key = keyOf(top);
   const chatters = useWildcards();
-  const [saved, setSaved] = useState<Saved | null>(load);
+  const [saved, setSaved] = useState<Saved | null>(() => load(key));
   const byId = useMemo(() => new Map(chatters && chatters !== "missing" ? chatters.map((c) => [c.id, c]) : []), [chatters]);
 
   // A saved run whose chatters changed since is started again.
@@ -115,36 +120,36 @@ export function RankChatters() {
     if (!saved || saved.order.length !== ids.length || !saved.order.every((id) => byId.has(id))) {
       const fresh = { order: shuffled(ids), steps: [] };
       setSaved(fresh);
-      save(fresh);
+      save(key, fresh);
     }
   }, [chatters, byId]);
 
   const state = useMemo(() => {
     if (!saved || !byId.size || !saved.order.every((id) => byId.has(id))) return null;
     try {
-      return replay(saved);
+      return replay(saved, top);
     } catch {
       return null;
     }
-  }, [saved, byId]);
+  }, [saved, byId, top]);
 
   const step = (s: Ranking | Choice) => {
     const nextSaved = { ...saved!, steps: [...saved!.steps, s] };
     setSaved(nextSaved);
-    save(nextSaved);
+    save(key, nextSaved);
   };
   const back = () => {
     if (!saved?.steps.length) return;
     const nextSaved = { ...saved, steps: saved.steps.slice(0, -1) };
     setSaved(nextSaved);
-    save(nextSaved);
+    save(key, nextSaved);
   };
   const restart = () => {
     if (!chatters || chatters === "missing") return;
     if (!confirm("Start over? Your answers so far are cleared.")) return;
     const fresh = { order: shuffled(chatters.map((c) => c.id)), steps: [] };
     setSaved(fresh);
-    save(fresh);
+    save(key, fresh);
   };
 
   if (chatters === null) return <Shell>Loading the wildcards…</Shell>;
@@ -152,10 +157,12 @@ export function RankChatters() {
   if (!state) return <Shell>Loading…</Shell>;
 
   const left = mostLeft(state);
+  const merge = currentMerge(state);
+  const split = currentSplit(state);
   return (
     <main className="mx-auto max-w-[110rem] space-y-5 px-4 py-6">
       <header className="cozy-panel flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4">
-        <h1 className="text-2xl font-black">Rank the wildcards</h1>
+        <h1 className="text-2xl font-black">{top ? `Your top ${top} of the wildcards` : "Rank the wildcards"}</h1>
         <span className="cozy-chip">{chatters.length} chatters</span>
         <span className="text-sm font-semibold" style={{ color: "var(--muted)" }}>
           {state.phase === "done"
@@ -171,8 +178,14 @@ export function RankChatters() {
           </button>
         </span>
       </header>
-      {state.phase === "merge" && <Compare state={state} byId={byId} onChoose={step} />}
-      {state.phase === "done" && <Final result={state.result} byId={byId} />}
+      {split && (
+        <p className="cozy-panel px-5 py-3 font-bold" style={{ background: "var(--highlight)" }}>
+          {split.size} are ranked equal for places {split.from} to {split.from + split.size - 1}, but only {split.need} of them fit in
+          your top {top}. Split them: rank just these for {split.need === 1 ? "the last place" : `places ${split.from} to ${split.from + split.need - 1}`}.
+        </p>
+      )}
+      {merge && <Compare state={merge} byId={byId} onChoose={step} />}
+      {state.phase === "done" && <Final result={state.result} byId={byId} top={top} />}
     </main>
   );
 }
@@ -192,7 +205,7 @@ function Face({ chatter, size }: { chatter: Chatter; size: number }) {
 }
 
 /** Which of two is better (each may be a group of equals, laid out in columns). */
-function Compare({ state, byId, onChoose }: { state: Extract<RankState, { phase: "merge" }>; byId: Map<string, Chatter>; onChoose: (c: Choice) => void }) {
+function Compare({ state, byId, onChoose }: { state: MergeState; byId: Map<string, Chatter>; onChoose: (c: Choice) => void }) {
   const a = state.left[0]!;
   const b = state.right[0]!;
   // Load the next profiles while this question is up.
@@ -312,22 +325,25 @@ function ProfileCard({ chatter }: { chatter: Chatter }) {
   );
 }
 
-/** The final list: places shared by equals (1, 2, 2, 4), the top five marked. */
-function Final({ result, byId }: { result: Ranking; byId: Map<string, Chatter> }) {
-  const rows: { place: number; ids: string[] }[] = [];
-  let place = 1;
-  for (const g of result) {
-    rows.push({ place, ids: g });
-    place += g.length;
-  }
-  const text = rows.map((r) => `${r.place}. ${r.ids.map((id) => byId.get(id)!.name).join(" = ")}`).join("\n");
+/**
+ * The final list: places shared by equals (1, 2, 2, 4). The whole ranking marks
+ * the top five; a top ten shows each one's points, and who didn't make it.
+ */
+function Final({ result, byId, top }: { result: Ranking; byId: Map<string, Chatter>; top: number | null }) {
+  const rows = points(result, top ?? 0).map((r) => ({ place: r.place, ids: r.group, points: top ? r.points : null }));
+  const shown = new Set(result.flat());
+  const rest = [...byId.values()].filter((c) => !shown.has(c.id)).sort((a, b) => a.name.localeCompare(b.name));
+  const pts = (n: number) => `${Number.isInteger(n) ? n : n.toFixed(2).replace(/0$/, "")} point${n === 1 ? "" : "s"}`;
+  const text = rows
+    .map((r) => `${r.place}. ${r.ids.map((id) => byId.get(id)!.name).join(" = ")}${r.points !== null ? ` (${pts(r.points)}${r.ids.length > 1 ? " each" : ""})` : ""}`)
+    .join("\n");
   const [copied, setCopied] = useState(false);
   return (
     <section className="cozy-panel space-y-4 p-5">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 className="text-xl font-black">Your ranking</h2>
+        <h2 className="text-xl font-black">{top ? `Your top ${top}` : "Your ranking"}</h2>
         <span className="text-sm font-semibold" style={{ color: "var(--muted)" }}>
-          The top 5 advance.
+          {top ? `Points: ${top} for 1st down to 1 for ${top}th. Equals share the points of the places they take.` : "The top 5 advance."}
         </span>
         <button
           type="button"
@@ -341,8 +357,8 @@ function Final({ result, byId }: { result: Ranking; byId: Map<string, Chatter> }
         {rows.map((r) => (
           <li
             key={r.ids[0]}
-            className="grid grid-cols-[2.5rem_1fr] items-center gap-3 rounded-[14px] px-2 py-1.5"
-            style={{ background: r.place <= 5 ? "var(--highlight)" : undefined }}
+            className="grid grid-cols-[2.5rem_1fr_auto] items-center gap-3 rounded-[14px] px-2 py-1.5"
+            style={{ background: !top && r.place <= 5 ? "var(--highlight)" : undefined }}
           >
             <span className="hand text-right text-2xl font-bold" style={{ color: "var(--muted)" }}>
               {r.place}
@@ -361,9 +377,17 @@ function Final({ result, byId }: { result: Ranking; byId: Map<string, Chatter> }
                 );
               })}
             </span>
+            <span className="text-sm font-bold tabular-nums" style={{ color: "var(--muted)" }}>
+              {r.points !== null && `${pts(r.points)}${r.ids.length > 1 ? " each" : ""}`}
+            </span>
           </li>
         ))}
       </ol>
+      {top && rest.length > 0 && (
+        <p className="text-sm font-semibold" style={{ color: "var(--muted)" }}>
+          Not in your top {top} ({rest.length}): {rest.map((c) => c.name).join(", ")}.
+        </p>
+      )}
     </section>
   );
 }
