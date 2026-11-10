@@ -149,6 +149,16 @@ export function RankChatters() {
     setSaved(nextSaved);
     save(key, nextSaved);
   };
+  // Backspace steps back, like the button.
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== "Backspace" || e.repeat || e.target instanceof HTMLInputElement) return;
+      e.preventDefault();
+      back();
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  });
   const restart = () => {
     if (!chatters || chatters === "missing") return;
     if (!confirm("Start over? Your answers so far are cleared.")) return;
@@ -194,7 +204,8 @@ export function RankChatters() {
                 : `${state.finalists!.length} finalists · comparison ${compared + 1} · about ${Math.max(1, left!.about)} to go, at most ${Math.max(1, left!.most)} · every Equal means fewer`}
         </span>
         <span className="ml-auto flex gap-2">
-          <button type="button" className="cozy-btn" onClick={back} disabled={!saved?.steps.length}>
+          <button type="button" className="cozy-btn gap-2" onClick={back} disabled={!saved?.steps.length}>
+            <Key name="backspace" label="Backspace" />
             Back
           </button>
           <button type="button" className="cozy-btn" onClick={restart}>
@@ -226,6 +237,15 @@ function Shell({ children }: { children: React.ReactNode }) {
       <div className="cozy-panel p-8 font-semibold">{children}</div>
     </main>
   );
+}
+
+/**
+ * A keyboard key, on the button it presses, so the keys explain themselves.
+ * Mr. Breakfast's Free Prompts (CC0), in src/media/key-*.svg. Hidden on
+ * touch screens, which have no keys.
+ */
+function Key({ name, label }: { name: "left" | "right" | "down" | "equals" | "backspace"; label: string }) {
+  return <img src={`/Media/key-${name}.svg`} alt={label} title={`Key: ${label}`} className="rank-key h-7 w-auto shrink-0" draggable={false} />;
 }
 
 function Face({ chatter, size }: { chatter: Chatter; size: number }) {
@@ -343,22 +363,25 @@ function Swipe({
         </div>
       </div>
       <div className="flex flex-wrap items-center justify-center gap-3">
-        <button type="button" className="cozy-btn" onClick={() => decide("no")}>
-          ← No
+        <button type="button" className="cozy-btn gap-2" onClick={() => decide("no")}>
+          <Key name="left" label="Left arrow" />
+          No
         </button>
         {!again && (
-          <button type="button" className="cozy-btn" onClick={() => decide("maybe")}>
-            ↓ Maybe
+          <button type="button" className="cozy-btn gap-2" onClick={() => decide("maybe")}>
+            <Key name="down" label="Down arrow" />
+            Maybe
           </button>
         )}
-        <button type="button" className="cozy-btn primary" onClick={() => decide("yes")}>
-          Yes →
+        <button type="button" className="cozy-btn primary gap-2" onClick={() => decide("yes")}>
+          Yes
+          <Key name="right" label="Right arrow" />
         </button>
       </div>
       <p className="text-center text-xs font-semibold" style={{ color: "var(--muted)" }}>
         {again
-          ? "Keys: ← no, → yes. Only the ones you keep are compared."
-          : "Keys: ← no, ↓ maybe, → yes; or drag the card. Only the yeses get compared, two at a time, after this (the maybes too if there are fewer than ten yeses)."}
+          ? "Only the ones you keep are compared."
+          : "Or drag the card. Only the yeses get compared, two at a time, after this (the maybes too if there are fewer than ten yeses)."}
       </p>
     </section>
   );
@@ -451,19 +474,23 @@ function Compare({
         {side(match.right, "right")}
       </div>
       <div className="flex flex-wrap items-center justify-center gap-3">
-        <button type="button" className="cozy-btn" onClick={() => choose("left")}>
-          ← Left is better
+        <button type="button" className="cozy-btn gap-2" onClick={() => choose("left")}>
+          <Key name="left" label="Left arrow" />
+          Left is better
         </button>
-        <button type="button" className="cozy-btn primary" onClick={() => choose("tie")}>
+        <button type="button" className="cozy-btn primary gap-2" onClick={() => choose("tie")}>
+          <Key name="down" label="Down arrow" />
           Equal
+          <Key name="equals" label="Equals" />
         </button>
-        <button type="button" className="cozy-btn" onClick={() => choose("right")}>
-          Right is better →
+        <button type="button" className="cozy-btn gap-2" onClick={() => choose("right")}>
+          Right is better
+          <Key name="right" label="Right arrow" />
         </button>
       </div>
       <p className="text-center text-xs font-semibold" style={{ color: "var(--muted)" }}>
-        Keys: ← and → pick a side, ↓ or = for equal. Equal ones go on together from here, so every Equal means fewer
-        choices later. Whoever loses to a loser is never asked about again.
+        Equal ones go on together from here, so every Equal means fewer choices later. Whoever loses to a loser is never
+        asked about again.
       </p>
     </section>
   );

@@ -530,3 +530,10 @@ input[type="range"].cozy-range {
     animation: none;
   }
 }
+
+/* Keyboard keys on the ranking buttons: not on touch screens. */
+@media (hover: none) {
+  .rank-key {
+    display: none;
+  }
+}
