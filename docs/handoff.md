@@ -560,6 +560,7 @@ A copy of the ranking for StrawWaffle's next idea: only each person's top 10 mat
 - **Equals may share places in the top 10, and points:** 10 for 1st down to 1 for 10th; equals share the points of the places they take (tied for 8th to 10th: (3 + 2 + 1) / 3 = 2 each). `points()` in `rank.ts`; shown in the final list and in "Copy as text".
 - **A group crossing the line is split:** if equals run past 10th (four tied for 8th to 11th), you rank just that group for the places left (three), with Equal still allowed; if it still crosses, it's split again. A note above the pair says which places. The "to go" estimate doesn't foresee a split: it rises when one starts.
 - The final list also names everyone not in the top 10.
+- **Holding an arrow key answers once** (key repeats are ignored), in both views. StrawWaffle found holding one kept voting.
 - Tests: `tests/rank.test.ts` (the top 10 in order in far fewer questions; equals inside the top and their points; a crossing group split until it fits).
 
 ### Ranking the wildcards, second take: two at a time, the whole profile (2026-11-10, deployed)

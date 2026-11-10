@@ -214,7 +214,8 @@ function Compare({ state, byId, onChoose }: { state: MergeState; byId: Map<strin
   }, [state, byId]);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement) return;
+      // One choice per press: holding a key down doesn't keep answering.
+      if (e.repeat || e.target instanceof HTMLInputElement) return;
       if (e.key === "ArrowLeft") onChoose("left");
       else if (e.key === "ArrowRight") onChoose("right");
       else if (e.key === "ArrowDown" || e.key === "=") onChoose("tie");
