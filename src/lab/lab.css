@@ -494,3 +494,10 @@ input[type="range"].cozy-range {
 .chat-greentext {
   color: var(--greentext);
 }
+
+/* Ranking the wildcards: two sides, each as wide as its columns of equals. */
+@media (min-width: 768px) {
+  .rank-pair {
+    grid-template-columns: var(--cols);
+  }
+}

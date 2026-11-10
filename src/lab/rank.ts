@@ -1,5 +1,7 @@
-// Ranking many things by hand, with ties: rank small batches first, then
-// merge the batches two at a time by picking the better of two (or "equal").
+// Ranking many things by hand, with ties: merge sort, asking a person. Lists
+// are merged two at a time by picking the better of two (or "equal"). With
+// `size` above 1 it starts from small batches ranked whole instead of single
+// items (tried first; picking from two all the way was quicker in practice).
 // A tie joins the two into one group, which then moves as one, so ties are
 // kept without asking more questions (if A = B and B = C, then A = C).
 //
@@ -25,8 +27,8 @@ export function batchesOf<T>(items: T[], size = 5): T[][] {
   return out;
 }
 
-/** Start: the items in batches, in the order given (shuffle them first for a fair mix). */
-export function start(ids: string[], size = 5): RankState {
+/** Start: the items one by one (or in batches), in the order given (shuffle them first for a fair mix). */
+export function start(ids: string[], size = 1): RankState {
   return next({ phase: "batches", batches: batchesOf(ids, size), ranked: [], asked: 0 });
 }
 
@@ -81,6 +83,19 @@ function merge(queue: Ranking[], asked: number): RankState {
 
 /** The most questions still to come (fewer when there are ties, or one side runs out early). */
 export function mostLeft(state: RankState): number {
+  return questionsLeft(state, (a, b) => a + b - 1);
+}
+
+/**
+ * About how many questions are still to come, if there are no more ties:
+ * merging a random a and b takes a + b - a/(b+1) - b/(a+1) on average, as one
+ * side usually runs out a little early. Every tie makes it fewer.
+ */
+export function expectedLeft(state: RankState): number {
+  return Math.round(questionsLeft(state, (a, b) => a + b - a / (b + 1) - b / (a + 1)));
+}
+
+function questionsLeft(state: RankState, merge: (a: number, b: number) => number): number {
   if (state.phase === "done") return 0;
   let queue: number[];
   let now = 0;
@@ -89,12 +104,12 @@ export function mostLeft(state: RankState): number {
     now = left.filter((b) => b.length > 1).length;
     queue = [...state.ranked.map((r) => r.length), ...left.map((b) => b.length)];
   } else {
-    now = state.left.length + state.right.length - 1;
+    now = merge(state.left.length, state.right.length);
     queue = [...state.queue.map((r) => r.length), state.out.length + state.left.length + state.right.length];
   }
   while (queue.length > 1) {
     const [a, b, ...rest] = queue;
-    now += a! + b! - 1;
+    now += merge(a!, b!);
     queue = [...rest, a! + b!];
   }
   return now;

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Emote } from "@/lab/Emote";
-import { type Choice, type Ranking, type RankState, choose, currentBatch, mostLeft, rankBatch, start } from "@/lab/rank";
+import { type Choice, type Ranking, type RankState, choose, expectedLeft, mostLeft, rankBatch, start } from "@/lab/rank";
 
 /** A wildcard chatter: the DGGer nominee, its name without the list number. */
 type Chatter = { id: string; name: string; emote: string | null; image: string | null };
@@ -17,7 +17,8 @@ type Profile = {
 /** What's saved: the order dealt, and every answer, replayed to get back to where you were. */
 type Saved = { order: string[]; steps: (Ranking | Choice)[] };
 
-const KEY = "lab.rank.wildcards";
+// v2: one by one, from 2026-11-10 (v1 started from batches of five).
+const KEY = "lab.rank.wildcards.v2";
 const load = (): Saved | null => {
   try {
     return JSON.parse(localStorage.getItem(KEY) ?? "null");
@@ -96,10 +97,11 @@ function useProfile(name: string) {
 }
 
 /**
- * Experiment: ranking the 67 DGGer wildcards by hand, with ties. First small
- * batches, each ranked (equal numbers tie); then the batches are merged two at
- * a time, by picking the better of two, or "equal" (src/lab/rank.ts). Ties stay
- * together from then on. Saved in this browser as you go; nothing is a vote.
+ * Experiment: ranking the 67 DGGer wildcards by hand, with ties: always two
+ * side by side, pick one or "equal" (merge sort, src/lab/rank.ts). Ties stay
+ * together from then on, which saves questions. Everything on the destiny.gg
+ * profile is shown, since more to go on makes the choice easier. Saved in this
+ * browser as you go; nothing is a vote.
  */
 export function RankChatters() {
   const chatters = useWildcards();
@@ -151,14 +153,14 @@ export function RankChatters() {
 
   const left = mostLeft(state);
   return (
-    <main className="mx-auto max-w-5xl space-y-5 px-4 py-6">
+    <main className="mx-auto max-w-[110rem] space-y-5 px-4 py-6">
       <header className="cozy-panel flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4">
         <h1 className="text-2xl font-black">Rank the wildcards</h1>
         <span className="cozy-chip">{chatters.length} chatters</span>
         <span className="text-sm font-semibold" style={{ color: "var(--muted)" }}>
           {state.phase === "done"
-            ? `Done in ${state.asked} answers.`
-            : `Answer ${state.asked + 1} · at most ${left} to go${state.phase === "batches" ? " (fewer with ties)" : ""}`}
+            ? `Done in ${state.asked} choices.`
+            : `Choice ${state.asked + 1} · about ${expectedLeft(state)} to go, at most ${left} · every Equal means fewer`}
         </span>
         <span className="ml-auto flex gap-2">
           <button type="button" className="cozy-btn" onClick={back} disabled={!saved?.steps.length}>
@@ -169,7 +171,6 @@ export function RankChatters() {
           </button>
         </span>
       </header>
-      {state.phase === "batches" && <Batch key={state.ranked.length} ids={currentBatch(state)!} byId={byId} total={state.batches.length} n={state.ranked.length} onDone={step} />}
       {state.phase === "merge" && <Compare state={state} byId={byId} onChoose={step} />}
       {state.phase === "done" && <Final result={state.result} byId={byId} />}
     </main>
@@ -190,67 +191,7 @@ function Face({ chatter, size }: { chatter: Chatter; size: number }) {
   return null;
 }
 
-/** Phase one: rank a batch of up to five. Equal numbers tie. */
-function Batch({
-  ids,
-  byId,
-  total,
-  n,
-  onDone,
-}: {
-  ids: string[];
-  byId: Map<string, Chatter>;
-  total: number;
-  n: number;
-  onDone: (r: Ranking) => void;
-}) {
-  const [rank, setRank] = useState<Record<string, number>>({});
-  const all = ids.every((id) => rank[id]);
-  const submit = () => {
-    const values = [...new Set(ids.map((id) => rank[id]!))].sort((a, b) => a - b);
-    onDone(values.map((v) => ids.filter((id) => rank[id] === v)));
-  };
-  return (
-    <section className="cozy-panel space-y-4 p-5">
-      <div className="flex flex-wrap items-baseline gap-3">
-        <h2 className="text-xl font-black">
-          Batch {n + 1} of {total}
-        </h2>
-        <p className="text-sm font-semibold" style={{ color: "var(--muted)" }}>
-          Give each a place, 1 the best. The same number for two means they're equal.
-        </p>
-      </div>
-      <div className="grid gap-3 md:grid-cols-2">
-        {ids.map((id) => (
-          <div key={id} className="space-y-2 rounded-[18px] border-2 p-2" style={{ background: "var(--cream)", borderColor: "var(--panel-border)" }}>
-            <ProfileCard chatter={byId.get(id)!} compact />
-            <div className="flex items-center gap-1.5 px-1">
-              <span className="text-sm font-bold" style={{ color: "var(--muted)" }}>
-                Place
-              </span>
-              {ids.map((_, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  className={`cozy-btn round ${rank[id] === i + 1 ? "primary" : ""}`}
-                  aria-pressed={rank[id] === i + 1}
-                  onClick={() => setRank((r) => ({ ...r, [id]: i + 1 }))}
-                >
-                  {i + 1}
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-      <button type="button" className="cozy-btn primary" disabled={!all} onClick={submit}>
-        {all ? "Next" : `Place all ${ids.length} to go on`}
-      </button>
-    </section>
-  );
-}
-
-/** Phase two: which of two is better (each may be a group of equals). */
+/** Which of two is better (each may be a group of equals, laid out in columns). */
 function Compare({ state, byId, onChoose }: { state: Extract<RankState, { phase: "merge" }>; byId: Map<string, Chatter>; onChoose: (c: Choice) => void }) {
   const a = state.left[0]!;
   const b = state.right[0]!;
@@ -270,27 +211,32 @@ function Compare({ state, byId, onChoose }: { state: Extract<RankState, { phase:
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   }, [onChoose]);
+  // A group of equals spreads into columns (up to three), and its side gets
+  // that much more of the width, so it doesn't run down the page.
+  const cols = (g: string[]) => Math.min(g.length, 3);
   const side = (g: string[], c: Choice) => (
     <button
       type="button"
       onClick={() => onChoose(c)}
-      className="cozy-card block w-full space-y-2 rounded-[20px] border-2 p-2 text-left"
+      className="cozy-card block w-full space-y-2 rounded-[20px] border-2 p-3 text-left"
       style={{ background: "var(--cream)", borderColor: "var(--panel-border)", boxShadow: "0 5px 0 var(--cream-shadow)" }}
     >
-      {g.length > 1 && (
-        <span className="cozy-chip green ml-1">
-          {g.length} ranked equal
-        </span>
-      )}
-      {g.map((id) => (
-        <ProfileCard key={id} chatter={byId.get(id)!} compact={g.length > 1} />
-      ))}
+      {g.length > 1 && <span className="cozy-chip green">{g.length} ranked equal</span>}
+      <div className="grid gap-x-5 gap-y-5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(15rem, 1fr))" }}>
+        {g.map((id) => (
+          <ProfileCard key={id} chatter={byId.get(id)!} />
+        ))}
+      </div>
     </button>
   );
   return (
     <section className="space-y-4">
       <p className="text-center text-lg font-black">Who deserves it more?</p>
-      <div className="grid items-start gap-4 md:grid-cols-2">
+      <div
+        className="rank-pair mx-auto grid items-start gap-4"
+        // As wide as the chatters showing need: two alone stay readable, groups spread out.
+        style={{ ["--cols" as string]: `${cols(a)}fr ${cols(b)}fr`, maxWidth: `${(cols(a) + cols(b)) * 24}rem` }}
+      >
         {side(a, "left")}
         {side(b, "right")}
       </div>
@@ -306,60 +252,62 @@ function Compare({ state, byId, onChoose }: { state: Extract<RankState, { phase:
         </button>
       </div>
       <p className="text-center text-xs font-semibold" style={{ color: "var(--muted)" }}>
-        Keys: ← and → pick a side, ↓ or = for equal. Equal ones stay together from here on.
+        Keys: ← and → pick a side, ↓ or = for equal. Equal ones stay together from here on, so every Equal means fewer
+        choices later.
       </p>
     </section>
   );
 }
 
-/** A chatter with their destiny.gg profile card: tier, team, member since, bio, signature. */
-function ProfileCard({ chatter, compact = false }: { chatter: Chatter; compact?: boolean }) {
+/**
+ * A chatter with everything their destiny.gg profile shows (bar nationality,
+ * gender and age, which the site never reads): their picture or emote, the
+ * profile photo, tier, team, member since, bio and signature.
+ */
+function ProfileCard({ chatter }: { chatter: Chatter }) {
   const p = useProfile(chatter.name);
+  const face = chatter.image || chatter.emote;
   return (
-    <div className="flex gap-3">
-      <div
-        className={`flex shrink-0 items-center justify-center overflow-hidden rounded-[14px] ${compact ? "h-16 w-16" : "h-28 w-28"}`}
-        style={{ background: "var(--panel-border)" }}
-      >
-        {p?.photoUrl && !chatter.image && !chatter.emote ? (
-          <img src={p.photoUrl} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <Face chatter={chatter} size={compact ? 1.4 : 2.4} />
+    <div className="min-w-0 space-y-2">
+      <div className="flex flex-wrap items-center gap-3">
+        {face && (
+          <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[14px]" style={{ background: "var(--panel-border)" }}>
+            <Face chatter={chatter} size={1.9} />
+          </div>
         )}
-      </div>
-      <div className="min-w-0 flex-1 space-y-1">
-        <div className="flex flex-wrap items-baseline gap-x-2">
-          <span className={`${compact ? "text-lg" : "text-2xl"} font-black`}>{chatter.name}</span>
+        {p?.photoUrl && <img src={p.photoUrl} alt="" className="h-20 w-20 shrink-0 rounded-[14px] object-cover" />}
+        <div className="min-w-[9rem] flex-1">
+          <div className="break-words text-2xl font-black leading-tight">{chatter.name}</div>
           {p?.url && (
             <a href={p.url} target="_blank" rel="noopener noreferrer" className="text-xs font-bold underline" onClick={(e) => e.stopPropagation()}>
-              profile ↗
+              destiny.gg profile ↗
             </a>
           )}
         </div>
-        {p === undefined && <p className="text-sm" style={{ color: "var(--muted)" }}>Loading the profile…</p>}
-        {p === null && <p className="text-sm" style={{ color: "var(--muted)" }}>No destiny.gg profile found.</p>}
-        {p && (
-          <>
-            <p className="flex flex-wrap gap-1.5">
-              {p.tier && <span className="cozy-chip green">{p.tier}</span>}
-              {p.team && <span className="cozy-chip">{/^team /i.test(p.team) ? p.team : `Team ${p.team}`}</span>}
-              {p.memberSince && <span className="cozy-chip">since {p.memberSince}</span>}
-              {!p.tier && !p.team && !p.memberSince && !p.bio && (
-                <span className="text-sm" style={{ color: "var(--muted)" }}>Private profile.</span>
-              )}
-            </p>
-            {p.bio && <p className={`text-sm font-semibold ${compact ? "line-clamp-2" : ""}`}>{p.bio}</p>}
-            {!compact && p.signatureSvg && (
-              <div
-                className="h-14 max-w-60 [&_svg]:h-full [&_svg]:w-auto"
-                style={{ color: "var(--text)" }}
-                // Rebuilt by the server from path data only (src/server/dgg-profile.ts).
-                dangerouslySetInnerHTML={{ __html: p.signatureSvg }}
-              />
-            )}
-          </>
-        )}
       </div>
+      {p === undefined && <p className="text-sm" style={{ color: "var(--muted)" }}>Loading the profile…</p>}
+      {p === null && <p className="text-sm" style={{ color: "var(--muted)" }}>No destiny.gg profile found.</p>}
+      {p && (
+        <>
+          <p className="flex flex-wrap gap-1.5">
+            {p.tier && <span className="cozy-chip green">{p.tier}</span>}
+            {p.team && <span className="cozy-chip">{/^team /i.test(p.team) ? p.team : `Team ${p.team}`}</span>}
+            {p.memberSince && <span className="cozy-chip">Member since {p.memberSince}</span>}
+            {!p.tier && !p.team && !p.memberSince && !p.bio && !p.signatureSvg && (
+              <span className="text-sm" style={{ color: "var(--muted)" }}>Private profile.</span>
+            )}
+          </p>
+          {p.bio && <p className="whitespace-pre-line break-words font-semibold">{p.bio}</p>}
+          {p.signatureSvg && (
+            <div
+              className="h-16 max-w-full [&_svg]:h-full [&_svg]:max-w-full [&_svg]:w-auto"
+              style={{ color: "var(--text)" }}
+              // Rebuilt by the server from path data only (src/server/dgg-profile.ts).
+              dangerouslySetInnerHTML={{ __html: p.signatureSvg }}
+            />
+          )}
+        </>
+      )}
     </div>
   );
 }

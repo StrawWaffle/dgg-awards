@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { type Choice, type RankState, batchesOf, choose, currentBatch, mostLeft, rankBatch, start } from "@/lab/rank";
+import { type Choice, type RankState, batchesOf, choose, currentBatch, expectedLeft, mostLeft, rankBatch, start } from "@/lab/rank";
 
 /** Answer every question from a known score (higher is better; equal scores tie). */
-function run(ids: string[], score: (id: string) => number) {
-  let s: RankState = start(ids);
+function run(ids: string[], score: (id: string) => number, size = 1) {
+  let s: RankState = start(ids, size);
   const seen: number[] = [mostLeft(s)];
   while (s.phase !== "done") {
     if (s.phase === "batches") {
@@ -51,8 +51,28 @@ describe("ranking with ties", () => {
     expect(seen.at(-1)).toBe(0);
   });
 
+  test("in batches of five, too", () => {
+    const ids = [...Array(31).keys()].map((i) => `n${i}`).sort(() => Math.random() - 0.5);
+    const { result } = run(ids, (id) => Number(id.slice(1)), 5);
+    expect(result).toEqual([...Array(31).keys()].reverse().map((i) => [`n${i}`]));
+  });
+
+  test("67 one by one: the estimate is below the most, and close to what it takes", () => {
+    const s = start([...Array(67).keys()].map((i) => `n${i}`));
+    expect(s.phase).toBe("merge");
+    expect(mostLeft(s)).toBe(67 * 7 - 2 ** 7 + 1 - 0); // n·⌈log2 n⌉ − 2^⌈log2 n⌉ + 1 for bottom-up pairs
+    let total = 0;
+    for (let i = 0; i < 20; i++) {
+      const ids = [...Array(67).keys()].map((i) => `n${i}`).sort(() => Math.random() - 0.5);
+      total += run(ids, (id) => Number(id.slice(1))).asked;
+    }
+    const average = total / 20;
+    expect(expectedLeft(s)).toBeLessThan(mostLeft(s));
+    expect(Math.abs(expectedLeft(s) - average)).toBeLessThan(15);
+  });
+
   test("a batch must be ranked whole", () => {
-    const s = start(["a", "b", "c"]);
+    const s = start(["a", "b", "c"], 5);
     expect(() => rankBatch(s, [["a"], ["b"]])).toThrow();
     expect(rankBatch(s, [["a", "b", "c"]]).phase).toBe("done");
   });

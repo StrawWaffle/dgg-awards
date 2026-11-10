@@ -552,6 +552,15 @@ StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, an
   - typecheck and 92 unit tests; 49 API tests, with the preview addresses added
   - in the browser: both preview menus (hover, jump, close, current page marked, the admin one on a phone), every stage and page, a preview vote not saved, the old addresses rewritten, `/lab#sound` kept, non-admin and signed-out refusals, the big screen switched to simulated votes with the reveal running, and the music's first play starting at 6.02 s
 
+### Ranking the wildcards, second take: two at a time, the whole profile (2026-11-10, built, not deployed)
+
+StrawWaffle tried the first take: the more there is to go on, the easier the choice, and keys are the quick way. Ranking batches by clicking places felt slow, so:
+
+- **No batches:** every step is two sides (or groups of equals), from the first choice: ← → or ↓ / =. `start(ids)` now begins from single chatters (`size` 1); batches still work with `size` 5. Saved under a new key (`lab.rank.wildcards.v2`), so a run from the first take isn't replayed.
+- **Everything on the profile, every step:** their emote or picture, the profile photo, tier, team, member since, the whole bio, the signature, the link (still not nationality, gender or age, which the site never reads). Something extra (chat stats?) may come later.
+- **Choices left:** "about N to go, at most M · every Equal means fewer". The estimate (`expectedLeft`) is merge sort's average with no ties: a + b − a/(b+1) − b/(a+1) per merge. For 67: about 325, at most 342; it's within 15 of the average of 20 simulated runs (unit test).
+- **Groups use the width:** equals sit in columns (at least 15rem each), a side is as wide as its columns (up to three), and the pair is as wide as needed, up to the window.
+
 ### Ranking the DGGer wildcards by hand, with ties (2026-11-10, deployed)
 
 StrawWaffle wants to try ranking the 67 wildcards (DGGer nominees whose description says "Wildcards") in the lab: `/preview/lab#rank`, "Rank the wildcards".
