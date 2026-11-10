@@ -75,6 +75,8 @@ export function loadResults(): Promise<Award[]> {
 }
 
 const ROW_H = 46;
+/** Rows on a long board (more than eight), so ten fit on a short screen. */
+const ROW_H_TIGHT = 38;
 const BAR_H = 26;
 /** The box drawn round a bar once its scribble is done. */
 const BOX_MS = 650;
@@ -166,6 +168,7 @@ export function Board({
 }) {
   const n = award.results.length;
   const crown = !decidedByRunoff(award);
+  const rowH = n > 8 ? ROW_H_TIGHT : ROW_H;
   // Last place first: the order they're revealed in.
   const [byRank] = useState(() => [...award.results].sort((a, b) => a.count - b.count));
   const [start] = useState(() => scrambled(award.results.map((r) => r.id), award.id));
@@ -363,7 +366,7 @@ export function Board({
   }, [done, target, barW, byRank, n, paint, onWinner, wake, crown]);
 
   return (
-    <div className="relative mt-8" style={{ height: n * ROW_H }}>
+    <div className={`relative ${n > 8 ? "mt-4" : "mt-8"}`} style={{ height: n * rowH }}>
       {award.results.map((r) => {
         const slot = slots.indexOf(r.id);
         const colour = crown && r.isWinner && settled ? "var(--coral)" : "var(--primary-shadow)";
@@ -374,7 +377,7 @@ export function Board({
           <div
             key={r.id}
             className="absolute inset-x-0 grid grid-cols-[minmax(8rem,14rem)_1fr_9.5rem] items-center gap-4"
-            style={{ height: ROW_H, transform: `translateY(${slot * ROW_H}px)`, transition: "transform 700ms cubic-bezier(.3,.7,.3,1)" }}
+            style={{ height: rowH, transform: `translateY(${slot * rowH}px)`, transition: "transform 700ms cubic-bezier(.3,.7,.3,1)" }}
           >
             <span className="truncate text-right font-extrabold">
               <span ref={(el) => void (e.name = el)} className="inline-block">
