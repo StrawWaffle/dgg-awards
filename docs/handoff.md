@@ -83,14 +83,14 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 **Next, roughly in StrawWaffle's order:**
 1. Bring the lab's voting page and presentation into the real site, once rinlux approves.
    - Voting: the one-award-at-a-time flow with ballot progress, and a ranked-voting interface.
-   - Presentation: the big screen and the results reveal. Room for the stream camera, and showing the instant-runoff rounds, are still open.
+   - Presentation: the big screen and the results reveal. Room for the stream camera and the runoff rounds are done in the lab (2026-11-10, see "The big screen for the stream").
 2. Re-check the double-count fix against the original code (`dgga-base`), and against the real 2025 votes if they turn up.
 3. Smaller items:
    - re-pull emotes from the DGG CDN
    - a privacy page (deferred until StrawWaffle lifts it)
    - a bot-vote comparison
    - precompute results when voting closes (scale)
-   - a "Remove clip" button in the editor (pictures can be removed; clips can't yet)
+   - ~~a "Remove clip" button in the editor~~: done 2026-11-10
 
 **Deploying (what was done each time):**
 - Back up the live database first: `VACUUM INTO /data/backups/<time>-before-deploy.db` inside `dgg-awards-app-1`. Imports also make their own backups there, and the newest 20 are kept.
@@ -551,6 +551,40 @@ StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, an
 - Tested:
   - typecheck and 92 unit tests; 49 API tests, with the preview addresses added
   - in the browser: both preview menus (hover, jump, close, current page marked, the admin one on a phone), every stage and page, a preview vote not saved, the old addresses rewritten, `/lab#sound` kept, non-admin and signed-out refusals, the big screen switched to simulated votes with the reveal running, and the music's first play starting at 6.02 s
+
+### The big screen for the stream, the wildcards in the vote, the year in chat (2026-11-10, deployed)
+
+Built on four branches at once (stage-camera, stage-polish, wildcard-vote, chat-story, then fullscreen and wildcard-numbers), merged in `combined`, deployed after a backup (`/data/backups/2026-11-10T22-34-57-371Z-before-deploy.db`). Migration 0011 adds `options.listNumber`.
+
+**Room for the streamer's camera** (StrawWaffle: a good default, plus draggable boxes so he can fix it himself). The default copies Destiny's usual stream (screenshot StrawWaffle sent): the website chat down the left third, the camera slot under it (bottom 27%), the show on the right two thirds (15% to 84% of the height), leaving the bottom-right corner (his TTS icon) and bottom middle (Discord speakers) to the characters. With chat off, the show centres above the slot.
+- **Camera slot:** a hand-drawn `Sketch` frame with "Place camera here"; Settings can hide it. Nothing in the show goes over it; characters may walk behind it.
+- **Arrange layout** (Settings): drag a box, or its bottom-right corner to resize, snapping to half percents. Boxes: chat, camera, and the show (scenes, results and clips are one box; clips lower over the scene). Only moved boxes are kept per browser (`lab.stage.layout`, `src/lab/StageLayout.tsx`); "Reset layout" clears it.
+- **Controls** (`src/lab/StageControls.tsx`, `ShowControls`): award, the four scenes, Back/Next, Reveal next, All but the top 3, Reveal all, the runoff rounds, clips, and a row of icons (music and volume, website chat, Settings, full screen). They sit **in the camera slot**, so on stream his camera covers them while he clicks them in his own browser. **Pop out controls** opens `/preview/lab?remote=stage`, synced over a BroadcastChannel (`dgga-stage`; same browser, no server): the big screen owns the show and sends its state, the pop-out sends commands and pings every 2 s; while it's open the slot shows only the frame. Music plays only in the big screen's window.
+- **Full screen** (icon in the controls, or Settings): hides the site header and lab tabs (`stageFull` in `Site.tsx`) and asks for the browser's full screen (needs a click in that window, so from the pop-out it only hides the header). Esc leaves. In full screen the gear opens Settings as a panel beside the slot (`FloatingSettings`). Not remembered.
+- **Settings** is a tab at the right of the lab's tab row (`#lab-tools`, a portal): votes, website chat, camera frame, full screen, arrange, reset, pop-out; "Advanced" holds the cast settings and stats. The old gear panel is gone.
+- **The crowd spreads by free space:** while a panel (scene or clip) is down, of those whose lane is in the rows it covers only the share the side strips' width is of the floor stays; the rest step down into the open rows (`home`, `roll` on each character, in the frame loop), and go back when it lifts.
+
+**Scenes and reveal polish** (`Scenes.tsx`, `Results.tsx`, `StageRunoff.tsx`):
+- Nominees without a clip are plain cards (no play button; arrow keys skip them); an award with no clips is an introduction. Descriptions show under names. 9–24 nominees: small cards; more than 24: a list.
+- **The runoff on the big screen:** for ranked awards decided over more than one round, the first-choice board marks no winner; then "Run the runoff →" steps round by round against a "half" line, and the winner card says which round won it. Simulated votes include made-up ranked ballots counted by `instantRunoff`.
+- **Labels:** "146 votes / 25.6% of first choices"; points read "110 points". The number and its unit sit apart (number left, unit right) so the units line up while numbers count.
+- **All but the top 3** button. Boards longer than 12 (and every points award) reveal the top 10 plus a line for the rest ("57 more with fewer points").
+- Emote nominees show the moving emote and their description.
+
+**The wildcards in the official vote** (StrawWaffle: everyone gives a top ten, points are added up, one ranking and one winner; the wildcards get their own award; Groups A–E stay in DGGer, their voting still open).
+- **Voting style `points`** (`src/lib/voting.ts`): a ballot is up to 10 nominees in groups of equals (`places`), stored with equals sharing a rank. 10 points for first down to 1 for tenth, shared by equals (same function as the lab's). Most points wins; ties go to more first places, then more ballots placing them.
+- **Server:** `POST /api/vote` takes `places`; `GET /api/vote/places`; `GET /api/nominees/:category/:id/profile` serves destiny.gg cards for points-award nominees (cached 6 h; watch for rate limits). Ballot counts are per voter and award. Results add `points` and `placed`; `percentage` is the share of points.
+- **Vote page:** `TopTen` (from `RankChatters.tsx`) is shared with the lab: swipe, compare, then Cast. Progress kept in the browser (`vote.top10.<award>`) until cast. Key hints hidden on touch.
+- **Data, run live 2026-11-10** (`scripts/split-wildcards.ts [--dry-run]`, backup `…22-35-23-786Z-before-split-wildcards.db`): created "DGGer wildcards" (`dgger_wildcards`, points) after DGGer and moved the 67 wildcards (DGGer now 56). Titles lost rinlux's number ("52. aus_bits" → "aus_bits", 52 kept in **`listNumber`**, admins only: shown as "#52 on the list" in the editor, never sent to voters, API-tested), and descriptions lost DGGer's group note ("Wildcards, 67 to choose from, top 5 advance:"). One history entry: undo moves them back with their old titles and descriptions. History imports can record `moved` nominees (`moveNominee` refuses nominees with votes).
+- **Open:** the award's name (DGGer's is "DGG Chatter of the Year"); the DGGer groups could move their numbers to `listNumber` the same way.
+
+**The year in chat:** StrawWaffle picked the story. `/chat` is the story (`src/site/ChatStory.tsx`); "See all the numbers" leads to the full page at `/chat/all` (`ChatReviewPage.tsx`), which links back. Both read through `useReview` (reviewing mode, or admins with `?preview=1`). In the preview menus as "Year in chat: every number" (`/preview/<stage>/chat-all`). The calm draft and the lab's two chat tabs are gone.
+
+**Remove clip** in the editor's Clip section (`DELETE /api/admin/clip`): clears the clip fields, recorded and undoable, refused while building or with no clip; the file and picture stay.
+
+**Tests:** 116 unit (new points tests) and 52 API tests (points voting, list number admin-only, remove clip, `/chat/all`). The `/Media/key-…` template that failed `data.test.ts` now spells the five key files out.
+
+**Test containers:** `dgga-lab` (3600) runs this code with a live copy, the wildcards split, and `ADMIN_USERNAMES=Tester,StrawWaffle` so StrawWaffle can sign in under his own name. `dgga-new` and `dgga-review` were rebuilt for the branches (dgga-new has dummy `R2_*` settings so live pictures load; that breaks API clip tests, so run those on a container without them).
 
 ### The wildcard cards, second pass: space, colour, emotes, big keys (2026-11-10, deployed)
 
