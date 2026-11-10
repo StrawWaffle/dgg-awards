@@ -154,18 +154,18 @@ export const nomineeQuery = z.object({ categoryId: required, id: required });
 /** Which nominee (in a JSON body). */
 export const nomineeRef = z.object({ categoryId: required, id: required });
 
-export const thumbnailAt = nomineeRef.extend({ at: z.number().int().min(0) });
+export const thumbnailAt = nomineeRef.extend({ at: z.number().min(0) });
 
 export const thumbnailUpload = z.object({
   categoryId: required,
   id: required,
   file: z.instanceof(File),
   /** The picture is (cropped from) the clip's frame this many seconds in. */
-  at: z.coerce.number().int().min(0).optional(),
+  at: z.coerce.number().min(0).optional(),
 });
 
 /** A frame of a nominee's clip, at full size, to crop in the editor. */
-export const clipFrameQuery = z.object({ categoryId: required, id: required, at: z.coerce.number().int().min(0) });
+export const clipFrameQuery = z.object({ categoryId: required, id: required, at: z.coerce.number().min(0) });
 
 /** A video to make the clip from; start and end in seconds, either optional. */
 export const clipUpload = z.object({
@@ -229,7 +229,7 @@ export const importedData = z.array(
         clipKey: mediaKey,
         clipStatus: z.enum(["ready"]).nullable().optional(),
         thumbnailKey: mediaKey,
-        thumbnailAt: z.number().int().min(0).nullable().optional(),
+        thumbnailAt: z.number().min(0).nullable().optional(),
       }),
     ),
   }),

@@ -459,7 +459,7 @@ function ClipSection({ nominee, unsaved }: { nominee: AdminNominee; unsaved: boo
                   preload="metadata"
                 />
                 <Button
-                  onClick={() => frame.mutate(Math.floor(video.current?.currentTime ?? 0))}
+                  onClick={() => frame.mutate(Math.round((video.current?.currentTime ?? 0) * 100) / 100)}
                   disabled={frame.isPending || saveFrame.isPending}
                 >
                   {frame.isPending ? "Getting the frame…" : saveFrame.isPending ? "Saving…" : "Use this frame as the picture…"}

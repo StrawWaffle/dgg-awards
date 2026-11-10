@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import rough from "roughjs";
 import { annotate } from "rough-notation";
-import { type Levels, type Source, useFrame } from "@/lab/music";
+import { type Levels, type Source, music, useFrame } from "@/lab/music";
 import { cssVar, reducedMotion } from "@/lab/sketch";
 
 export type Result = { id: string; title: string; count: number; percentage: number; isWinner: boolean };
@@ -194,7 +194,7 @@ export function Board({
 
   const onBeat = useCallback(
     (levels: Record<Source, Levels>) => {
-      if (!levels.map.beat || reducedMotion()) return;
+      if (!levels.map.beat || music.isDucked || reducedMotion()) return;
       wobble.current = (wobble.current % 3) + 1;
       paint();
     },

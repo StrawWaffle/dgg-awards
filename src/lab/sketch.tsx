@@ -4,7 +4,7 @@
 // music, the way hand-drawn animation jitters; still when the music is off). All strokes use currentColor, so CSS
 // colours them per theme.
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { type Levels, type Source, useFrame } from "@/lab/music";
+import { type Levels, type Source, music, useFrame } from "@/lab/music";
 import rough from "roughjs";
 
 // ---- Drawing helpers.
@@ -44,9 +44,9 @@ function useBoil(on: boolean) {
   const live = useRef(on);
   live.current = on && !reducedMotion();
   // On each beat of the music (from the beat map), the next wobble; still
-  // between beats, and when the music is off.
+  // between beats, when the music is off, and while it's faded out for a clip.
   const onFrame = useCallback((levels: Record<Source, Levels>) => {
-    if (live.current && levels.map.beat) setSeed((s) => (s % 3) + 1);
+    if (live.current && levels.map.beat && !music.isDucked) setSeed((s) => (s % 3) + 1);
   }, []);
   useFrame(onFrame);
   return seed;

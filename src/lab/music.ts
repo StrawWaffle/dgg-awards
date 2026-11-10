@@ -124,6 +124,10 @@ class Music {
 
   /** While a clip plays the music fades out completely, and back after. */
   private ducked = false;
+  /** Faded out for a clip: still playing underneath, silent. */
+  get isDucked() {
+    return this.ducked;
+  }
   setDucked(on: boolean) {
     this.ducked = on;
     this.applyVolume(0.6);
