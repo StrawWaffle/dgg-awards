@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { classifyLink, embedUrl, formatTimestamp, linkAt, linkLabel, parseTimestamp } from "@/lib/links";
+import { classifyLink, driveFileId, embedUrl, formatTimestamp, linkAt, linkLabel, parseTimestamp } from "@/lib/links";
 
 describe("classifyLink", () => {
   const cases: [string, string, number?][] = [
@@ -113,5 +113,22 @@ describe("embedUrl", () => {
     for (const url of ["https://kick.com/destiny/clips/clip_1", "https://x.com/a/status/1", "https://www.youtube.com/clip/Ugkx", "not a url"]) {
       expect(embedUrl(url, { parent })).toBeNull();
     }
+  });
+});
+
+describe("Google Drive videos", () => {
+  const link = "https://drive.google.com/file/d/1qOmLWWSGbYfx22oAwl_3GYkayup3r2VU/view?usp=sharing";
+  test("are recognised, with their file id", () => {
+    expect(classifyLink(link).type).toBe("google-drive");
+    expect(driveFileId(link)).toBe("1qOmLWWSGbYfx22oAwl_3GYkayup3r2VU");
+    expect(driveFileId("https://drive.google.com/open?id=abc123")).toBe("abc123");
+    expect(classifyLink("https://drive.google.com/drive/folders/xyz").type).toBe("web");
+    expect(driveFileId("https://example.com/file/d/abc/view")).toBeNull();
+    expect(linkLabel("google-drive")).toBe("Google Drive video");
+  });
+  test("embed in Drive's player, whole", () => {
+    expect(embedUrl(link, { start: 10, end: 20, parent: "x" })).toBe(
+      "https://drive.google.com/file/d/1qOmLWWSGbYfx22oAwl_3GYkayup3r2VU/preview",
+    );
   });
 });

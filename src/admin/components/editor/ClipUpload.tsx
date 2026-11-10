@@ -26,12 +26,15 @@ export function ClipUpload({
   id,
   busy,
   onStarted,
+  driveId,
 }: {
   categoryId: string;
   id: string;
   /** A clip is already being built. */
   busy: boolean;
   onStarted: () => void;
+  /** The nominee's Google Drive video, whose library copy opens ready to mark. */
+  driveId?: string | null;
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [libraryPath, setLibraryPath] = useState<string | null>(null);
@@ -71,6 +74,15 @@ export function ClipUpload({
     setSrc(null);
     setLibraryPath(path || null);
   };
+  // A Drive nominee: open the library's copy of its video, ready to mark.
+  const opened = useRef(false);
+  useEffect(() => {
+    if (opened.current || !driveId) return;
+    const copy = videos.find((v) => v.driveId === driveId);
+    if (!copy) return;
+    opened.current = true;
+    pickLibrary(copy.path);
+  }, [driveId, videos]);
   const reset = () => {
     setFile(null);
     setLibraryPath(null);

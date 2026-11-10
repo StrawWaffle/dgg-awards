@@ -24,6 +24,9 @@ export type NomineeInput = {
   linkType?: LinkType | null;
   clipStart?: number | null;
   clipEnd?: number | null;
+  /** A built clip, and a picture, if there are any. */
+  clipKey?: string | null;
+  thumbnailKey?: string | null;
 };
 
 export type CategoryInput = {
@@ -45,6 +48,7 @@ export type IssueCode =
   | "clip-not-video"
   | "long-clip"
   | "missing-description"
+  | "untrimmed-drive"
   | "duplicate-title";
 
 export type Issue = {
@@ -107,8 +111,15 @@ export function checkNominee(
     add("unrecognized-link", "warning", "Unrecognized link. Check what it points to and set its type.");
   }
 
-  if (!n.imageId && !n.videoId && n.clipStart == null) {
+  if (!n.imageId && !n.videoId && n.clipStart == null && !n.clipKey && !n.thumbnailKey && type !== "google-drive") {
     add("missing-media", "error", "No image, video or clip.");
+  }
+  if (type === "google-drive" && !n.clipKey) {
+    add(
+      "untrimmed-drive",
+      "warning",
+      "Plays the whole video from Google Drive. Mark the clip on the library copy and make it, so voters get the trimmed clip.",
+    );
   }
 
   if (!n.date) {

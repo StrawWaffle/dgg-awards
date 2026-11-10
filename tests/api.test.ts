@@ -1199,7 +1199,7 @@ describe("admin", () => {
       });
       const items = await (await req("/api/admin/library", {}, admin)).json();
       const item = items.find((i: any) => i.path === "Ally of the Year/sample.mp4");
-      expect(item).toEqual({ path: "Ally of the Year/sample.mp4", folder: "Ally of the Year", name: "sample.mp4", kind: "video", size: expect.any(Number) });
+      expect(item).toEqual({ path: "Ally of the Year/sample.mp4", folder: "Ally of the Year", name: "sample.mp4", kind: "video", size: expect.any(Number), driveId: null });
       expect((await req("/api/admin/library", {}, user)).status).toBe(401);
 
       // Watched while marking: with byte ranges, never cached publicly.

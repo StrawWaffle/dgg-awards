@@ -12,6 +12,7 @@ export const linkTypes = [
   "kick-clip",
   "kick-channel",
   "streamable",
+  "google-drive",
   "reddit-post",
   "reddit-subreddit",
   "reddit-user",
@@ -61,6 +62,24 @@ export const videoLinkTypes: ReadonlySet<LinkType> = new Set([
   "reddit-post",
   "video-file",
 ]);
+
+/**
+ * A video in a Google Drive folder (rinlux's clips). It plays in Drive's own
+ * player, whole, until a clip is cut from the library's copy of the same
+ * file (scripts/import-drive.py keeps their ids). yt-dlp can't fetch it.
+ */
+export function driveFileId(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    if (hostOf(url) !== "drive.google.com") return null;
+    const parts = url.pathname.split("/").filter(Boolean);
+    const i = parts.indexOf("d");
+    return (parts[0] === "file" && i >= 0 && parts[i + 1]) || url.searchParams.get("id") || null;
+  } catch {
+    return null;
+  }
+}
 
 /** "1h2m3s", "2m3s", "123s", "123" or "1:02:03" to seconds. */
 export function parseTimestamp(value: string | null | undefined): number | undefined {
@@ -134,6 +153,7 @@ export function classifyLink(raw: string): { type: LinkType; start?: number } {
   }
 
   if (host === "streamable.com") return { type: "streamable" };
+  if (host === "drive.google.com" && driveFileId(raw)) return { type: "google-drive" };
 
   if (host === "reddit.com" || host === "redd.it") {
     if (host === "redd.it" || parts.includes("comments") || parts[2] === "s") {
@@ -217,6 +237,11 @@ export function embedUrl(
     const id = parts[0] === "e" || parts[0] === "o" ? parts[1] : parts[0];
     return id ? `https://streamable.com/e/${encodeURIComponent(id)}?autoplay=1` : null;
   }
+  if (type === "google-drive") {
+    // Whole: Drive's player can't start or stop at a time.
+    const id = driveFileId(raw);
+    return id ? `https://drive.google.com/file/d/${encodeURIComponent(id)}/preview` : null;
+  }
   return null;
 }
 
@@ -231,6 +256,7 @@ const platformLabels: Record<LinkType, string> = {
   "kick-clip": "Kick clip",
   "kick-channel": "Kick channel",
   streamable: "Streamable clip",
+  "google-drive": "Google Drive video",
   "reddit-post": "Reddit post",
   "reddit-subreddit": "Subreddit",
   "reddit-user": "Reddit profile",

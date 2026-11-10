@@ -21,10 +21,32 @@ export type LibraryItem = {
   name: string;
   kind: "video" | "image";
   size: number;
+  /** The Google Drive file it was copied from, if known. */
+  driveId: string | null;
 };
+
+/**
+ * Drive file id → library path, written by scripts/import-drive.py as
+ * `.drive-ids.json` in the library.
+ */
+async function driveIds(): Promise<Record<string, string>> {
+  const f = Bun.file(join(LIBRARY_DIR, ".drive-ids.json"));
+  try {
+    return (await f.exists()) ? await f.json() : {};
+  } catch {
+    return {};
+  }
+}
+
+/** The library path of a Google Drive file's copy, or null if there's none. */
+export async function libraryPathForDrive(driveId: string): Promise<string | null> {
+  const path = (await driveIds())[driveId];
+  return path && (await libraryFile(path)) ? path : null;
+}
 
 export async function listLibrary(): Promise<LibraryItem[]> {
   const items: LibraryItem[] = [];
+  const byPath = new Map(Object.entries(await driveIds()).map(([id, path]) => [path, id]));
   const walk = async (dir: string) => {
     let entries;
     try {
@@ -43,7 +65,7 @@ export async function listLibrary(): Promise<LibraryItem[]> {
       if (!kind) continue;
       const path = relative(LIBRARY_DIR, full).split(sep).join("/");
       const folder = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
-      items.push({ path, folder, name: e.name, kind, size: (await stat(full)).size });
+      items.push({ path, folder, name: e.name, kind, size: (await stat(full)).size, driveId: byPath.get(path) ?? null });
     }
   };
   await walk(LIBRARY_DIR);

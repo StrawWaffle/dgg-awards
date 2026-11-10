@@ -552,6 +552,20 @@ StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, an
   - typecheck and 92 unit tests; 49 API tests, with the preview addresses added
   - in the browser: both preview menus (hover, jump, close, current page marked, the admin one on a phone), every stage and page, a preview vote not saved, the old addresses rewritten, `/lab#sound` kept, non-admin and signed-out refusals, the big screen switched to simulated votes with the reveal running, and the music's first play starting at 6.02 s
 
+### Drafts from rinlux's clip folders, playing from Google Drive until trimmed (branch `worktree-drive-drafts`, 2026-11-10)
+
+StrawWaffle: the videos were already sorted into award folders on Drive, so use that for the empty awards, and "use the Google Drive previews in all places until rinlux provides the trimmed timestamps, then process the file and replace it". Folders that aren't awards get their own categories at the end.
+- **Google Drive links** are a link type now (`google-drive`, `driveFileId()` in `src/lib/links.ts`). They embed in Drive's player (`/file/d/<id>/preview`), whole: it can't start or stop at a time. So until a clip is built, a Drive draft plays its whole video, everywhere clips play (voting, the big screen, the results). Once a clip is built, that replaces it, as for every other nominee.
+- **Making the clip:** the library keeps which Drive file each of its files came from (`.drive-ids.json` in the library, written by `scripts/import-drive.py`; `driveId` on library items). A Drive nominee's clip section opens the library's copy of its video straight away, ready to mark and make. Its status says the site plays the whole Drive video until then.
+- **New check `untrimmed-drive`** (warning): a Drive video without a built clip. A Drive link, a built clip or a picture now counts as media for `missing-media`.
+- **The drafts:** `bun scripts/import-drive-drafts.ts <listing.json> [--dry-run]`, run in the app container. One draft per file, titled from its file name ("Draft from rinlux's clip folder."), New Emote titled with destiny.gg's spelling of the emote and in the compact layout:
+  - into the empty awards: Cutestiny 2, Dankmemes 3, Derpstiny 4, Godstiny 3, Omegalul 4, REE 1, Shitshow 3, New Emote 11 (10 pictures and GSN), and 4 more for Yikestiny
+  - new categories at the end: Bonus memes (8), DuckerZ (3), Other clips (9 loose files)
+  - "2025 review" left out (last year's highlights)
+  - pictures become the nominees' pictures (AVIF converted to PNG); videos get a frame a third in as their picture until the clip is made
+  - it's one history entry, and undo removes all of it, including drafts added to existing awards (the import undo now also handles `added` nominees, not only new categories). A rerun skips what's there.
+- **Tested** on `dgga-lab` with the real listing and the Emote folder: 55 drafts, 44 untrimmed warnings, undo back to 22 awards and 174 nominees, redo to 25 and 229; the editor opened GSN's library copy; voting opened Drive's player (Drive itself doesn't load in the test browser, so its playback is to check live). 95 unit tests, 50 API tests.
+
 ### Two takes on the year in chat, and the wobble on the beat (2026-11-10, deployed)
 
 rinlux on `/chat`: "cute! but maybe a bit busy … the sketch style … updates so fast on the top banner … break it up or just negative space to help highlight things". StrawWaffle asked for both directions as rough drafts, behind the admin lock, to pick from:

@@ -7,7 +7,7 @@ import { libraryUrl, useLibrary } from "@/admin/components/editor/library";
 import { HistoryList } from "@/admin/components/history/HistoryList";
 import { Button, ErrorText, Field, TimeInput, inputClass } from "@/admin/components/editor/fields";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { type LinkType, classifyLink, linkAt, linkLabel, linkTypes } from "@/lib/links";
+import { type LinkType, classifyLink, driveFileId, linkAt, linkLabel, linkTypes } from "@/lib/links";
 import {
   type AdminNominee,
   type DggProfile,
@@ -432,12 +432,15 @@ function ClipSection({ nominee, unsaved }: { nominee: AdminNominee; unsaved: boo
                   "Ready."
                 ))}
               {nominee.clipStatus === "failed" && <span className="text-red-700">Failed: {nominee.clipError}</span>}
-              {!nominee.clipStatus && "No clip yet. Set the start and end above, save, then build; or upload a video below."}
+              {!nominee.clipStatus &&
+                (driveFileId(nominee.url)
+                  ? "No clip yet: the site plays the whole video from Google Drive. Mark the part to keep below (it's the library's copy) and make the clip."
+                  : "No clip yet. Set the start and end above, save, then build; or upload a video below.")}
             </span>
             {unsaved && <span className="text-neutral-500">Save first.</span>}
           </div>
           <ErrorText>{build.error?.message}</ErrorText>
-          <ClipUpload categoryId={nominee.categoryId} id={nominee.id} busy={working} onStarted={refresh} />
+          <ClipUpload categoryId={nominee.categoryId} id={nominee.id} busy={working} onStarted={refresh} driveId={driveFileId(nominee.url)} />
 
           {nominee.clipUrl && (
             <div className="grid gap-4 md:grid-cols-2">

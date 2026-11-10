@@ -11,6 +11,7 @@ data volume mounted, e.g. for the live site:
 Uses gdown's folder parser; Drive allows at most 50 files per folder that way.
 """
 
+import json
 import sys
 import time
 from pathlib import Path
@@ -43,7 +44,12 @@ def files_in(folder_id: str):
 def main(folder_id: str, out_dir: str) -> None:
     out = Path(out_dir)
     got = skipped = failed = 0
+    # Which Drive file each library file came from, so a nominee linked to
+    # the Drive file can be cut from its copy here (src/server/library.ts).
+    ids_file = out / ".drive-ids.json"
+    ids = json.loads(ids_file.read_text()) if ids_file.exists() else {}
     for file_id, rel in files_in(folder_id):
+        ids[file_id] = rel.as_posix()
         target = out / rel
         if target.exists() and target.stat().st_size > 0:
             skipped += 1
@@ -67,6 +73,8 @@ def main(folder_id: str, out_dir: str) -> None:
                 else:
                     time.sleep(30 * (attempt + 1))
         time.sleep(3)
+    out.mkdir(parents=True, exist_ok=True)
+    ids_file.write_text(json.dumps(ids, indent=1))
     print(f"done: {got} downloaded, {skipped} already there, {failed} failed")
 
 

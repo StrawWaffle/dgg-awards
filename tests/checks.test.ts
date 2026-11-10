@@ -27,6 +27,14 @@ describe("checkNominee", () => {
     expect(codes({})).toEqual([]);
   });
 
+  test("a Google Drive video counts as media, but untrimmed until a clip is built", () => {
+    const drive = { url: "https://drive.google.com/file/d/abc/view", imageId: null };
+    expect(codes(drive)).toEqual(["untrimmed-drive"]);
+    expect(codes({ ...drive, clipKey: "clips/x.mp4" })).toEqual([]);
+    // A built clip or a picture is media too.
+    expect(codes({ imageId: null, thumbnailKey: "thumbs/x.png" })).toEqual([]);
+  });
+
   test("15:41 / 18:48: a whole 3-hour video with no timestamp", () => {
     expect(codes({ url: "https://www.youtube.com/watch?v=abc" })).toEqual(["whole-video"]);
   });

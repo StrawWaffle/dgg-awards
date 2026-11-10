@@ -255,12 +255,21 @@ export async function undo(id: number, actor: Actor, force = false): Promise<num
 
     case "import": {
       if (entry.action === "create") {
-        // Remove what the import added, unless it has been voted on since.
+        // Remove what the import added, unless it has been voted on since:
+        // new categories (with their nominees), and nominees added to
+        // categories that were already there (`added`).
         const ids = (after.categories ?? []) as string[];
+        const added = (after.added ?? []) as { categoryId: string; id: string }[];
         const snapshots = [];
+        const rows: NomineeRow[] = [];
         for (const categoryId of ids) {
           if (await categoryHasVotes(categoryId)) {
             throw new UndoConflict(`"${categoryId}" has votes now, so the import can't be undone.`);
+          }
+        }
+        for (const a of added) {
+          if (await nomineeHasVotes(a.categoryId, a.id)) {
+            throw new UndoConflict(`"${a.id}" in "${a.categoryId}" has votes now, so the import can't be undone.`);
           }
         }
         for (const categoryId of ids) {
@@ -269,21 +278,36 @@ export async function undo(id: number, actor: Actor, force = false): Promise<num
           snapshots.push(snapshot);
           await deleteCategory(categoryId);
         }
-        return record(actor, { ...base, action: "delete", before: { categories: snapshots } });
+        for (const a of added) {
+          const row = await getNominee(a.categoryId, a.id);
+          if (!row) continue;
+          rows.push(row);
+          await deleteNominee(a.categoryId, a.id);
+        }
+        return record(actor, { ...base, action: "delete", before: { categories: snapshots, added: rows } });
       }
-      // Undoing that undo: put the imported categories back.
+      // Undoing that undo: put the imported categories and nominees back.
       const snapshots = (before.categories ?? []) as (CategoryRow & { options?: NomineeRow[] })[];
+      const rows = (before.added ?? []) as NomineeRow[];
       for (const snap of snapshots) {
         if (await getCategory(snap.id)) throw new UndoConflict(`A category "${snap.id}" exists again.`);
+      }
+      for (const row of rows) {
+        if (await getNominee(row.categoryId, row.id)) throw new UndoConflict(`A nominee "${row.id}" exists again in "${row.categoryId}".`);
       }
       for (const { options = [], ...row } of snapshots) {
         await insertCategory(row);
         for (const nominee of options) await insertNominee(nominee);
       }
+      for (const row of rows) await insertNominee(row);
       return record(actor, {
         ...base,
         action: "create",
-        after: { categories: snapshots.map((s) => s.id), nominees: snapshots.reduce((n, s) => n + (s.options?.length ?? 0), 0) },
+        after: {
+          categories: snapshots.map((s) => s.id),
+          added: rows.map((r) => ({ categoryId: r.categoryId, id: r.id })),
+          nominees: snapshots.reduce((n, s) => n + (s.options?.length ?? 0), 0) + rows.length,
+        },
       });
     }
   }
