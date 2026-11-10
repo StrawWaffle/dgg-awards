@@ -6,22 +6,42 @@ import { ChatAggregator, type ChatSummary } from "@/server/lab/chat-aggregator";
 export type FeedStatus = { connected: boolean; note: string; ingestMs?: number };
 type OnSummary = (summary: ChatSummary, status: FeedStatus) => void;
 
-/** The live relay. Returns a function that disconnects. */
+const EMPTY = (): ChatSummary => ({ at: Date.now(), messages: 0, emoteOnly: 0, events: [], speakers: [], top: [], combo: null, ended: [], said: [] });
+
+/**
+ * The live relay. If the connection to it drops (a deploy, the network), it
+ * reconnects by itself, waiting a little longer each time (up to 30 s).
+ * Returns a function that disconnects for good.
+ */
 export function liveFeed(onSummary: OnSummary) {
-  const socket = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/lab/chat`);
-  socket.onmessage = (e) => {
-    const { summary, status } = JSON.parse(e.data);
-    onSummary(summary, {
-      connected: status.connected,
-      note: status.connected ? "Connected to destiny.gg chat" : `Connecting to destiny.gg chat (try ${status.retries + 1})`,
-    });
+  let socket: WebSocket | null = null;
+  let retry: ReturnType<typeof setTimeout> | undefined;
+  let tries = 0;
+  let stopped = false;
+  const connect = () => {
+    const s = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/lab/chat`);
+    socket = s;
+    s.onmessage = (e) => {
+      tries = 0;
+      const { summary, status } = JSON.parse(e.data);
+      onSummary(summary, {
+        connected: status.connected,
+        note: status.connected ? "Connected to destiny.gg chat" : `Connecting to destiny.gg chat (try ${status.retries + 1})`,
+      });
+    };
+    s.onclose = () => {
+      if (stopped) return;
+      const wait = Math.min(30_000, 1000 * 2 ** tries++);
+      onSummary(EMPTY(), { connected: false, note: `Lost the relay; reconnecting in ${Math.round(wait / 1000)} s` });
+      retry = setTimeout(connect, wait);
+    };
   };
-  socket.onclose = () =>
-    onSummary(
-      { at: Date.now(), messages: 0, emoteOnly: 0, events: [], top: [], combo: null, ended: [], said: [] },
-      { connected: false, note: "Disconnected from the relay (admins only; reload to retry)" },
-    );
-  return () => socket.close();
+  connect();
+  return () => {
+    stopped = true;
+    clearTimeout(retry);
+    socket?.close();
+  };
 }
 
 const SIM_EMOTES = [

@@ -49,10 +49,34 @@ type Line =
   | { id: number; kind: "said"; nick: string; flair: string | null; text: string }
   | { id: number; kind: "combo"; emote: string; count: number };
 
-/** A character stays at least this long before it can be sent off to make room. */
+/** A character stays at least this long before it can be swapped out to make room. */
 const MIN_STAY_MS = 12_000;
-/** New characters a second, at most: the cast changes gradually, not in a churn. */
-const ARRIVALS_PER_SECOND = 2;
+
+/**
+ * Who's on stage, set in the gear's settings and remembered per browser:
+ * - `who`: everyone who chats, or only emote-only messages
+ * - `stayMin`: minutes someone stays after their last message
+ * - `arrivals`: new characters a second at most, so the cast changes gradually
+ * - `whenFull`: keep who's there (as dgg-radio does), or swap in newcomers
+ */
+const CAST_KEY = "lab.stage";
+type Cast = {
+  max: number;
+  names: boolean;
+  showSaid: boolean;
+  who: "everyone" | "emotes";
+  stayMin: number;
+  arrivals: number;
+  whenFull: "keep" | "swap";
+};
+const CAST_DEFAULTS: Cast = { max: 60, names: true, showSaid: true, who: "everyone", stayMin: 5, arrivals: 2, whenFull: "keep" };
+function loadCast(): Cast {
+  try {
+    return { ...CAST_DEFAULTS, ...JSON.parse(localStorage.getItem(CAST_KEY) ?? "{}") };
+  } catch {
+    return CAST_DEFAULTS;
+  }
+}
 
 function setEmote(npc: Npc, emote: string) {
   if (npc.emote === emote) return;
@@ -121,11 +145,26 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
   const [feed, setFeed] = useState<"sim" | "live">("sim");
   const [rate, setRate] = useState(300);
   const [emoteShare, setEmoteShare] = useState(0.5);
-  const [max, setMax] = useState(60);
-  const [names, setNames] = useState(true);
-  const [showSaid, setShowSaid] = useState(true);
+  // Who's on stage, remembered per browser (the gear's settings).
+  const [saved] = useState(loadCast);
+  const [max, setMax] = useState(saved.max);
+  const [names, setNames] = useState(saved.names);
+  const [showSaid, setShowSaid] = useState(saved.showSaid);
+  const [who, setWho] = useState(saved.who);
+  const [stayMin, setStayMin] = useState(saved.stayMin);
+  const [arrivalRate, setArrivalRate] = useState(saved.arrivals);
+  const [whenFull, setWhenFull] = useState(saved.whenFull);
+  useEffect(() => {
+    try {
+      localStorage.setItem(CAST_KEY, JSON.stringify({ max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull }));
+    } catch {}
+  }, [max, names, showSaid, who, stayMin, arrivalRate, whenFull]);
+  /** Who spoke lately: nick → when, their last emote, flair. Oldest first. */
+  const roster = useRef(new Map<string, { at: number; emote: string | null; flair: string | null }>());
+  /** What chat is spamming most: for someone who hasn't sent an emote. */
+  const chatEmote = useRef("PEPE");
   const [status, setStatus] = useState<FeedStatus>({ connected: false, note: "" });
-  const [stats, setStats] = useState({ fps: 0, npcs: 0, perSecond: 0, emoteOnly: 0, ingestMs: 0 });
+  const [stats, setStats] = useState({ fps: 0, npcs: 0, perSecond: 0, emoteOnly: 0, ingestMs: 0, chatting: 0 });
   const [winner, setWinner] = useState<string | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -186,8 +225,8 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
   const sceneNow = useRef(scene);
   sceneNow.current = scene;
   const [bursts, fire] = useBursts();
-  const settings = useRef({ rate, emoteShare, max, names, showSaid });
-  settings.current = { rate, emoteShare, max, names, showSaid };
+  const settings = useRef({ rate, emoteShare, max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull });
+  settings.current = { rate, emoteShare, max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull };
   const fps = useRef({ frames: 0, since: performance.now(), value: 0 });
   const clapUntil = useRef(0);
   const lineId = useRef(0);
@@ -259,35 +298,69 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
       setStatus(feedStatus);
       const now = performance.now();
       const all = npcs.current;
+      const set = settings.current;
+      const stayMs = set.stayMin * 60_000;
       const bucket = arrivals.current;
-      bucket.tokens = Math.min(4, bucket.tokens + ((now - bucket.at) / 1000) * ARRIVALS_PER_SECOND);
+      bucket.tokens = Math.min(4, bucket.tokens + ((now - bucket.at) / 1000) * set.arrivals);
       bucket.at = now;
-      for (const event of summary.events) {
-        let npc = all.get(event.nick);
-        // During a clip only the characters already out can change emote.
-        if (!npc && clipOn.current) continue;
-        if (!npc) {
-          // Arrivals are paced, and nobody is sent off before they've had
-          // their moment; if neither allows it, this chatter isn't shown.
-          if (bucket.tokens < 1) continue;
-          if (all.size >= settings.current.max) {
-            let oldest: Npc | null = null;
+      if (summary.top[0]) chatEmote.current = summary.top[0][0];
+
+      // The roster, as dgg-radio keeps it: who spoke within the last few
+      // minutes, most recent last, with the last emote they used. With
+      // "everyone", any message counts; otherwise only emote-only ones.
+      const heard: { nick: string; emote: string | null; flair: string | null }[] =
+        set.who === "everyone" ? (summary.speakers ?? []) : summary.events;
+      const book = roster.current;
+      for (const p of [...heard, ...summary.said.map((x) => ({ nick: x.nick, emote: null, flair: x.flair }))]) {
+        const known = book.get(p.nick);
+        book.delete(p.nick);
+        book.set(p.nick, { at: now, emote: p.emote ?? known?.emote ?? null, flair: p.flair ?? known?.flair ?? null });
+      }
+      for (const [nick, r] of book) {
+        if (now - r.at <= stayMs) break; // the rest are more recent
+        book.delete(nick);
+      }
+
+      // Those on stage: a new emote if they sent one, a hop, and still here.
+      for (const p of heard) {
+        const npc = all.get(p.nick);
+        if (!npc) continue;
+        if (p.emote) {
+          // During a winner moment everyone claps; they go back to this after.
+          setEmote(npc, npc.clapUntil > now ? "Klappa" : p.emote);
+          if (npc.clapUntil > now) npc.restore = p.emote;
+          if (!npc.entering && !clipOn.current) npc.hop = Math.max(npc.hop, 0.6);
+        }
+        npc.lastSeen = now;
+      }
+
+      // Newcomers, most recent first, paced. While a clip plays, nobody new.
+      // A full stage keeps who's there (dgg-radio's way: people stay until
+      // they go quiet), or swaps out the quietest, if set to.
+      if (!clipOn.current && bucket.tokens >= 1) {
+        const waiting = [...book].reverse();
+        for (const [nick, r] of waiting) {
+          if (bucket.tokens < 1) break;
+          if (all.has(nick)) continue;
+          if (all.size >= set.max) {
+            if (set.whenFull !== "swap") break;
+            let quietest: Npc | null = null;
             for (const n of all.values()) {
               if (n.entering || now - n.bornAt < MIN_STAY_MS) continue;
-              if (!oldest || n.lastSeen < oldest.lastSeen) oldest = n;
+              if (!quietest || n.lastSeen < quietest.lastSeen) quietest = n;
             }
-            if (!oldest) continue;
-            leave(oldest);
+            if (!quietest || quietest.lastSeen >= r.at) break;
+            leave(quietest);
           }
           bucket.tokens -= 1;
-          npc = spawn(event.nick, event.emote, event.flair);
-          if (clapUntil.current > now) npc.clapUntil = clapUntil.current;
+          const npc = spawn(nick, r.emote ?? chatEmote.current, r.flair);
+          npc.lastSeen = r.at;
+          if (clapUntil.current > now) {
+            npc.clapUntil = clapUntil.current;
+            npc.restore = npc.emote;
+            setEmote(npc, "Klappa");
+          }
         }
-        // During a winner moment everyone claps, newcomers too.
-        setEmote(npc, npc.clapUntil > now ? "Klappa" : event.emote);
-        if (npc.clapUntil > now) npc.restore = event.emote;
-        if (!npc.entering && !clipOn.current) npc.hop = Math.max(npc.hop, 0.6);
-        npc.lastSeen = now;
       }
       const said = settings.current.showSaid ? summary.said : [];
       // No speech bubbles over a clip.
@@ -295,7 +368,7 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
         // A verified message gets a character too, within the same limits.
         let npc = all.get(s.nick);
         if (!npc) {
-          if (bucket.tokens < 1 || all.size >= settings.current.max) continue;
+          if (bucket.tokens < 1 || all.size >= set.max) continue;
           bucket.tokens -= 1;
           npc = spawn(s.nick, "PepoG", s.flair);
         }
@@ -338,8 +411,8 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
       if (summary.combo && summary.combo.count >= 3 && !clipOn.current) {
         for (const n of all.values()) if (n.emote === summary.combo.emote && !n.entering) n.hop = 1.4;
       }
-      // Characters walk off after a minute of silence.
-      if (!clipOn.current) for (const n of [...all.values()]) if (now - n.lastSeen > 60_000) leave(n);
+      // Characters walk off once they've been quiet for the stay time.
+      if (!clipOn.current) for (const n of [...all.values()]) if (now - n.lastSeen > stayMs) leave(n);
       // Over the limit (it was lowered): the quietest go, a few at a time.
       if (all.size > settings.current.max && !clipOn.current) {
         const quiet = [...all.values()].filter((n) => !n.entering).sort((a, b) => a.lastSeen - b.lastSeen);
@@ -350,6 +423,7 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
         npcs: all.size,
         perSecond: Math.round(s.perSecond * 0.7 + summary.messages * 4 * 0.3),
         emoteOnly: Math.round(s.emoteOnly * 0.7 + summary.emoteOnly * 4 * 0.3),
+        chatting: book.size,
         ingestMs: feedStatus.ingestMs ?? 0,
       }));
     },
@@ -365,6 +439,7 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
   // Everyone walks off and the chat clears when switching feeds.
   useEffect(() => {
     for (const n of [...npcs.current.values()]) leave(n);
+    roster.current.clear();
     setLines([]);
   }, [feed, leave]);
 
@@ -693,6 +768,30 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
                   </select>
                 </label>
                 <label className="flex items-center gap-2">
+                  Who shows up
+                  <select value={who} onChange={(e) => setWho(e.currentTarget.value as Cast["who"])} className="cozy-input py-1!">
+                    <option value="everyone">Everyone who chats</option>
+                    <option value="emotes">Only emote messages</option>
+                  </select>
+                </label>
+                <label className="flex items-center gap-2" title="How long someone stays after their last message">
+                  Stays for
+                  <input type="range" min={1} max={30} step={1} value={stayMin} onChange={(e) => setStayMin(Number(e.currentTarget.value))} className="cozy-range" />
+                  <span className="w-12 tabular-nums">{stayMin} min</span>
+                </label>
+                <label className="flex items-center gap-2" title="New characters a second, at most">
+                  Arrivals
+                  <input type="range" min={0.5} max={10} step={0.5} value={arrivalRate} onChange={(e) => setArrivalRate(Number(e.currentTarget.value))} className="cozy-range" />
+                  <span className="w-12 tabular-nums">{arrivalRate}/s</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  When full
+                  <select value={whenFull} onChange={(e) => setWhenFull(e.currentTarget.value as Cast["whenFull"])} className="cozy-input py-1!">
+                    <option value="keep">Keep who's there</option>
+                    <option value="swap">Swap in newcomers</option>
+                  </select>
+                </label>
+                <label className="flex items-center gap-2">
                   Characters at most
                   <input type="range" min={10} max={400} step={10} value={max} onChange={(e) => setMax(Number(e.currentTarget.value))} className="cozy-range" />
                   <span className="w-9 tabular-nums">{max}</span>
@@ -718,7 +817,7 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
                   <input type="checkbox" checked={showSaid} onChange={(e) => setShowSaid(e.currentTarget.checked)} /> Verified messages
                 </label>
                 <p className="sm:col-span-2" style={{ color: "var(--muted)" }}>
-                  {status.note}
+                  {status.note} {stats.chatting.toLocaleString()} chatting in the last {stayMin} min.
                   {feed === "sim" &&
                     ` ${stats.emoteOnly.toLocaleString()} emote-only/s; the aggregator takes ${stats.ingestMs.toFixed(1)} ms each ¼ s.`}
                 </p>

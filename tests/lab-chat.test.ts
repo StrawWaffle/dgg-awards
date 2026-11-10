@@ -32,6 +32,22 @@ describe("chat aggregator", () => {
     expect(agg.flush(2)).toMatchObject({ messages: 0, events: [], top: [] });
   });
 
+  test("lists everyone who spoke, once each with their latest emote, up to a cap", () => {
+    const agg = new ChatAggregator(catalogue, { maxSpeakers: 3 });
+    agg.ingest(msg("a", "hello chat"));
+    agg.ingest(msg("b", "nice YEE"));
+    agg.ingest(msg("a", "Klappa"));
+    expect(agg.flush().speakers).toEqual([
+      { nick: "a", emote: "Klappa", flair: null },
+      { nick: "b", emote: "YEE", flair: null },
+    ]);
+    for (const n of ["c", "d", "e", "f", "g"]) agg.ingest(msg(n, "words"));
+    const s = agg.flush();
+    expect(s.speakers.length).toBe(3);
+    expect(s.messages).toBe(5);
+    expect(agg.flush().speakers).toEqual([]);
+  });
+
   test("an emote the author's tier doesn't allow is a word", () => {
     const agg = new ChatAggregator(catalogue);
     agg.ingest(msg("free", "SubOnly"));
@@ -87,7 +103,9 @@ describe("chat aggregator", () => {
     expect(s.messages).toBe(100_000);
     expect(s.events.length).toBe(40);
     expect(s.top.length).toBe(8);
-    expect(JSON.stringify(s).length).toBeLessThan(6000);
+    // 40 events, 150 speakers, the top emotes: about 10 kB, four times a second.
+    expect(s.speakers.length).toBe(150);
+    expect(JSON.stringify(s).length).toBeLessThan(14_000);
     // Generous: a busy awards chat is a few hundred messages a second.
     expect(ms).toBeLessThan(2000);
   });

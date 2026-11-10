@@ -552,6 +552,15 @@ StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, an
   - typecheck and 92 unit tests; 49 API tests, with the preview addresses added
   - in the browser: both preview menus (hover, jump, close, current page marked, the admin one on a phone), every stage and page, a preview vote not saved, the old addresses rewritten, `/lab#sound` kept, non-admin and signed-out refusals, the big screen switched to simulated votes with the reveal running, and the music's first play starting at 6.02 s
 
+### The big screen's cast, the way dgg-radio keeps it (2026-11-10, deployed)
+
+StrawWaffle: with the live chat only a few people showed up, even in an active chat; look at how dgg-radio decides who stays, and expose the settings.
+- **Why:** only emote-only messages put someone on stage (most of real chat types words), and anyone without another emote-only message for a minute walked off. And the page never reconnected to the relay after it dropped.
+- **Now:** the relay's summary has `speakers`, everyone who said anything in the quarter second (once each, with the last emote they used, up to 150; `ChatAggregator`). The stage keeps a roster like dgg-radio's `chooseWatchers`: who spoke within the stay time, most recent last. People on stage stay while they're in it, and newcomers fill free spots, most recent first, paced. Someone who hasn't sent an emote shows as the one chat is spamming most at that moment; their own once they send one.
+- **Settings in the gear** (remembered per browser, `lab.stage`): Who shows up (everyone who chats / only emote messages), Stays for (1–30 min after their last message, default 5), Arrivals (0.5–10 a second, default 2), When full (keep who's there, the default and dgg-radio's way / swap in newcomers, the quietest out after 12 s), plus Characters at most, names and verified messages as before. The note says how many are chatting within the stay time.
+- **The live feed reconnects** by itself (1 s, then doubling up to 30 s), saying so while it waits.
+- Tested: unit tests for `speakers` (96 pass; the flood test's summary limit raised to 14 kB for the 150 speakers); the simulator with no emote-only messages filled the stage at 2 a second to the 60 limit; the setting survived a reload; live destiny.gg chat filled 60 in 30 s; the page stayed connected through a server restart.
+
 ### Drafts from rinlux's clip folders, playing from Google Drive until trimmed (2026-11-10, deployed and imported)
 
 StrawWaffle: the videos were already sorted into award folders on Drive, so use that for the empty awards, and "use the Google Drive previews in all places until rinlux provides the trimmed timestamps, then process the file and replace it". Folders that aren't awards get their own categories at the end.

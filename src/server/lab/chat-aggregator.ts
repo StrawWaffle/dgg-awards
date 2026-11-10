@@ -11,6 +11,8 @@ import type { EmoteCatalogue } from "@/server/lab/emotes";
 
 /** Someone who sent only emotes: shown as a character doing that emote. */
 export type ChatEvent = { nick: string; emote: string; flair: string | null };
+/** Someone who said anything, with the last emote in it (null if none). */
+export type ChatSpeaker = { nick: string; emote: string | null; flair: string | null };
 /** Words from someone verified, which the stage may show at the right moment. */
 export type ChatSaid = { nick: string; text: string; flair: string | null };
 
@@ -23,6 +25,12 @@ export type ChatSummary = {
   emoteOnly: number;
   /** A uniform random sample of the emote-only messages. */
   events: ChatEvent[];
+  /**
+   * Who spoke in the window (any message), once each with their latest, up to
+   * a cap (a random pick past it). The stage keeps a roster from these, as
+   * dgg-radio does, so people who type words appear and stay too.
+   */
+  speakers: ChatSpeaker[];
   /** The most used emotes in the window, most first. */
   top: [emote: string, count: number][];
   /** A run of messages that were all the same single emote, as chat counts combos. */
@@ -44,6 +52,8 @@ export class ChatAggregator {
   private messages = 0;
   private emoteOnly = 0;
   private sample: ChatEvent[] = [];
+  private speakers = new Map<string, ChatSpeaker>();
+  private speakerCount = 0;
   private counts = new Map<string, number>();
   private said: ChatSaid[] = [];
   private combo: { emote: string; count: number } | null = null;
@@ -52,7 +62,7 @@ export class ChatAggregator {
 
   constructor(
     private catalogue: EmoteCatalogue | null,
-    private readonly options: { maxEvents?: number; maxSaid?: number; verified?: string[]; random?: () => number } = {},
+    private readonly options: { maxEvents?: number; maxSaid?: number; maxSpeakers?: number; verified?: string[]; random?: () => number } = {},
   ) {
     this.verified = new Set(options.verified ?? VERIFIED_FLAIRS);
   }
@@ -92,6 +102,21 @@ export class ChatAggregator {
     }
     const flair = SHOWN_FLAIRS.find((f) => features.includes(f)) ?? null;
 
+    // Everyone who speaks, once per window with their latest. Past the cap,
+    // each new name may replace one at random (reservoir sampling).
+    const maxSpeakers = this.options.maxSpeakers ?? 150;
+    const speaker = { nick: msg.nick, emote: last, flair };
+    if (this.speakers.has(msg.nick) || this.speakers.size < maxSpeakers) this.speakers.set(msg.nick, speaker);
+    else {
+      this.speakerCount++;
+      const random = this.options.random ?? Math.random;
+      if (Math.floor(random() * (maxSpeakers + this.speakerCount)) < maxSpeakers) {
+        const victim = [...this.speakers.keys()][Math.floor(random() * this.speakers.size)]!;
+        this.speakers.delete(victim);
+        this.speakers.set(msg.nick, speaker);
+      }
+    }
+
     // Combos: consecutive messages that are exactly one emote, the same one.
     const continues = allEmotes && words.length === 1 && last !== null && this.combo?.emote === last;
     if (!continues && this.combo && this.combo.count >= 2 && this.ended.length < 10) this.ended.push(this.combo);
@@ -122,6 +147,7 @@ export class ChatAggregator {
       messages: this.messages,
       emoteOnly: this.emoteOnly,
       events: this.sample,
+      speakers: [...this.speakers.values()],
       top: [...this.counts].sort((a, b) => b[1] - a[1]).slice(0, 8),
       combo: this.combo && this.combo.count >= 2 ? this.combo : null,
       ended: this.ended,
@@ -131,6 +157,8 @@ export class ChatAggregator {
     this.messages = 0;
     this.emoteOnly = 0;
     this.sample = [];
+    this.speakers = new Map();
+    this.speakerCount = 0;
     this.counts = new Map();
     this.said = [];
     return summary;
