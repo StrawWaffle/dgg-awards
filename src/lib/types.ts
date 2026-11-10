@@ -33,7 +33,8 @@ export type NomineeDetails =
   | "clipStatus"
   | "clipError"
   | "thumbnailKey"
-  | "thumbnailAt";
+  | "thumbnailAt"
+  | "emote";
 
 export type ImportableData = (Omit<Category, "votingStyle"> &
   Partial<Pick<Category, "votingStyle">> & { hidden?: boolean } & {

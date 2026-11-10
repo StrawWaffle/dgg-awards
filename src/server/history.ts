@@ -23,6 +23,7 @@ import {
   reorderNominees,
   setCategoryFields,
   setNomineeFields,
+  setNomineeMedia,
   setSetting,
   setUserAdmin,
 } from "@/lib/data/driver";
@@ -30,6 +31,10 @@ import type { HistoryAction, HistoryKind } from "@/lib/data/schema";
 import { adminUsernames } from "@/server/routes/auth";
 
 export type Actor = { uid: number | null; name: string };
+/** A picture an import gave a nominee that was already there: `from` is what it had. */
+export type ImportedPicture = { categoryId: string; id: string; from: string | null; to: string };
+/** An emote an import gave a nominee: `from` is what it had. */
+export type ImportedEmote = ImportedPicture;
 type Snapshot = Record<string, unknown>;
 
 /** Clip builds finish in the background, after the request that started them. */
@@ -284,7 +289,23 @@ export async function undo(id: number, actor: Actor, force = false): Promise<num
           rows.push(row);
           await deleteNominee(a.categoryId, a.id);
         }
-        return record(actor, { ...base, action: "delete", before: { categories: snapshots, added: rows } });
+        // Pictures and emotes it gave nominees that were already there,
+        // unless one has been changed since.
+        const pictures: ImportedPicture[] = [];
+        for (const p of (after.pictures ?? []) as ImportedPicture[]) {
+          const row = await getNominee(p.categoryId, p.id);
+          if (row?.thumbnailKey !== p.to) continue;
+          await setNomineeMedia(p.categoryId, p.id, { thumbnailKey: p.from, thumbnailAt: null });
+          pictures.push(p);
+        }
+        const emotes: ImportedEmote[] = [];
+        for (const e of (after.emotes ?? []) as ImportedEmote[]) {
+          const row = await getNominee(e.categoryId, e.id);
+          if (row?.emote !== e.to) continue;
+          await setNomineeFields(e.categoryId, e.id, { emote: e.from });
+          emotes.push(e);
+        }
+        return record(actor, { ...base, action: "delete", before: { categories: snapshots, added: rows, pictures, emotes } });
       }
       // Undoing that undo: put the imported categories and nominees back.
       const snapshots = (before.categories ?? []) as (CategoryRow & { options?: NomineeRow[] })[];
@@ -300,6 +321,20 @@ export async function undo(id: number, actor: Actor, force = false): Promise<num
         for (const nominee of options) await insertNominee(nominee);
       }
       for (const row of rows) await insertNominee(row);
+      const pictures: ImportedPicture[] = [];
+      for (const p of (before.pictures ?? []) as ImportedPicture[]) {
+        const row = await getNominee(p.categoryId, p.id);
+        if (!row || row.thumbnailKey !== p.from) continue;
+        await setNomineeMedia(p.categoryId, p.id, { thumbnailKey: p.to, thumbnailAt: null });
+        pictures.push(p);
+      }
+      const emotes: ImportedEmote[] = [];
+      for (const e of (before.emotes ?? []) as ImportedEmote[]) {
+        const row = await getNominee(e.categoryId, e.id);
+        if (!row || row.emote !== e.from) continue;
+        await setNomineeFields(e.categoryId, e.id, { emote: e.to });
+        emotes.push(e);
+      }
       return record(actor, {
         ...base,
         action: "create",
@@ -307,6 +342,8 @@ export async function undo(id: number, actor: Actor, force = false): Promise<num
           categories: snapshots.map((s) => s.id),
           added: rows.map((r) => ({ categoryId: r.categoryId, id: r.id })),
           nominees: snapshots.reduce((n, s) => n + (s.options?.length ?? 0), 0) + rows.length,
+          pictures,
+          emotes,
         },
       });
     }

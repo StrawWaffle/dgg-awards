@@ -20,6 +20,7 @@ const fieldNames: Record<string, string> = {
   clipError: "clip error",
   thumbnailKey: "thumbnail",
   thumbnailAt: "thumbnail frame",
+  emote: "emote",
   votingStyle: "voting style",
   viewingMode: "mode",
   startTime: "voting opens",

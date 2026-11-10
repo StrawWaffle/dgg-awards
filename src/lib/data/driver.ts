@@ -695,6 +695,7 @@ export async function updateNominee(d: API.PATCH_NomineeRequest) {
       linkType: d.linkType,
       clipStart: d.clipStart,
       clipEnd: d.clipEnd,
+      emote: d.emote,
     })
     .where(
       and(

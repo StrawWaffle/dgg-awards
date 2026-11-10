@@ -552,6 +552,17 @@ StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, an
   - typecheck and 92 unit tests; 49 API tests, with the preview addresses added
   - in the browser: both preview menus (hover, jump, close, current page marked, the admin one on a phone), every stage and page, a preview vote not saved, the old addresses rewritten, `/lab#sound` kept, non-admin and signed-out refusals, the big screen switched to simulated votes with the reveal running, and the music's first play starting at 6.02 s
 
+### Draft pictures: the wiki for people, an emote for chatters (2026-11-10, built, not deployed)
+
+StrawWaffle's idea: nominees without a picture get a draft one.
+
+- **People** (Ally, Antagonist, Brainlet, Buddy, Employee, Frenemy): the main picture of their DGG wiki page (`wiki.destiny.gg`, MediaWiki's `pageimages`), uploaded as an ordinary picture. Pages are mapped by hand in `scripts/draft-pictures.ts` (`WIKI`): the wiki's search picks wrong pages (Connor gave Alex O'Connor, so he's left out). No page or no picture: Mehdi Hasan, Prof. Dave, Kafka, FreyaHolmer, Jaydr (redirects to "Chatters"), 10minuteads.
+- **Chatters** (DGGer of the Year, and people above with no wiki picture who chat): an **emote**, drawn live where the picture goes. destiny.gg profile photos were tried first, but they are only 8 preset drawings and 76 of 117 chatters have the default one.
+  - A new nominee column `emote` (migration 0010), set in the editor's Picture section and shown, moving, by destiny.gg's `emotes.css` on the vote cards, the big screen, the results and the admin list. A picture always wins. `admin.html` now links `emotes.css` too. The `missing-media` check counts an emote as media.
+  - Which emote: the one that's "most theirs" (StrawWaffle's pick). From their top five emotes this year (from the chat logs, dgg-scs), the largest share of their emote uses, weighed by how few other nominees have it in their top five (tf-idf), so OMEGALUL (the top emote of 71 of 117) rarely wins. Only emotes destiny.gg still has.
+- **Run:** `bun scripts/draft-pictures.ts <top-emotes.json> [--dry-run]` in the app container (copy the file in with `docker cp`). The JSON is `{ "<nick>": { messages, emotes, top: [[emote, count], …] } }`; it isn't in the repo. Nominees with a picture or emote are skipped. It backs up first and is one history entry; undo takes off its pictures and emotes (`after.pictures`, `after.emotes`), except any changed since.
+- Dry run on a copy of the live data: 14 wiki pictures, 119 emotes, 15 left as they are (the six people above; and ningquang, Mexijo, SydneySweeny, wwholen, owoot and the nameless "12." in DGGer, which have no messages this year: probably misspelt).
+
 ### The big screen's cast, the way dgg-radio keeps it (2026-11-10, deployed)
 
 StrawWaffle: with the live chat only a few people showed up, even in an active chat; look at how dgg-radio decides who stays, and expose the settings.

@@ -7,7 +7,7 @@ import { Emote } from "@/lab/Emote";
 import { cssVar } from "@/lab/sketch";
 import type { Me, SiteConfig } from "@/site/Site";
 
-type Nominee = { id: string; title: string; description: string; image: string | null; clip: Clip | null };
+type Nominee = { id: string; title: string; description: string; image: string | null; emote: string | null; clip: Clip | null };
 type Award = { id: string; title: string; description: string; ranked: boolean; nominees: Nominee[] };
 
 const toAwards = (data: any[]): Award[] =>
@@ -23,6 +23,7 @@ const toAwards = (data: any[]): Award[] =>
         title: o.title,
         description: o.description ?? "",
         image: o.thumbnailUrl ?? (o.imageId ? `/Media/${o.imageId}` : null),
+        emote: o.emote ?? null,
         clip: nomineeClip(o, o.title),
       })),
     }));
@@ -330,7 +331,15 @@ function Ballot({
                         aria-pressed={on}
                       >
                         <div className="relative aspect-[4/3] overflow-hidden rounded-[14px]" style={{ background: "var(--panel-border)" }}>
-                          {n.image && <img src={n.image} alt="" className="h-full w-full object-cover" loading="lazy" />}
+                          {n.image ? (
+                            <img src={n.image} alt="" className="h-full w-full object-cover" loading="lazy" />
+                          ) : (
+                            n.emote && (
+                              <span className="flex h-full w-full items-center justify-center" style={{ background: "var(--cream)" }}>
+                                <Emote name={n.emote} size={2.4} />
+                              </span>
+                            )
+                          )}
                           {award.ranked && on && (
                             <span
                               className="hand absolute top-2 left-2 flex h-9 w-9 items-center justify-center rounded-full text-2xl font-bold"

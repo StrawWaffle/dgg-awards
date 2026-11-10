@@ -88,6 +88,7 @@ export async function loadSimulated(): Promise<AwardResult[]> {
           percentage: Number(((counts[i]! / counted) * 100).toFixed(1)),
           isWinner: counts[i] === most,
           image: o.thumbnailUrl ?? (o.imageId ? `/Media/${o.imageId}` : null),
+          emote: o.emote ?? undefined,
           clip: nomineeClip(o, `${o.title} · ${c.title}`),
         }))
         .sort((a: Standing, b: Standing) => b.count! - a.count!);
@@ -111,6 +112,7 @@ export async function loadSummary(): Promise<AwardResult[]> {
       percentage: o.percentage,
       isWinner: o.isWinner,
       image: o.payload?.thumbnailUrl ?? (o.payload?.imageId ? `/Media/${o.payload.imageId}` : null),
+      emote: o.payload?.emote ?? undefined,
       clip: o.payload ? nomineeClip(o.payload, `${o.title} · ${c.categoryTitle}`) : null,
     })),
     rounds: c.runoff?.rounds ?? null,

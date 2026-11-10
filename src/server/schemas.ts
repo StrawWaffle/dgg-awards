@@ -121,6 +121,8 @@ export const nomineePatch = z.object({
   imageId: z.string().nullable().optional(),
   videoId: z.string().nullable().optional(),
   renderType: renderType.nullable().optional(),
+  /** A destiny.gg emote name, shown while there's no picture. */
+  emote: z.string().regex(/^[A-Za-z0-9_]{1,40}$/, "An emote name, as typed in chat.").nullable().optional(),
   ...nomineeDetails,
 });
 

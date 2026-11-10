@@ -27,6 +27,8 @@ export type NomineeInput = {
   /** A built clip, and a picture, if there are any. */
   clipKey?: string | null;
   thumbnailKey?: string | null;
+  /** An emote shown in place of a picture. */
+  emote?: string | null;
 };
 
 export type CategoryInput = {
@@ -111,7 +113,7 @@ export function checkNominee(
     add("unrecognized-link", "warning", "Unrecognized link. Check what it points to and set its type.");
   }
 
-  if (!n.imageId && !n.videoId && n.clipStart == null && !n.clipKey && !n.thumbnailKey && type !== "google-drive") {
+  if (!n.imageId && !n.videoId && n.clipStart == null && !n.clipKey && !n.thumbnailKey && !n.emote && type !== "google-drive") {
     add("missing-media", "error", "No image, video or clip.");
   }
   if (type === "google-drive" && !n.clipKey) {

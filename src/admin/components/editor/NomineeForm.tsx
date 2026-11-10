@@ -7,6 +7,7 @@ import { libraryUrl, useLibrary } from "@/admin/components/editor/library";
 import { HistoryList } from "@/admin/components/history/HistoryList";
 import { Button, ErrorText, Field, TimeInput, inputClass } from "@/admin/components/editor/fields";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Emote } from "@/lab/Emote";
 import { type LinkType, classifyLink, driveFileId, linkAt, linkLabel, linkTypes } from "@/lib/links";
 import {
   type AdminNominee,
@@ -30,6 +31,7 @@ type Draft = {
   clipStart: number | null;
   clipEnd: number | null;
   imageId: string;
+  emote: string;
   renderType: "default" | "compact";
 };
 
@@ -42,6 +44,7 @@ const draftOf = (n: AdminNominee): Draft => ({
   clipStart: n.clipStart,
   clipEnd: n.clipEnd,
   imageId: n.imageId ?? "",
+  emote: n.emote ?? "",
   renderType: n.renderType ?? "default",
 });
 
@@ -79,6 +82,7 @@ export function NomineeForm({ nominee, issues }: { nominee: AdminNominee; issues
         clipStart: draft.clipStart,
         clipEnd: draft.clipEnd,
         imageId: draft.imageId.trim() || null,
+        emote: draft.emote.trim() || null,
         renderType: draft.renderType,
       }),
     onSuccess: refresh,
@@ -248,7 +252,13 @@ export function NomineeForm({ nominee, issues }: { nominee: AdminNominee; issues
         </div>
       </Section>
 
-      <PictureSection nominee={nominee} imageId={draft.imageId} setImageId={(v) => set("imageId", v)} />
+      <PictureSection
+        nominee={nominee}
+        imageId={draft.imageId}
+        setImageId={(v) => set("imageId", v)}
+        emote={draft.emote}
+        setEmote={(v) => set("emote", v)}
+      />
       <ClipSection nominee={nominee} unsaved={dirty} />
       {type === "dgg-profile" && draft.url && (
         <ProfileSection url={draft.url} onUseBio={(bio) => set("description", bio)} />
@@ -280,10 +290,14 @@ function PictureSection({
   nominee,
   imageId,
   setImageId,
+  emote,
+  setEmote,
 }: {
   nominee: AdminNominee;
   imageId: string;
   setImageId: (value: string) => void;
+  emote: string;
+  setEmote: (value: string) => void;
 }) {
   const refresh = useRefreshEditor();
   const fileInput = useRef<HTMLInputElement>(null);
@@ -315,15 +329,19 @@ function PictureSection({
       : "An uploaded picture."
     : imageId
       ? "The image file from the code."
-      : "No picture yet.";
+      : emote
+        ? "No picture: the emote shows in its place."
+        : "No picture yet.";
 
   return (
     <div>
-      <Section id="nominee-picture" title="Picture" aside={nominee.thumbnailUrl || imageId ? "set" : "none"} boxed={false}>
+      <Section id="nominee-picture" title="Picture" aside={nominee.thumbnailUrl || imageId ? "set" : emote ? "emote" : "none"} boxed={false}>
         <div className="flex flex-wrap items-start gap-4">
           <div className="flex h-32 w-32 shrink-0 items-center justify-center overflow-hidden rounded border border-neutral-200 bg-[repeating-conic-gradient(#eee_0_25%,#fff_0_50%)] bg-[length:16px_16px]">
             {shown ? (
               <img src={shown} alt="" className="max-h-full max-w-full object-contain" />
+            ) : emote ? (
+              <Emote name={emote.trim()} size={2} />
             ) : (
               <span className="text-xs text-neutral-500">none</span>
             )}
@@ -379,6 +397,9 @@ function PictureSection({
             <ErrorText>{upload.error?.message ?? remove.error?.message ?? fromLibrary.error?.message}</ErrorText>
             <Field label="Image file from the code (older nominees)" hint="A file in src/media, e.g. zee.jpg. Shows when there's no picture. Saved with Save above.">
               <input className={inputClass} value={imageId} onChange={(e) => setImageId(e.currentTarget.value)} />
+            </Field>
+            <Field label="Emote" hint="A destiny.gg emote, spelt as in chat (e.g. PepoTurtle). Shows, moving, in place of the picture while there's none. Saved with Save above.">
+              <input className={inputClass} value={emote} onChange={(e) => setEmote(e.currentTarget.value)} />
             </Field>
           </div>
         </div>

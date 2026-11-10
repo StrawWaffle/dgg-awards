@@ -6,6 +6,7 @@ import { HistoryList } from "@/admin/components/history/HistoryList";
 import { DragHandle, SortableList, useSortableRow } from "@/admin/components/Sortable";
 import { Button, ErrorText, Field, inputClass } from "@/admin/components/editor/fields";
 import { NomineeForm, useRefreshEditor } from "@/admin/components/editor/NomineeForm";
+import { Emote } from "@/lab/Emote";
 import { slugify, uniqueId } from "@/lib/ids";
 import type { VotingStyle } from "@/lib/voting";
 import {
@@ -413,6 +414,10 @@ function NomineeRow({
         <DragHandle label={`Move ${n.title}`} {...row.handle} />
         {image ? (
           <img src={image} alt="" className="h-10 w-10 shrink-0 rounded object-cover" loading="lazy" />
+        ) : n.emote ? (
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded bg-neutral-100">
+            <Emote name={n.emote} size={0.9} />
+          </div>
         ) : (
           <div className="h-10 w-10 shrink-0 rounded bg-neutral-200" />
         )}

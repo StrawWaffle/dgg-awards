@@ -4,7 +4,7 @@ import { type Clip, nomineeClip } from "@/lab/ClipPlayer";
 import { Emote } from "@/lab/Emote";
 import type { Award } from "@/lab/Results";
 
-export type Nominee = { id: string; title: string; image: string | null; clip: Clip | null };
+export type Nominee = { id: string; title: string; image: string | null; emote: string | null; clip: Clip | null };
 /** One award on the big screen: its results joined to its nominees' pictures and clips. */
 export type ShowAward = Award & { description: string; nominees: Nominee[] };
 
@@ -21,10 +21,22 @@ export async function loadShow(results: Award[]): Promise<ShowAward[]> {
       id: o.id,
       title: o.title,
       image: o.thumbnailUrl ?? (o.imageId ? `/Media/${o.imageId}` : null),
+      emote: o.emote ?? null,
       clip: nomineeClip(o, `${o.title} · ${award.title}`),
     }));
     return { ...award, description: category?.description ?? "", nominees };
   });
+}
+
+/** The nominee's picture, or its emote while there's none. */
+function Picture({ nominee, size }: { nominee: Nominee; size: number }) {
+  if (nominee.image) return <img src={nominee.image} alt="" className="h-full w-full object-cover" />;
+  if (!nominee.emote) return null;
+  return (
+    <span className="flex h-full w-full items-center justify-center" style={{ background: "var(--cream)" }}>
+      <Emote name={nominee.emote} size={size} />
+    </span>
+  );
 }
 
 /** Scene one: the award's name, big, while the chatters roam. */
@@ -113,7 +125,7 @@ export function DvdMenu({ award, onPlay, keys }: { award: ShowAward; onPlay: (cl
                     playsInline
                   />
                 ) : (
-                  nominee.image && <img src={nominee.image} alt="" className="h-full w-full object-cover" />
+                  <Picture nominee={nominee} size={2.4} />
                 )}
                 {nominee.clip && (
                   <span
@@ -153,9 +165,9 @@ export function WinnerCard({ award, onPlay, onCheer }: { award: ShowAward; onPla
         <span className="cozy-chip coral">Winner</span>
         <Emote name="Klappa" size={1.3} title="" />
       </div>
-      {nominee?.image && (
+      {(nominee?.image || nominee?.emote) && (
         <div className="mx-auto aspect-video max-w-md overflow-hidden rounded-[16px] border-2" style={{ borderColor: "var(--panel-border)" }}>
-          <img src={nominee.image} alt="" className="h-full w-full object-cover" />
+          <Picture nominee={nominee} size={4} />
         </div>
       )}
       <h2 className="text-4xl font-black">{result.title}</h2>

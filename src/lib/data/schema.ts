@@ -93,6 +93,11 @@ export const optionsTable = sqliteTable(
     thumbnailKey: text(),
     /** Seconds into the clip the thumbnail frame was taken at. */
     thumbnailAt: int(),
+    /**
+     * A destiny.gg emote's name, drawn live (destiny.gg's emotes.css) where
+     * the picture goes while there's no picture. For chatters.
+     */
+    emote: text(),
     /** Display order within the category. Lowest first. */
     position: int().notNull().default(0),
   },
