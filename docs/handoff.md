@@ -552,6 +552,16 @@ StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, an
   - typecheck and 92 unit tests; 49 API tests, with the preview addresses added
   - in the browser: both preview menus (hover, jump, close, current page marked, the admin one on a phone), every stage and page, a preview vote not saved, the old addresses rewritten, `/lab#sound` kept, non-admin and signed-out refusals, the big screen switched to simulated votes with the reveal running, and the music's first play starting at 6.02 s
 
+### Ranking, third take: insertion, and picking exactly who fits (2026-11-10, built, not deployed)
+
+StrawWaffle, after trying the top 10: splitting a group cost far too many choices (it ranked the group all over again), and the comparisons felt random; he asked for midpoints. So `src/lab/rank.ts` is now **insertion**, for both views (`/preview/lab#rank` and `#rank-top`):
+
+- Chatters are placed one at a time into the list so far. The newcomer is on the left; on the right, whoever holds the midpoint of where they could still land (binary search), so every choice halves what's left to learn. Equal puts them in that group. The right side says where that group currently stands ("Currently 4th", "Currently equal, places 1 to 10").
+- **Top 10:** once ten are placed, a newcomer's first question is against your current 10th ("Does X make your top 10?", chip "the cutoff"). Worse: out after one choice, never asked again. Better: midpoint questions among the top. For 67, about 146 choices on average (merge sort: 207); the whole ranking about 318 (was 325). "At most" is the worst case, where everyone beats the cutoff (310).
+- **A group crossing the line is one pick:** "N are ranked equal for places a to b, but only k fit: pick the k who stay." Exactly k; they stay equal, sharing those places' points; the rest drop out. One step, whatever the group's size.
+- **Standings so far** under the pair: the list with the cutoff group marked, and how many are placed, to go and out.
+- New saved keys (`lab.rank.wildcards.v3`, `…v3.top10`): earlier runs don't replay. Tests rewritten in `tests/rank.test.ts` (order, ties, cutoff first, one pick of exactly k, points, estimates within 20 of 20 simulated runs).
+
 ### Wildcards: top 10, with points (2026-11-10, deployed)
 
 A copy of the ranking for StrawWaffle's next idea: only each person's top 10 matters. Lab view "Wildcards: top 10" (`/preview/lab#rank-top`), next to the whole ranking, which is unchanged. Same page (`RankChatters top={10}`), saved under its own key (`lab.rank.wildcards.top10`).

@@ -1,15 +1,18 @@
-// Ranking many things by hand, with ties: merge sort, asking a person. Lists
-// are merged two at a time by picking the better of two (or "equal"). With
-// `size` above 1 it starts from small batches ranked whole instead of single
-// items (tried first; picking from two all the way was quicker in practice).
-// A tie joins the two into one group, which then moves as one, so ties are
-// kept without asking more questions (if A = B and B = C, then A = C).
+// Ranking many things by hand, with ties: insertion, asking a person. The
+// items are placed one at a time into the list ranked so far, each by
+// comparing with the midpoint of where it could still land (binary search),
+// so every question halves what's left to learn about it. "Equal" puts it in
+// that group: ties cost nothing extra, and if A = B and B = C, then A = C.
 //
-// With `top` (say 10), only the best that many matter: a merge stops once it
-// has that many, and the rest drop out, never asked about again. Equals may
-// share places in the top, but a group that crosses the line (four tied for
-// places 8 to 11) is split: the person ranks just that group, for the places
-// left (three), and again if it still crosses.
+// With `top` (say 10), only the best that many matter. Once ten are placed, a
+// newcomer is first compared with whoever holds 10th place: worse, and they're
+// out after one question, never asked about again; better, and the midpoint
+// questions place them among the top. Equals may share places in the top, but
+// if a group of equals ends up crossing the line (four tied for places 8 to
+// 11), the person picks exactly the ones that fit (three); those stay equal.
+//
+// (Merge sort was tried first: its comparisons felt random, and splitting a
+// group meant ranking it all over again.)
 //
 // The state is plain data (JSON), so it can be saved and stepped back.
 
@@ -18,133 +21,119 @@ export type Group = string[];
 /** Best first. */
 export type Ranking = Group[];
 
-type Common = { asked: number; top: number | null };
-export type RankState = Common &
-  (
-    | { phase: "batches"; batches: string[][]; ranked: Ranking[] }
-    | { phase: "merge"; queue: Ranking[]; left: Ranking; right: Ranking; out: Ranking }
-    /** A group crossing the top line: `inner` ranks it for the `need` places left after `kept`. */
-    | { phase: "split"; kept: Ranking; need: number; inner: RankState }
-    | { phase: "done"; result: Ranking }
-  );
-export type MergeState = Extract<RankState, { phase: "merge" }>;
+export type RankState = {
+  top: number | null;
+  /** Not placed yet, in the order they'll come. */
+  queue: string[];
+  /** Placed so far, best first. */
+  ranked: Ranking;
+  /** Dropped: can't make the top any more. */
+  out: string[];
+  /** The one being placed, and the groups (by index) it could still land among: [lo, hi). */
+  cur: string | null;
+  lo: number;
+  hi: number;
+  /** The group it's compared with now. */
+  probe: number;
+  asked: number;
+};
 
 export type Choice = "left" | "right" | "tie";
+/** Answers, as saved: a comparison, or the ones kept out of a group crossing the line. */
+export type Step = Choice | { keep: string[] };
 
 const count = (r: Ranking) => r.reduce((n, g) => n + g.length, 0);
 
-/** Split into batches of at most `size`, as even as they can be (11 → 4, 3, 4). */
-export function batchesOf<T>(items: T[], size = 5): T[][] {
-  const n = Math.ceil(items.length / size);
-  const out: T[][] = [];
-  for (let i = 0; i < n; i++) out.push(items.slice(Math.round((i * items.length) / n), Math.round(((i + 1) * items.length) / n)));
-  return out;
+/** Start: the items in the order given (shuffle them first for a fair mix). */
+export function start(ids: string[], top: number | null = null): RankState {
+  return next({ top, queue: ids, ranked: [], out: [], cur: null, lo: 0, hi: 0, probe: 0, asked: 0 });
 }
 
-/** Start: the items one by one (or in batches), in the order given (shuffle them first for a fair mix). */
-export function start(ids: string[], size = 1, top: number | null = null): RankState {
-  return next({ phase: "batches", batches: batchesOf(ids, size), ranked: [], asked: 0, top });
+export type Phase = "compare" | "pick" | "done";
+export function phase(s: RankState): Phase {
+  if (s.cur) return "compare";
+  return crossing(s) ? "pick" : "done";
 }
 
-/** The batch to rank now, if it's that phase. */
-export function currentBatch(state: RankState) {
-  return state.phase === "batches" ? state.batches[state.ranked.length]! : null;
+/** The comparison being asked: the newcomer and the group it's measured against, with that group's first place. */
+export function current(s: RankState) {
+  if (!s.cur) return null;
+  const group = s.ranked[s.probe]!;
+  let place = 1;
+  for (let i = 0; i < s.probe; i++) place += s.ranked[i]!.length;
+  return { id: s.cur, group, place };
 }
 
-/** The comparison being asked, however deep in splits. */
-export function currentMerge(state: RankState): MergeState | null {
-  if (state.phase === "split") return currentMerge(state.inner);
-  return state.phase === "merge" ? state : null;
+/** The group of equals crossing the top line, and how many of them fit. */
+export function crossing(s: RankState): { group: Group; need: number; place: number } | null {
+  if (s.top === null || s.cur || count(s.ranked) <= s.top) return null;
+  const group = s.ranked.at(-1)!;
+  const before = count(s.ranked) - group.length;
+  return { group, need: s.top - before, place: before + 1 };
 }
 
-/** While a group crossing the top line is being split: how many it is, the places it's for, and the first place. */
-export function currentSplit(state: RankState): { size: number; need: number; from: number } | null {
-  if (state.phase !== "split") return null;
-  const deeper = currentSplit(state.inner);
-  const from = count(state.kept) + 1;
-  if (deeper) return { ...deeper, from: from + deeper.from - 1 };
-  return { size: splitSize(state.inner), need: state.need, from };
-}
-function splitSize(s: RankState): number {
-  if (s.phase === "batches") return s.batches.flat().length;
-  if (s.phase === "merge") return count(s.out) + count(s.left) + count(s.right) + s.queue.reduce((n, r) => n + count(r), 0);
-  if (s.phase === "split") return count(s.kept) + splitSize(s.inner);
-  return count(s.result);
-}
-
-/** Rank the current batch: its items in groups, best first. */
-export function rankBatch(state: RankState, ranking: Ranking): RankState {
-  if (state.phase !== "batches") throw new Error("Not ranking batches.");
-  const batch = state.batches[state.ranked.length]!;
-  const given = ranking.flat();
-  if (given.length !== batch.length || !batch.every((id) => given.includes(id))) throw new Error("Rank every item of the batch, once.");
-  return next({ ...state, ranked: [...state.ranked, cut(ranking.filter((g) => g.length), state.top)], asked: state.asked + 1 });
+/** Pick between the newcomer (left) and the group it's compared with (right). */
+export function choose(s: RankState, choice: Choice): RankState {
+  if (!s.cur) throw new Error("Nothing to compare.");
+  const asked = s.asked + 1;
+  if (choice === "tie") {
+    const ranked = s.ranked.map((g, i) => (i === s.probe ? [...g, s.cur!] : g));
+    return next(trim({ ...s, ranked, cur: null, asked }));
+  }
+  const lo = choice === "left" ? s.lo : s.probe + 1;
+  const hi = choice === "left" ? s.probe : s.hi;
+  if (lo < hi) return { ...s, lo, hi, probe: Math.floor((lo + hi) / 2), asked };
+  const ranked = [...s.ranked.slice(0, lo), [s.cur], ...s.ranked.slice(lo)];
+  return next(trim({ ...s, ranked, cur: null, asked }));
 }
 
-/** Pick between the two groups shown. */
-export function choose(state: RankState, choice: Choice): RankState {
-  if (state.phase === "split") return next({ ...state, inner: choose(state.inner, choice), asked: state.asked + 1 });
-  if (state.phase !== "merge") throw new Error("Not comparing.");
-  const [a, ...left] = state.left;
-  const [b, ...right] = state.right;
-  const asked = state.asked + 1;
-  if (choice === "left") return next({ ...state, left, out: [...state.out, a!], asked });
-  if (choice === "right") return next({ ...state, right, out: [...state.out, b!], asked });
-  return next({ ...state, left, right, out: [...state.out, [...a!, ...b!]], asked });
+/** Keep exactly the ones that fit out of the group crossing the line; the rest drop out. They stay equal. */
+export function keep(s: RankState, ids: string[]): RankState {
+  const x = crossing(s);
+  if (!x) throw new Error("No group to split.");
+  if (ids.length !== x.need || !ids.every((id) => x.group.includes(id))) throw new Error(`Keep exactly ${x.need} of them.`);
+  const rest = x.group.filter((id) => !ids.includes(id));
+  return { ...s, ranked: [...s.ranked.slice(0, -1), ids], out: [...s.out, ...rest], asked: s.asked + 1 };
 }
 
-/** The groups that start within the top (a group crossing the line is kept whole, for now). */
-function cut(r: Ranking, top: number | null): Ranking {
-  if (top === null) return r;
-  const kept: Ranking = [];
+export function apply(s: RankState, step: Step): RankState {
+  return typeof step === "string" ? choose(s, step) : keep(s, step.keep);
+}
+
+/** With a top: groups that start past the line drop out (one crossing it stays, to be split at the end). */
+function trim(s: RankState): RankState {
+  if (s.top === null) return s;
+  const ranked: Ranking = [];
+  const out = [...s.out];
   let before = 0;
-  for (const g of r) {
-    if (before >= top) break;
-    kept.push(g);
+  for (const g of s.ranked) {
+    if (before >= s.top) out.push(...g);
+    else ranked.push(g);
     before += g.length;
   }
-  return kept;
+  return { ...s, ranked, out };
 }
 
-/** Move on until there's a question to ask (a batch with more than one item, or two groups to compare). */
-function next(state: RankState): RankState {
-  const { top } = state;
-  if (state.phase === "batches") {
-    // A batch of one ranks itself.
-    while (state.ranked.length < state.batches.length && state.batches[state.ranked.length]!.length < 2) {
-      state = { ...state, ranked: [...state.ranked, state.batches[state.ranked.length]!.map((id) => [id])] };
-    }
-    if (state.ranked.length < state.batches.length) return state;
-    return merge(state.ranked, state.asked, top);
-  }
-  if (state.phase === "merge") {
-    // Done when a side runs out, or (with a top) once the top is full: the rest drop out.
-    const full = top !== null && count(state.out) >= top;
-    if (full || !state.left.length || !state.right.length) {
-      const merged = full ? state.out : [...state.out, ...state.left, ...state.right];
-      return merge([...state.queue, cut(merged, top)], state.asked, top);
-    }
-  }
-  if (state.phase === "split" && state.inner.phase === "done") {
-    return { phase: "done", result: [...state.kept, ...state.inner.result], asked: state.asked, top };
-  }
-  return state;
+/** Take the next one from the queue and set up its first question. */
+function next(s: RankState): RankState {
+  if (s.cur || !s.queue.length) return s;
+  const [cur, ...queue] = s.queue;
+  if (!s.ranked.length) return next({ ...s, queue, ranked: [[cur!]] });
+  const c = cutoff(s);
+  // Once the top is full, the first question is against whoever holds the last place.
+  if (c !== null) return { ...s, queue, cur: cur!, lo: 0, hi: c + 1, probe: c };
+  return { ...s, queue, cur: cur!, lo: 0, hi: s.ranked.length, probe: Math.floor(s.ranked.length / 2) };
 }
 
-/** Merge the first two rankings in the queue (the result goes to the back), or finish. */
-function merge(queue: Ranking[], asked: number, top: number | null): RankState {
-  if (queue.length <= 1) return finish(queue[0] ?? [], asked, top);
-  const [left, right, ...rest] = queue;
-  return next({ phase: "merge", queue: rest, left: left!, right: right!, out: [], asked, top });
-}
-
-/** The end, unless a group of equals crosses the top line: then that group is split. */
-function finish(result: Ranking, asked: number, top: number | null): RankState {
-  if (top === null || count(result) <= top) return { phase: "done", result, asked, top };
-  const kept = result.slice(0, -1);
-  const need = top - count(kept);
-  const group = result.at(-1)!;
-  return next({ phase: "split", kept, need, inner: start(group, 1, need), asked, top });
+/** The index of the group holding the last place of the top, once that many are placed. */
+function cutoff(s: RankState): number | null {
+  if (s.top === null || count(s.ranked) < s.top) return null;
+  let before = 0;
+  for (let i = 0; i < s.ranked.length; i++) {
+    before += s.ranked[i]!.length;
+    if (before >= s.top) return i;
+  }
+  return null;
 }
 
 /**
@@ -163,43 +152,40 @@ export function points(result: Ranking, top: number): { place: number; group: Gr
   return rows;
 }
 
-/** The most questions still to come (fewer when there are ties, or one side runs out early). */
-export function mostLeft(state: RankState): number {
-  return questionsLeft(state, (a, b) => a + b - 1);
+/** The most questions still to come (fewer with ties). */
+export function mostLeft(s: RankState): number {
+  return questionsLeft(s, (n) => Math.ceil(Math.log2(n + 1)), () => 1);
 }
 
 /**
- * About how many questions are still to come, if there are no more ties:
- * merging a random a and b takes a + b - a/(b+1) - b/(a+1) on average, as one
- * side usually runs out a little early. Every tie makes it fewer.
+ * About how many questions are still to come, with no more ties. In a top,
+ * the k-th newcomer beats the cutoff with about top/k odds (random order), and
+ * only then needs the midpoint questions.
  */
-export function expectedLeft(state: RankState): number {
-  return Math.round(questionsLeft(state, (a, b) => a + b - a / (b + 1) - b / (a + 1)));
+export function expectedLeft(s: RankState): number {
+  return Math.round(questionsLeft(s, (n) => Math.log2(n + 1), (k) => Math.min(1, (s.top ?? 0) / k)));
 }
 
-function questionsLeft(state: RankState, cost: (a: number, b: number) => number): number {
-  const { top } = state;
-  if (state.phase === "done") return 0;
-  if (state.phase === "split") return questionsLeft(state.inner, cost);
-  // With a top, a merge asks at most `top` questions (each places at least
-  // one), and keeps at most `top`.
-  const merge = (a: number, b: number) => (top === null ? cost(a, b) : Math.min(cost(a, b), top));
-  const keep = (n: number) => (top === null ? n : Math.min(n, top));
-  let queue: number[];
+/** `search(n)`: questions to place among n groups; `odds(k)`: that the k-th newcomer beats the cutoff. */
+function questionsLeft(s: RankState, search: (n: number) => number, odds: (k: number) => number): number {
   let now = 0;
-  if (state.phase === "batches") {
-    const left = state.batches.slice(state.ranked.length);
-    now = left.filter((b) => b.length > 1).length;
-    queue = [...state.ranked.map((r) => r.length), ...left.map((b) => keep(b.length))];
-  } else {
-    const placed = state.out.length;
-    now = top === null ? cost(state.left.length, state.right.length) : Math.min(cost(state.left.length, state.right.length), Math.max(0, top - count(state.out)));
-    queue = [...state.queue.map((r) => r.length), keep(placed + state.left.length + state.right.length)];
+  let groups = s.ranked.length;
+  let seen = count(s.ranked) + s.out.length;
+  if (s.cur) {
+    // The one on the table: however many of the groups it could still land among.
+    now += Math.max(1, search(s.hi - s.lo) - 0) * (s.hi - s.lo > 0 ? 1 : 0);
+    groups++;
+    seen++;
   }
-  while (queue.length > 1) {
-    const [a, b, ...rest] = queue;
-    now += merge(a!, b!);
-    queue = [...rest, keep(a! + b!)];
+  for (let i = 0; i < s.queue.length; i++) {
+    seen++;
+    if (s.top !== null && seen - 1 >= s.top) {
+      now += 1 + odds(seen) * search(Math.min(groups, s.top) - 1);
+      groups = Math.min(groups + 1, s.top);
+    } else {
+      now += search(groups);
+      groups++;
+    }
   }
   return now;
 }

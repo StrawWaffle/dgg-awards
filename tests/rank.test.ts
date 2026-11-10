@@ -1,134 +1,126 @@
 import { describe, expect, test } from "bun:test";
-import { type Choice, type RankState, batchesOf, choose, currentBatch, currentMerge, currentSplit, expectedLeft, mostLeft, points, rankBatch, start } from "@/lab/rank";
+import { type Choice, type RankState, choose, crossing, current, expectedLeft, keep, mostLeft, phase, points, start } from "@/lab/rank";
 
 /**
  * Answer every question from a known score (higher is better; equal scores
- * tie). When splitting a group that crosses the top line, `split` breaks ties
- * (as a person must, at least somewhere in the group).
+ * tie). A group crossing the top line keeps the `need` best by `pick` (as a
+ * person must choose, somehow).
  */
-function run(ids: string[], score: (id: string) => number, size = 1, top: number | null = null, split = (id: string) => score(id)) {
-  let s: RankState = start(ids, size, top);
+function run(ids: string[], score: (id: string) => number, top: number | null = null, pick = (id: string) => score(id)) {
+  let s: RankState = start(ids, top);
   const seen: number[] = [mostLeft(s)];
-  let splits = 0;
-  while (s.phase !== "done") {
-    if (s.phase === "batches") {
-      const batch = currentBatch(s)!;
-      const scores = [...new Set(batch.map(score))].sort((a, b) => b - a);
-      s = rankBatch(s, scores.map((v) => batch.filter((id) => score(id) === v)));
-    } else {
-      const m = currentMerge(s)!;
-      const f = currentSplit(s) ? split : score;
-      if (currentSplit(s)) splits++;
-      const a = f(m.left[0]![0]!);
-      const b = f(m.right[0]![0]!);
+  let picks = 0;
+  while (phase(s) !== "done") {
+    if (phase(s) === "compare") {
+      const q = current(s)!;
+      const a = score(q.id);
+      const b = score(q.group[0]!);
       const c: Choice = a > b ? "left" : a < b ? "right" : "tie";
       s = choose(s, c);
+    } else {
+      const x = crossing(s)!;
+      s = keep(s, [...x.group].sort((p, q) => pick(q) - pick(p)).slice(0, x.need));
+      picks++;
     }
     seen.push(mostLeft(s));
   }
-  return { result: s.result, asked: s.asked, seen, splits };
+  return { result: s.ranked, out: s.out, asked: s.asked, seen, picks };
 }
+const shuffle = <T,>(xs: T[]) => [...xs].sort(() => Math.random() - 0.5);
+const names = (n: number) => [...Array(n).keys()].map((i) => `n${i}`);
+const value = (id: string) => Number(id.slice(1));
 
-describe("ranking with ties", () => {
-  test("batches are as even as they can be", () => {
-    expect(batchesOf([...Array(11).keys()]).map((b) => b.length)).toEqual([4, 3, 4]);
-    expect(batchesOf([...Array(67).keys()]).map((b) => b.length).sort()).toEqual([4, 4, 4, ...Array(11).fill(5)].sort());
-    expect(batchesOf([...Array(5).keys()]).map((b) => b.length)).toEqual([5]);
-  });
-
-  test("67 distinct items come out in order", () => {
-    const ids = [...Array(67).keys()].map((i) => `n${i}`).sort(() => Math.random() - 0.5);
-    const { result, asked } = run(ids, (id) => Number(id.slice(1)));
-    expect(result).toEqual([...Array(67).keys()].reverse().map((i) => [`n${i}`]));
+describe("ranking by insertion, with ties", () => {
+  test("67 distinct items come out in order, in about n log n questions", () => {
+    const { result, asked, out } = run(shuffle(names(67)), value);
+    expect(result).toEqual(names(67).reverse().map((i) => [i]));
+    expect(out).toEqual([]);
     expect(asked).toBeLessThan(67 * 7);
+    expect(asked).toBeGreaterThan(67 * 4);
   });
 
   test("ties stay together, however they're met", () => {
-    const ids = [...Array(40).keys()].map((i) => `n${i}`).sort(() => Math.random() - 0.5);
-    const tier = (id: string) => Math.floor(Number(id.slice(1)) / 7); // 6 tiers of 7, one of 5
-    const { result } = run(ids, tier);
+    const tier = (id: string) => Math.floor(value(id) / 7); // 6 tiers of 7, one of 5
+    const { result } = run(shuffle(names(40)), tier);
     expect(result.map((g) => g.length)).toEqual([5, 7, 7, 7, 7, 7]);
     for (const g of result) expect(new Set(g.map(tier)).size).toBe(1);
     expect(result.map((g) => tier(g[0]!))).toEqual([5, 4, 3, 2, 1, 0]);
   });
 
-  test("the questions left never go up, and end at zero", () => {
-    const ids = [...Array(23).keys()].map((i) => `n${i}`);
-    const { seen } = run(ids, (id) => Number(id.slice(1)) % 4);
+  test("the most to go never rises while comparing, and ends at zero", () => {
+    const { seen } = run(names(23), value);
     for (let i = 1; i < seen.length; i++) expect(seen[i]!).toBeLessThanOrEqual(seen[i - 1]!);
     expect(seen.at(-1)).toBe(0);
   });
 
-  test("in batches of five, too", () => {
-    const ids = [...Array(31).keys()].map((i) => `n${i}`).sort(() => Math.random() - 0.5);
-    const { result } = run(ids, (id) => Number(id.slice(1)), 5);
-    expect(result).toEqual([...Array(31).keys()].reverse().map((i) => [`n${i}`]));
-  });
-
-  test("67 one by one: the estimate is below the most, and close to what it takes", () => {
-    const s = start([...Array(67).keys()].map((i) => `n${i}`));
-    expect(s.phase).toBe("merge");
-    expect(mostLeft(s)).toBe(67 * 7 - 2 ** 7 + 1 - 0); // n·⌈log2 n⌉ − 2^⌈log2 n⌉ + 1 for bottom-up pairs
-    let total = 0;
-    for (let i = 0; i < 20; i++) {
-      const ids = [...Array(67).keys()].map((i) => `n${i}`).sort(() => Math.random() - 0.5);
-      total += run(ids, (id) => Number(id.slice(1))).asked;
-    }
-    const average = total / 20;
-    expect(expectedLeft(s)).toBeLessThan(mostLeft(s));
-    expect(Math.abs(expectedLeft(s) - average)).toBeLessThan(15);
-  });
-
-  test("a batch must be ranked whole", () => {
-    const s = start(["a", "b", "c"], 5);
-    expect(() => rankBatch(s, [["a"], ["b"]])).toThrow();
-    expect(rankBatch(s, [["a", "b", "c"]]).phase).toBe("done");
-  });
-
-  test("top 10 of 67: just the best ten, in order, in far fewer questions", () => {
-    const ids = [...Array(67).keys()].map((i) => `n${i}`).sort(() => Math.random() - 0.5);
-    const all = run(ids, (id) => Number(id.slice(1)));
-    const top = run(ids, (id) => Number(id.slice(1)), 1, 10);
+  test("top 10 of 67: the best ten in order, in far fewer questions, most out after one", () => {
+    const ids = shuffle(names(67));
+    const all = run(ids, value);
+    const top = run(ids, value, 10);
     expect(top.result).toEqual([...Array(10).keys()].map((i) => [`n${66 - i}`]));
-    expect(top.asked).toBeLessThan(all.asked * 0.75);
-    expect(top.splits).toBe(0);
+    expect(top.out).toHaveLength(57);
+    expect(top.asked).toBeLessThan(all.asked * 0.6);
+    expect(top.picks).toBe(0);
+    // The 11th and later newcomers each cost at least one question; those who
+    // beat the cutoff cost a few more.
+    expect(top.asked).toBeGreaterThan(57);
   });
 
-  test("top 10: equals inside the top share it, and points", () => {
-    // Scores: n0..n2 best (equal), n3..n5 next (equal), then the rest one by one.
-    const score = (id: string) => {
-      const i = Number(id.slice(1));
-      return i < 3 ? 100 : i < 6 ? 90 : 80 - i;
-    };
-    const ids = [...Array(30).keys()].map((i) => `n${i}`).sort(() => Math.random() - 0.5);
-    const { result, splits } = run(ids, score, 1, 10);
+  test("top 10: equals inside the top share places and points", () => {
+    const score = (id: string) => (value(id) < 3 ? 100 : value(id) < 6 ? 90 : 80 - value(id));
+    const { result, picks } = run(shuffle(names(30)), score, 10);
     expect(result.map((g) => g.length)).toEqual([3, 3, 1, 1, 1, 1]);
-    expect(splits).toBe(0);
+    expect(picks).toBe(0);
     const rows = points(result, 10);
     expect(rows.map((r) => r.place)).toEqual([1, 4, 7, 8, 9, 10]);
     expect(rows.map((r) => r.points)).toEqual([9, 6, 4, 3, 2, 1]);
   });
 
-  test("top 10: a group crossing the line is split until it fits", () => {
+  test("top 10: a group crossing the line is split in one pick of exactly those who fit", () => {
     // 8 clear ones, then 5 equal (places 9 to 13), then the rest.
-    const score = (id: string) => {
-      const i = Number(id.slice(1));
-      return i < 8 ? 100 - i : i < 13 ? 50 : 10 - i;
-    };
-    const ids = [...Array(25).keys()].map((i) => `n${i}`).sort(() => Math.random() - 0.5);
-    // In the split, n8 and n9 are best of the five, and equal: they share 9th and 10th.
-    const split = (id: string) => (["n8", "n9"].includes(id) ? 2 : Number(id.slice(1)) < 13 ? 1 : 0);
-    const { result, splits } = run(ids, score, 1, 10, split);
-    expect(splits).toBeGreaterThan(0);
-    expect(result.slice(0, 8)).toEqual([...Array(8).keys()].map((i) => [`n${i}`]));
+    const score = (id: string) => (value(id) < 8 ? 100 - value(id) : value(id) < 13 ? 50 : 10 - value(id));
+    const pick = (id: string) => (["n8", "n9"].includes(id) ? 1 : 0);
+    const { result, out, picks, asked } = run(shuffle(names(25)), score, 10, pick);
+    expect(picks).toBe(1);
+    expect(result.slice(0, 8)).toEqual(names(8).map((i) => [i]));
     expect(result[8]!.sort()).toEqual(["n8", "n9"]);
     expect(result.flat()).toHaveLength(10);
+    expect(out).toHaveLength(15);
     expect(points(result, 10).at(-1)!.points).toBe(1.5);
+    expect(asked).toBeLessThan(25 * 4);
   });
 
-  test("top 10: the estimate starts well below a full ranking", () => {
-    const ids = [...Array(67).keys()].map((i) => `n${i}`);
-    expect(expectedLeft(start(ids, 1, 10))).toBeLessThan(expectedLeft(start(ids)) * 0.75);
-    expect(mostLeft(start(ids, 1, 10))).toBeLessThan(mostLeft(start(ids)));
+  test("keep() wants exactly the number that fit", () => {
+    let s = start(names(12), 10);
+    while (phase(s) === "compare") s = choose(s, "tie"); // all twelve equal
+    const x = crossing(s)!;
+    expect([x.group.length, x.need, x.place]).toEqual([12, 10, 1]);
+    expect(() => keep(s, x.group.slice(0, 9))).toThrow();
+    expect(() => keep(s, [...x.group.slice(0, 9), "nope"])).toThrow();
+    s = keep(s, x.group.slice(0, 10));
+    expect(phase(s)).toBe("done");
+    expect(s.out).toHaveLength(2);
+  });
+
+  test("the first question for a newcomer to a full top is against the cutoff", () => {
+    let s = start(names(12), 10);
+    // Place the first ten in order (each better than everyone so far: always "left").
+    for (let i = 0; i < 10; i++) while (s.cur === `n${i}`) s = choose(s, "left");
+    const q = current(s)!;
+    expect(q.id).toBe("n10");
+    expect(q.place).toBe(10);
+    expect(q.group).toEqual(["n0"]);
+    s = choose(s, "right"); // worse than the 10th: out at once
+    expect(s.out).toEqual(["n10"]);
+    expect(current(s)!.id).toBe("n11");
+  });
+
+  test("estimates: the top is well below the whole, and close to what it takes", () => {
+    const ids = names(67);
+    expect(expectedLeft(start(ids, 10))).toBeLessThan(expectedLeft(start(ids)) * 0.6);
+    expect(expectedLeft(start(ids, 10))).toBeLessThanOrEqual(mostLeft(start(ids, 10)));
+    let total = 0;
+    for (let i = 0; i < 20; i++) total += run(shuffle(ids), value, 10).asked;
+    expect(Math.abs(expectedLeft(start(ids, 10)) - total / 20)).toBeLessThan(20);
   });
 });
