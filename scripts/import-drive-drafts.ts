@@ -103,6 +103,25 @@ await Bun.write(idsFile, JSON.stringify(ids, null, 1));
 const newCategories: string[] = [];
 const added: { categoryId: string; id: string }[] = [];
 const taken = new Map<string, Set<string>>();
+
+/** Set a picture from a file, shrinking it first if it's over the 5 MB limit. A failure only loses the picture. */
+async function setPicture(categoryId: string, id: string, source: string) {
+  try {
+    let file = source;
+    if (Bun.file(file).size > 5 * 1024 * 1024) {
+      file = `/tmp/${id}-small.jpg`;
+      const ff = Bun.spawnSync(["ffmpeg", "-v", "error", "-i", source, "-vf", "scale='min(2400,iw)':-2", "-frames:v", "1", "-q:v", "3", "-y", file]);
+      if (ff.exitCode !== 0) throw new Error("couldn't shrink it");
+    }
+    const bytes = await Bun.file(file).arrayBuffer();
+    await thumbnailFromUpload(categoryId, id, new File([bytes], file.split("/").pop()!));
+  } catch (error) {
+    console.log(`  no picture for ${categoryId}/${id}: ${(error as Error).message}`);
+  }
+}
+
+// The history entry is written whatever happens, so undo always covers what was added.
+try {
 for (const p of plan) {
   if (p.own && !(await getCategory(p.own.id)) && !newCategories.includes(p.own.id)) {
     await insertCategory({ id: p.own.id, title: p.own.title, description: p.own.description, votingStyle: null, hidden: false });
@@ -142,8 +161,7 @@ for (const p of plan) {
     const frame = `/tmp/${id}-frame.jpg`;
     const ff = Bun.spawnSync(["ffmpeg", "-v", "error", "-ss", at.toFixed(2), "-i", path, "-frames:v", "1", "-q:v", "3", "-y", frame]);
     if (ff.exitCode === 0) {
-      const bytes = await Bun.file(frame).arrayBuffer();
-      await thumbnailFromUpload(p.categoryId, id, new File([bytes], "frame.jpg"));
+      await setPicture(p.categoryId, id, frame);
     } else {
       console.log(`  couldn't take a frame from ${p.file.path}`);
     }
@@ -159,15 +177,15 @@ for (const p of plan) {
         continue;
       }
     }
-    const bytes = await Bun.file(source).arrayBuffer();
-    await thumbnailFromUpload(p.categoryId, id, new File([bytes], source.split("/").pop()!));
+    await setPicture(p.categoryId, id, source);
   }
 }
-
+} finally {
 await record(serverActor, {
   kind: "import",
   action: "create",
   label: `Drafts from rinlux's clip folders: ${plan.length} nominees${newCategories.length ? `, ${newCategories.length} new categories` : ""}`,
   after: { categories: newCategories, added, nominees: plan.length },
 });
-console.log(`added ${plan.length} drafts (${newCategories.length} new categories: ${newCategories.join(", ") || "none"})`);
+}
+console.log(`added ${added.length + plan.filter((p) => newCategories.includes(p.categoryId)).length} of ${plan.length} drafts (${newCategories.length} new categories: ${newCategories.join(", ") || "none"})`);

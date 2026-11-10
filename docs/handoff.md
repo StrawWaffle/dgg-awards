@@ -27,7 +27,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 
 ### At a glance (end of session 2, 2026-11-09)
 
-**Live** (`main` at `972fccd`, deployed and pushed):
+**Live** (`main` at the drive drafts fix, deployed and pushed):
 - **Infrastructure:** the Docker preview behind a Cloudflare tunnel, real destiny.gg sign-in, the stack upgrade (Bun 1.4, Hono, Zod, TS 7), and clips into Cloudflare R2 at 1080p.
 - **Admin page:**
   - a left sidebar, dark theme, drag to reorder, and collapsible sections
@@ -552,7 +552,7 @@ StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, an
   - typecheck and 92 unit tests; 49 API tests, with the preview addresses added
   - in the browser: both preview menus (hover, jump, close, current page marked, the admin one on a phone), every stage and page, a preview vote not saved, the old addresses rewritten, `/lab#sound` kept, non-admin and signed-out refusals, the big screen switched to simulated votes with the reveal running, and the music's first play starting at 6.02 s
 
-### Drafts from rinlux's clip folders, playing from Google Drive until trimmed (branch `worktree-drive-drafts`, 2026-11-10)
+### Drafts from rinlux's clip folders, playing from Google Drive until trimmed (2026-11-10, deployed and imported)
 
 StrawWaffle: the videos were already sorted into award folders on Drive, so use that for the empty awards, and "use the Google Drive previews in all places until rinlux provides the trimmed timestamps, then process the file and replace it". Folders that aren't awards get their own categories at the end.
 - **Google Drive links** are a link type now (`google-drive`, `driveFileId()` in `src/lib/links.ts`). They embed in Drive's player (`/file/d/<id>/preview`), whole: it can't start or stop at a time. So until a clip is built, a Drive draft plays its whole video, everywhere clips play (voting, the big screen, the results). Once a clip is built, that replaces it, as for every other nominee.
@@ -564,6 +564,7 @@ StrawWaffle: the videos were already sorted into award folders on Drive, so use 
   - "2025 review" left out (last year's highlights)
   - pictures become the nominees' pictures (AVIF converted to PNG); videos get a frame a third in as their picture until the clip is made
   - it's one history entry, and undo removes all of it, including drafts added to existing awards (the import undo now also handles `added` nominees, not only new categories). A rerun skips what's there.
+- **On the live site** (2026-11-10): the first run stopped at a 7.8 MB picture ("9ep no kings", over the 5 MB picture limit) after 47 drafts, before its history entry. Those were removed by hand (back to 22 awards and 159 nominees), the script was fixed (pictures over 5 MB are shrunk to 2400 px first, a failed picture no longer stops the run, and the history entry is written whatever happens), and the second run added all 55 with a picture each: 25 awards, 214 nominees, 44 untrimmed warnings, one history entry. Backups: `…-before-deploy.db` and `2026-11-10T00-22-48-834Z-before-drive-drafts.db`.
 - **Tested** on `dgga-lab` with the real listing and the Emote folder: 55 drafts, 44 untrimmed warnings, undo back to 22 awards and 174 nominees, redo to 25 and 229; the editor opened GSN's library copy; voting opened Drive's player (Drive itself doesn't load in the test browser, so its playback is to check live). 95 unit tests, 50 API tests.
 
 ### Two takes on the year in chat, and the wobble on the beat (2026-11-10, deployed)
