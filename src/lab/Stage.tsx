@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { GearIcon } from "@radix-ui/react-icons";
-import { Emote } from "@/lab/Emote";
+import { Emote, emoteElement, loopRepeating } from "@/lab/Emote";
 import { type Clip, ClipPlayer } from "@/lab/ClipPlayer";
 import { Sketch } from "@/lab/sketch";
 import { type FeedStatus, liveFeed, simulatedFeed } from "@/lab/chatFeed";
@@ -83,6 +83,7 @@ function setEmote(npc: Npc, emote: string) {
   npc.emote = emote;
   npc.w = 0;
   npc.emoteEl.className = `emote ${emote}`;
+  setTimeout(() => loopRepeating(npc.emoteEl), 50);
 }
 
 /** The scenes of one award, in order; after the winner comes the next award's title. */
@@ -245,9 +246,8 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
     label.className = `${nickClass(flair)} mb-0.5 whitespace-nowrap rounded-full px-1.5 text-[11px]`;
     label.style.background = "color-mix(in oklab, var(--panel) 75%, transparent)";
     label.textContent = nick;
-    const emoteEl = document.createElement("span");
-    emoteEl.className = `emote ${emote}`;
-    el.append(bubble, label, emoteEl);
+    const { wrap, emote: emoteEl } = emoteElement(emote);
+    el.append(bubble, label, wrap);
     box.append(el);
     el.style.opacity = "0";
     // In from the left or the right edge, walking onto the stage.
