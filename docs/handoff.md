@@ -552,7 +552,7 @@ StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, an
   - typecheck and 92 unit tests; 49 API tests, with the preview addresses added
   - in the browser: both preview menus (hover, jump, close, current page marked, the admin one on a phone), every stage and page, a preview vote not saved, the old addresses rewritten, `/lab#sound` kept, non-admin and signed-out refusals, the big screen switched to simulated votes with the reveal running, and the music's first play starting at 6.02 s
 
-### Draft pictures: the wiki for people, an emote for chatters (2026-11-10, built, not deployed)
+### Draft pictures: the wiki for people, an emote for chatters (2026-11-10, deployed and run)
 
 StrawWaffle's idea: nominees without a picture get a draft one.
 
@@ -562,6 +562,7 @@ StrawWaffle's idea: nominees without a picture get a draft one.
   - Which emote: the one that's "most theirs" (StrawWaffle's pick). From their top five emotes this year (from the chat logs, dgg-scs), the largest share of their emote uses, weighed by how few other nominees have it in their top five (tf-idf), so OMEGALUL (the top emote of 71 of 117) rarely wins. Only emotes destiny.gg still has.
 - **Run:** `bun scripts/draft-pictures.ts <top-emotes.json> [--dry-run]` in the app container (copy the file in with `docker cp`). The JSON is `{ "<nick>": { messages, emotes, top: [[emote, count], …] } }`; it isn't in the repo. Nominees with a picture or emote are skipped. It backs up first and is one history entry; undo takes off its pictures and emotes (`after.pictures`, `after.emotes`), except any changed since.
 - **Chatting, and emotes drawn only in chat:** destiny.gg's `emotes.css` animates some emotes only inside a chat message (`.text > .emote.Chatting`); anywhere else Chatting was its whole 10-frame strip, still. `Emote` (and the big screen's cast, through `emoteElement`) now puts each emote in a `<span class="text" style="display: contents">`, and repeating animations loop forever on the big screen too (`loopRepeating`), as in `Emote`. StrawWaffle spotted it on the big screen.
+- **Run live** 2026-11-10 after a backup (`/data/backups/2026-11-10T01-31-18-360Z-before-draft-pictures.db`; the deploy's is `…01-30-47-793Z-before-deploy.db`): 14 wiki pictures and 119 emotes set, one history entry.
 - Dry run on a copy of the live data: 14 wiki pictures, 119 emotes, 15 left as they are (the six people above; and ningquang, Mexijo, SydneySweeny, wwholen, owoot and the nameless "12." in DGGer, which have no messages this year: probably misspelt).
 
 ### The big screen's cast, the way dgg-radio keeps it (2026-11-10, deployed)
