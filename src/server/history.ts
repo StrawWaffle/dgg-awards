@@ -36,16 +36,36 @@ export type Actor = { uid: number | null; name: string };
 export type ImportedPicture = { categoryId: string; id: string; from: string | null; to: string };
 /** An emote an import gave a nominee: `from` is what it had. */
 export type ImportedEmote = ImportedPicture;
-/** A nominee an import moved to another award, and its place in the old one. */
-export type MovedNominee = { id: string; from: string; to: string; position: number };
+/**
+ * A nominee an import moved to another award, and its place in the old one.
+ * `fields` are columns it changed on the way (the wildcards' titles lost
+ * their list number to `listNumber`): `before` is put back on undo.
+ */
+export type MovedNominee = {
+  id: string;
+  from: string;
+  to: string;
+  position: number;
+  fields?: { before: Partial<NomineeRow>; after: Partial<NomineeRow> };
+};
 
-/** Move nominees back where they came from (undo), or on again (redo). Skips any changed since. */
+/**
+ * Move nominees back where they came from (undo), or on again (redo), with
+ * the fields they had there. Skips any changed since.
+ */
 async function moveAll(moved: MovedNominee[], back: boolean) {
   const done: MovedNominee[] = [];
   for (const m of moved) {
     const [from, to] = back ? [m.to, m.from] : [m.from, m.to];
-    if (!(await getNominee(from, m.id)) || (await getNominee(to, m.id)) || (await nomineeHasVotes(from, m.id))) continue;
+    const row = await getNominee(from, m.id);
+    if (!row || (await getNominee(to, m.id)) || (await nomineeHasVotes(from, m.id))) continue;
     await moveNominee(from, m.id, to, back ? m.position : undefined);
+    if (m.fields) {
+      // Only if they're still as this left them.
+      const [was, now] = back ? [m.fields.after, m.fields.before] : [m.fields.before, m.fields.after];
+      const unchanged = Object.entries(was).every(([k, v]) => same((row as Snapshot)[k], v));
+      if (unchanged) await setNomineeFields(to, m.id, now);
+    }
     done.push(m);
   }
   return done;

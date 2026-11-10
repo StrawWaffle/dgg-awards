@@ -62,6 +62,8 @@ const nomineeDetails = {
   linkType: z.enum(linkTypes).nullable().optional(),
   clipStart: seconds.nullable().optional(),
   clipEnd: seconds.nullable().optional(),
+  /** Admin-only: the number on the organisers' list. */
+  listNumber: z.number().int().min(1).max(99999).nullable().optional(),
 };
 
 export const nomineeForm = z.object({

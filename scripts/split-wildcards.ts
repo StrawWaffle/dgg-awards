@@ -2,14 +2,16 @@
 // right after DGGer, voted as a top 10 by points (StrawWaffle, 2026-11-10: everyone
 // gives a top ten, the points are added up, one ranking and one winner).
 // The wildcards are the DGGer nominees whose description mentions
-// "wildcard"; they keep their pictures, emotes, links and clips. Groups A–E
-// stay in DGGer.
+// "wildcard"; they keep their pictures, emotes, links and clips. Their
+// titles lose the number from rinlux's list ("52. aus_bits" becomes
+// "aus_bits"); the number goes to `listNumber`, which only admins see.
+// Groups A–E stay in DGGer.
 //
 //   bun scripts/split-wildcards.ts [--dry-run]
 //
 // It backs up first and is one entry in the history: undoing it moves the
-// nominees back to DGGer, in their old places, and removes the new award
-// (refused once anyone has voted in it).
+// nominees back to DGGer, in their old places and with their old titles, and
+// removes the new award (refused once anyone has voted in it).
 import {
   backupDatabase,
   categoryHasVotes,
@@ -19,6 +21,7 @@ import {
   insertCategory,
   moveNominee,
   reorderCategories,
+  setNomineeFields,
 } from "@/lib/data/driver";
 import { type MovedNominee, record, serverActor } from "@/server/history";
 
@@ -36,8 +39,16 @@ if (await categoryHasVotes(FROM)) {
   console.log(`note: "${FROM}" has votes; nominees with votes won't move`);
 }
 
+/** "52. aus_bits" → title "aus_bits", number 52. A title that's only a number stays as it is. */
+const split = (title: string) => {
+  const m = title.match(/^(\d+)\.\s*(.+)$/);
+  return m ? { title: m[2]!.trim(), listNumber: Number(m[1]) } : null;
+};
 console.log(`${dry ? "Would create" : "Creating"} "${TO}" after "${from.title}" and move ${wildcards.length} nominees:`);
-console.log("  " + wildcards.map((o) => o.title).join(", "));
+for (const o of wildcards) {
+  const s = split(o.title);
+  console.log(`  ${o.title.padEnd(26)} → ${s ? `${s.title} (#${s.listNumber} on the list, admins only)` : "title kept"}`);
+}
 if (dry) process.exit(0);
 
 console.log("backup:", await backupDatabase("before-split-wildcards"));
@@ -58,14 +69,17 @@ try {
   await reorderCategories(order);
   for (const o of wildcards) {
     await moveNominee(FROM, o.id, TO);
-    moved.push({ id: o.id, from: FROM, to: TO, position: o.position });
+    const s = split(o.title);
+    const fields = s ? { before: { title: o.title, listNumber: o.listNumber }, after: s } : undefined;
+    if (fields) await setNomineeFields(TO, o.id, fields.after);
+    moved.push({ id: o.id, from: FROM, to: TO, position: o.position, ...(fields ? { fields } : {}) });
   }
 } finally {
   if (created) {
     await record(serverActor, {
       kind: "import",
       action: "create",
-      label: `Moved ${moved.length} DGGer wildcards into their own award, "DGGer wildcards" (top 10 by points)`,
+      label: `Moved ${moved.length} DGGer wildcards into their own award, "DGGer wildcards" (top 10 by points), their list numbers kept for admins`,
       categoryId: TO,
       after: { categories: [TO], added: [], nominees: moved.length, pictures: [], emotes: [], moved },
     });

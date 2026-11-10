@@ -34,7 +34,8 @@ export type NomineeDetails =
   | "clipError"
   | "thumbnailKey"
   | "thumbnailAt"
-  | "emote";
+  | "emote"
+  | "listNumber";
 
 export type ImportableData = (Omit<Category, "votingStyle"> &
   Partial<Pick<Category, "votingStyle">> & { hidden?: boolean } & {
@@ -161,7 +162,8 @@ export type ResultsData = {
     isWinner: boolean;
     points?: number;
     placed?: number;
-    payload: Option;
+    // Public: without the admin-only list number.
+    payload: Omit<Option, "listNumber">;
   }[];
 }[];
 

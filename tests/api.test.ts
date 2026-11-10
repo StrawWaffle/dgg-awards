@@ -1050,6 +1050,36 @@ describe("admin", () => {
     await req("/api/admin/category", json("PATCH", { id: "pointscat", hidden: true }), admin);
   });
 
+  test("a nominee's list number is for admins only", async () => {
+    const json = (method: string, body: unknown) => ({
+      method,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const ally = (await (await req("/api/admin/nominees", {}, admin)).json()).find((c: any) => c.id === "ally");
+    const id = ally.options[0].id;
+    expect(ally.options[0].listNumber).toBeNull();
+    expect((await req("/api/admin/nominee", json("PATCH", { id, categoryId: "ally", listNumber: 0 }), admin)).status).toBe(400);
+    expect((await req("/api/admin/nominee", json("PATCH", { id, categoryId: "ally", listNumber: 52 }), admin)).status).toBe(200);
+    const adminView = (await (await req("/api/admin/nominees", {}, admin)).json()).find((c: any) => c.id === "ally");
+    expect(adminView.options.find((o: any) => o.id === id).listNumber).toBe(52);
+    // The history has it, and undoing clears it.
+    const [entry] = await (await req(`/api/admin/history?nomineeId=${id}`, {}, admin)).json();
+    expect(entry?.after).toMatchObject({ listNumber: 52 });
+
+    // Voters never get it: not in the nominees, the results or a ballot's answer.
+    const hasIt = (x: unknown) => JSON.stringify(x).includes("listNumber");
+    expect(hasIt(await (await req("/api/nominees")).json())).toBe(false);
+    await setMode(admin, "reviewing");
+    expect(hasIt(await (await req("/api/vote/results")).json())).toBe(false);
+    expect(hasIt(await (await req("/api/vote/results?preview=1", {}, admin)).json())).toBe(false);
+    await setMode(admin, "voting");
+
+    expect((await req(`/api/admin/history/${entry.id}/undo`, json("POST", {}), admin)).status).toBe(200);
+    const after = (await (await req("/api/admin/nominees", {}, admin)).json()).find((c: any) => c.id === "ally");
+    expect(after.options.find((o: any) => o.id === id).listNumber).toBeNull();
+  });
+
   // Needs the dgga-files container serving tests/fixtures (see tests/run.sh).
   test(
     "clips: build in the background, serve with ranges, pick thumbnails",

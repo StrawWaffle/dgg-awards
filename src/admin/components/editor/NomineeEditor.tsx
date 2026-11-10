@@ -423,7 +423,14 @@ function NomineeRow({
           <div className="h-10 w-10 shrink-0 rounded bg-neutral-200" />
         )}
         <button type="button" className="min-w-0 flex-1 pl-1 text-left" aria-expanded={open} onClick={onToggle}>
-          <span className="block truncate text-sm font-medium">{n.title}</span>
+          <span className="flex min-w-0 items-baseline gap-2">
+            <span className="truncate text-sm font-medium">{n.title}</span>
+            {n.listNumber != null && (
+              <span className="shrink-0 text-xs text-neutral-600" title="Its number on rinlux's list. Admins only.">
+                #{n.listNumber} on the list
+              </span>
+            )}
+          </span>
           <span className="block text-xs text-neutral-600">
             {errors > 0 && <span className="text-red-700">{errors} error{errors > 1 && "s"} </span>}
             {issues.length - errors > 0 &&

@@ -98,6 +98,12 @@ export const optionsTable = sqliteTable(
      * the picture goes while there's no picture. For chatters.
      */
     emote: text(),
+    /**
+     * Admin-only: the nominee's number on the organisers' own list (rinlux's
+     * numbered wildcards; the DGGer groups' numbers could go here too), so
+     * titles can be plain names. Never sent to voters (see getNominees).
+     */
+    listNumber: int(),
     /** Display order within the category. Lowest first. */
     position: int().notNull().default(0),
   },
