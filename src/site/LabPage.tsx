@@ -3,6 +3,7 @@ import { ChatCalm } from "@/lab/ChatCalm";
 import { ChatStory } from "@/lab/ChatStory";
 import { Emote } from "@/lab/Emote";
 import { useSourceChoice, useStartOnFirstGesture } from "@/lab/music";
+import { RankChatters } from "@/lab/RankChatters";
 import { Stage } from "@/lab/Stage";
 import { Visualizer } from "@/lab/Visualizer";
 
@@ -16,6 +17,8 @@ export const labViews = [
   // Two takes on the year in chat (the live one is /chat), to pick from.
   { id: "chat-calm", label: "Year in chat: calm" },
   { id: "chat-story", label: "Year in chat: story" },
+  // Ranking the DGGer wildcards by hand, with ties (src/lab/rank.ts).
+  { id: "rank", label: "Rank the wildcards" },
 ] as const;
 export type LabView = (typeof labViews)[number]["id"];
 
@@ -50,6 +53,7 @@ function Experiments({ view, chatOpen, onView }: { view: LabView; chatOpen: bool
       .catch(() => setEmotes([]));
   }, []);
   if (view === "stage") return <Stage source={source} emotes={emotes} chatOpen={chatOpen} />;
+  if (view === "rank") return <RankChatters />;
   if (view === "chat-story") return <ChatStory onCalm={() => onView("chat-calm")} />;
   if (view === "chat-calm") {
     return (

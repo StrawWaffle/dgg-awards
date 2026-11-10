@@ -552,6 +552,16 @@ StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, an
   - typecheck and 92 unit tests; 49 API tests, with the preview addresses added
   - in the browser: both preview menus (hover, jump, close, current page marked, the admin one on a phone), every stage and page, a preview vote not saved, the old addresses rewritten, `/lab#sound` kept, non-admin and signed-out refusals, the big screen switched to simulated votes with the reveal running, and the music's first play starting at 6.02 s
 
+### Ranking the DGGer wildcards by hand, with ties (2026-11-10, built, not deployed)
+
+StrawWaffle wants to try ranking the 67 wildcards (DGGer nominees whose description says "Wildcards") in the lab: `/preview/lab#rank`, "Rank the wildcards".
+
+- **How:** the 67 are dealt at random into 14 batches of 4–5. Each batch is ranked by giving each chatter a place (the same number ties). Then the batches are merged two at a time, as merge sort does: two chatters (or two groups of equals) side by side, pick one or "Equal". Equals join into one group and move together from then on, so ties cost no extra questions (if A = B and B = C, then A = C). Keys: ← → for a side, ↓ or = for equal.
+- Each side shows the chatter's destiny.gg profile card (tier, team, member since, bio, signature, a link), from the editor's `/api/admin/dgg-profile/:name`. The next pair's profiles load in the background.
+- **At the end**, the full list: places shared by equals (1, 1, 3…), the top 5 marked, "Copy as text" (`1. Josh = Damon`).
+- **Saved in this browser** as you go (`lab.rank.wildcards`: the order dealt and every answer, replayed), with Back and Start over. Nothing is a vote and nothing goes to the server.
+- The logic is `src/lab/rank.ts` (plain data, unit-tested in `tests/rank.test.ts`); the page is `src/lab/RankChatters.tsx`. "At most N to go" counts the worst case; ties and runs where one side runs out early make it fewer. With random answers on the live wildcards it took 14 batches and 111 comparisons.
+
 ### Draft pictures: the wiki for people, an emote for chatters (2026-11-10, deployed and run)
 
 StrawWaffle's idea: nominees without a picture get a draft one.
