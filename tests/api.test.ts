@@ -95,6 +95,8 @@ describe("static and public routes", () => {
       ["/2025", "DGG Awards"],
       ["/chat", "DGG Awards"],
       ["/preview/results/chat", "DGG Awards"],
+      ["/chat/all", "DGG Awards"],
+      ["/preview/results/chat-all", "DGG Awards"],
       ["/lab", "DGG Awards"],
       ["/preview", "DGG Awards"],
       ["/preview/before", "DGG Awards"],
@@ -1107,6 +1109,19 @@ describe("admin", () => {
       expect(removed).toMatchObject({ action: "update", after: { thumbnailKey: null } });
       expect((await req(`/api/admin/history/${removed.id}/undo`, json("POST", {}), admin)).status).toBe(200);
       expect((await nominee("clipok")).thumbnailUrl).toBe(gifUrl);
+
+      // Removing the clip: admins only, recorded, undoable; the file and the picture stay.
+      const clipUrl = (await nominee("clipok")).clipUrl;
+      expect((await req("/api/admin/clip?categoryId=ally&id=clipok", { method: "DELETE" }, user)).status).toBe(401);
+      expect((await req("/api/admin/clip?categoryId=ally&id=clipok", { method: "DELETE" }, admin)).status).toBe(200);
+      const noClip = await nominee("clipok");
+      expect(noClip).toMatchObject({ clipUrl: null, clipStatus: null, thumbnailUrl: gifUrl });
+      expect((await req(clipUrl)).status).toBe(200);
+      expect((await req("/api/admin/clip?categoryId=ally&id=clipok", { method: "DELETE" }, admin)).status).toBe(400);
+      const [cleared] = await (await req("/api/admin/history?categoryId=ally&nomineeId=clipok", {}, admin)).json();
+      expect(cleared).toMatchObject({ action: "update", after: { clipKey: null, clipStatus: null } });
+      expect((await req(`/api/admin/history/${cleared.id}/undo`, json("POST", {}), admin)).status).toBe(200);
+      expect(await nominee("clipok")).toMatchObject({ clipUrl, clipStatus: "ready" });
 
       // A source that can't be downloaded ends as "failed" with a reason.
       await addNominee("clipbad", { url: `${FILES}/missing.mp4`, link_type: "video-file", clip_start: "0", clip_end: "2" });

@@ -54,7 +54,7 @@ import {
   thumbnailFromClip,
   thumbnailFromUpload,
   clipFrame,
-  clearThumbnail,
+  clearClip, clearThumbnail,
 } from "@/server/clips";
 import { DGG_NAME, fetchDggProfile } from "@/server/dgg-profile";
 import { categoriesWithMediaUrls } from "@/server/present";
@@ -473,6 +473,19 @@ export const adminRoutes = new Hono<SessionEnv>()
     const before = await getNominee(categoryId, id);
     if (!before) return c.body(null, 404);
     await clearThumbnail(categoryId, id);
+    await recordNomineeUpdate(await actor(c), before);
+    return c.body(null, 200);
+  })
+  /** Take the clip off; the site plays the source link again. Not while one is being made. */
+  .delete("/clip", zValidator("query", nomineeQuery, rejectInvalid), async (c) => {
+    const { categoryId, id } = c.req.valid("query");
+    const before = await getNominee(categoryId, id);
+    if (!before) return c.body(null, 404);
+    if (before.clipStatus === "pending" || before.clipStatus === "processing") {
+      return c.text("A clip is being made. Wait for it to finish, then remove it.", 409);
+    }
+    if (!before.clipKey && !before.clipStatus) return c.text("This nominee has no clip.", 400);
+    await clearClip(categoryId, id);
     await recordNomineeUpdate(await actor(c), before);
     return c.body(null, 200);
   })

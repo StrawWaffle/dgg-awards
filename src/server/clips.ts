@@ -419,6 +419,14 @@ export async function clearThumbnail(categoryId: string, id: string) {
   await setNomineeMedia(categoryId, id, { thumbnailKey: null, thumbnailAt: null });
 }
 
+/**
+ * Take the clip off (the site plays the source link again). The file stays, so
+ * undo can put it back; the picture stays too, even a frame from the clip.
+ */
+export async function clearClip(categoryId: string, id: string) {
+  await setNomineeMedia(categoryId, id, { clipKey: null, clipStatus: null, clipError: null });
+}
+
 /** Width and height of an image or video's first stream. */
 async function probeSize(path: string): Promise<[number, number]> {
   const { stdout } = await run(
