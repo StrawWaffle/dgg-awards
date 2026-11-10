@@ -552,6 +552,16 @@ StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, an
   - typecheck and 92 unit tests; 49 API tests, with the preview addresses added
   - in the browser: both preview menus (hover, jump, close, current page marked, the admin one on a phone), every stage and page, a preview vote not saved, the old addresses rewritten, `/lab#sound` kept, non-admin and signed-out refusals, the big screen switched to simulated votes with the reveal running, and the music's first play starting at 6.02 s
 
+### The wildcard cards, polished, with motion and sound (2026-11-10, built, not deployed)
+
+StrawWaffle liked swipe then compare, and asked for polish: the swipe card has one person, so more room; cleaner, labelled cards; checked against every chatter; cute animation and sound effects.
+
+- **Survey of all 67 profiles first** (live destiny.gg): 32 of 65 bios are destiny.gg's placeholder "It's a secret..."; 41 profile photos are the default "buddy" drawing; 37 signatures, mostly 5.9 : 1 wide, some down to 2.3 : 1; 2 have no profile (wwholen, SydneySweeny: misspelt?), 3 no emote, 17 not subscribed, 12 no team; bios up to 160 characters; names up to 17 (Bluelivingabandon).
+- **The card** (`ProfileCard`, `large` for the swipe): the emote is the big picture (it widens for wide emotes) with "Emote: X" under the name; the profile photo is the small avatar by the link; then a labelled list: Subscription, Team, Member since (with how many years), Bio, Signature (in a dashed box, a fixed height, centred). Missing values say so in grey ("Not subscribed", "No team", "No bio", "No signature"); "It's a secret..." counts as no bio. No emote: their initial. On a phone the picture sits above the name. The swipe card has a steady height (32rem from `sm`), so the buttons don't move.
+- **Checked on every card:** all 67 captured and measured (`rk8.mjs` in the session scratchpad: a contact sheet): no overflow, every card with a profile has its five rows, one height.
+- **Motion:** a new card or match rises in (`rank-card-in`, off for reduced motion); dragging tilts the card and fades in a "Yes!" or "Nope" stamp; an answer flies it off that way ("Maybe" drops it); a Yes throws seven of their emote (the lab's bursts); in a match the picked side pops and the other fades for 0.2 s.
+- **Sound** (`src/lab/sfx.ts`, Web Audio, no files): yes two rising notes, no a soft drop, maybe a tick, a pick a pop, equal two equal notes, Back a fall, the finished top ten a little arpeggio. At the music's volume, muted with it.
+
 ### Ranking, fifth take: swipe first, compare only the finalists (2026-11-10, deployed)
 
 StrawWaffle, after the knockout: still too many choices; the aim is least effort (decision fatigue), not fewest comparisons; he suggested a quick yes/no pass first. Research backs it: per item, paired comparisons take about four times as long as a rating (Touchstone's comparison of 8 scaling techniques); ratings are best for broad coverage and comparisons for the top tier, and mixing the two beats either alone ("The Benefits of Diversity", 2026); Q-sorts start by splitting the cards into three rough piles before any fine ordering.

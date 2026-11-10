@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useBursts } from "@/lab/Bursts";
 import { Emote } from "@/lab/Emote";
+import { sfx } from "@/lab/sfx";
+import { reducedMotion } from "@/lab/sketch";
 import { type Choice, type Ranking, type RankState, choicesLeft, crossing, current, inPlay, points } from "@/lab/rank";
 import { type Step, type TriageState, type Verdict, apply, card, comparisonsFor, phase, result, start } from "@/lab/triage";
 
@@ -141,6 +144,7 @@ export function RankChatters() {
   };
   const back = () => {
     if (!saved?.steps.length) return;
+    sfx.back();
     const nextSaved = { ...saved, steps: saved.steps.slice(0, -1) };
     setSaved(nextSaved);
     save(key, nextSaved);
@@ -152,6 +156,15 @@ export function RankChatters() {
     setSaved(fresh);
     save(key, fresh);
   };
+
+  // A little fanfare when the last answer finishes the top ten (not on loading a finished run).
+  const wasDone = useRef<boolean | null>(null);
+  const isDone = state ? phase(state) === "done" : null;
+  useEffect(() => {
+    if (isDone === null) return;
+    if (isDone && wasDone.current === false) sfx.done();
+    wasDone.current = isDone;
+  }, [isDone]);
 
   if (chatters === null) return <Shell>Loading the wildcards…</Shell>;
   if (chatters === "missing") return <Shell>No wildcards found in DGGer of the Year.</Shell>;
@@ -199,7 +212,7 @@ export function RankChatters() {
           onSwipe={(v) => step({ swipe: v })}
         />
       )}
-      {bracket && match && <Compare state={bracket} match={match} byId={byId} onChoose={step} />}
+      {bracket && match && <Compare key={bracket.asked} state={bracket} match={match} byId={byId} onChoose={step} />}
       {bracket && at === "pick" && cross && <Pick group={cross.group} need={cross.need} place={cross.place} top={top} byId={byId} onKeep={(ids) => step({ keep: ids })} />}
       {at === "done" && <Final result={result(state)} byId={byId} top={top} />}
       {bracket && at !== "done" && <Standings state={bracket} byId={byId} />}
@@ -218,13 +231,17 @@ function Shell({ children }: { children: React.ReactNode }) {
 function Face({ chatter, size }: { chatter: Chatter; size: number }) {
   if (chatter.image) return <img src={chatter.image} alt="" className="h-full w-full object-cover" />;
   if (chatter.emote) return <Emote name={chatter.emote} size={size} />;
-  return null;
+  return (
+    <span className="hand font-bold" style={{ fontSize: `${size * 1.3}rem`, color: "var(--muted)" }}>
+      {chatter.name.charAt(0).toUpperCase()}
+    </span>
+  );
 }
 
 /**
  * One card: yes (top ten material), no, or maybe. Keys ← ↓ →, the buttons, or
- * dragging the card left or right. The second pass, over too many yeses, is
- * yes or no only.
+ * dragging the card. It flies off the way it went, with a sound; a yes throws
+ * a few of their emote. The second pass, over too many yeses, is yes or no.
  */
 function Swipe({
   id,
@@ -240,64 +257,101 @@ function Swipe({
   onSwipe: (v: Verdict) => void;
 }) {
   const [dx, setDx] = useState(0);
+  const [gone, setGone] = useState<Verdict | null>(null);
   const from = useRef<number | null>(null);
+  const box = useRef<HTMLElement>(null);
+  const [layer, fire] = useBursts();
+  const chatter = byId.get(id)!;
   // Load the next card's profile while this one is up.
   useEffect(() => {
     if (next) profileOf(byId.get(next)!.name);
   }, [next, byId]);
+  const decide = (v: Verdict) => {
+    if (gone) return;
+    setGone(v);
+    sfx[v]();
+    if (v === "yes" && chatter.emote && box.current) fire(chatter.emote, box.current.clientWidth / 2 - 20, 160, 7);
+    setTimeout(() => onSwipe(v), reducedMotion() ? 0 : 230);
+  };
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (e.repeat || e.target instanceof HTMLInputElement) return;
-      if (e.key === "ArrowLeft") onSwipe("no");
-      else if (e.key === "ArrowRight") onSwipe("yes");
-      else if (!again && (e.key === "ArrowDown" || e.key === "m")) onSwipe("maybe");
+      if (e.key === "ArrowLeft") decide("no");
+      else if (e.key === "ArrowRight") decide("yes");
+      else if (!again && (e.key === "ArrowDown" || e.key === "m")) decide("maybe");
       else return;
       e.preventDefault();
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  }, [onSwipe, again]);
-  const lean = dx > 40 ? "yes" : dx < -40 ? "no" : null;
+  });
+  const lean = gone ?? (dx > 40 ? "yes" : dx < -40 ? "no" : null);
+  const shown = (v: Verdict) => (gone === v ? 1 : v === "yes" ? Math.min(1, Math.max(0, (dx - 20) / 90)) : v === "no" ? Math.min(1, Math.max(0, (-dx - 20) / 90)) : 0);
+  const transform =
+    gone === "yes"
+      ? "translateX(130%) rotate(14deg)"
+      : gone === "no"
+        ? "translateX(-130%) rotate(-14deg)"
+        : gone === "maybe"
+          ? "translateY(70px) scale(0.92)"
+          : `translateX(${dx}px) rotate(${dx / 30}deg)`;
   return (
-    <section className="mx-auto max-w-2xl space-y-4">
+    <section ref={box} className="relative mx-auto max-w-3xl space-y-4">
+      {layer}
       <p className="text-center text-lg font-black">{again ? "Too many yeses: still a yes?" : "Top 10 material?"}</p>
-      <div
-        className="cozy-panel touch-pan-y select-none space-y-2 p-5"
-        style={{
-          transform: `translateX(${dx}px) rotate(${dx / 40}deg)`,
-          transition: from.current === null ? "transform 150ms ease" : "none",
-          borderColor: lean === "yes" ? "var(--primary-shadow)" : lean === "no" ? "var(--coral)" : undefined,
-        }}
-        onPointerDown={(e) => {
-          if ((e.target as HTMLElement).closest("a")) return;
-          from.current = e.clientX;
-          (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-        }}
-        onPointerMove={(e) => from.current !== null && setDx(e.clientX - from.current)}
-        onPointerUp={() => {
-          from.current = null;
-          const d = dx;
-          setDx(0);
-          if (d > 100) onSwipe("yes");
-          else if (d < -100) onSwipe("no");
-        }}
-        onPointerCancel={() => {
-          from.current = null;
-          setDx(0);
-        }}
-      >
-        <ProfileCard chatter={byId.get(id)!} />
+      <div className="rank-card-in">
+        <div
+          className="cozy-panel relative touch-pan-y select-none p-6 sm:min-h-[32rem] sm:p-8"
+          style={{
+            transform,
+            opacity: gone ? 0 : 1,
+            transition: from.current !== null ? "none" : gone ? "transform 230ms ease-in, opacity 230ms ease-in" : "transform 150ms ease",
+            borderColor: lean === "yes" ? "var(--primary-shadow)" : lean === "no" ? "var(--coral)" : undefined,
+            cursor: from.current !== null ? "grabbing" : "grab",
+          }}
+          onPointerDown={(e) => {
+            if (gone || (e.target as HTMLElement).closest("a")) return;
+            from.current = e.clientX;
+            (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+          }}
+          onPointerMove={(e) => from.current !== null && setDx(e.clientX - from.current)}
+          onPointerUp={() => {
+            if (from.current === null) return;
+            from.current = null;
+            const d = dx;
+            setDx(0);
+            if (d > 100) decide("yes");
+            else if (d < -100) decide("no");
+          }}
+          onPointerCancel={() => {
+            from.current = null;
+            setDx(0);
+          }}
+        >
+          <span className="rank-stamp" style={{ left: "1.25rem", color: "var(--primary-shadow)", opacity: shown("yes"), transform: "rotate(-12deg)" }}>
+            Yes!
+          </span>
+          <span className="rank-stamp" style={{ right: "1.25rem", color: "var(--coral)", opacity: shown("no"), transform: "rotate(12deg)" }}>
+            Nope
+          </span>
+          {gone === "maybe" && (
+            <span className="rank-stamp" style={{ left: "50%", translate: "-50% 0", color: "var(--muted)" }}>
+              Maybe
+            </span>
+          )}
+          <ProfileCard chatter={chatter} large />
+        </div>
       </div>
       <div className="flex flex-wrap items-center justify-center gap-3">
-        <button type="button" className="cozy-btn" onClick={() => onSwipe("no")}>
+        <button type="button" className="cozy-btn" onClick={() => decide("no")}>
           ← No
         </button>
         {!again && (
-          <button type="button" className="cozy-btn" onClick={() => onSwipe("maybe")}>
+          <button type="button" className="cozy-btn" onClick={() => decide("maybe")}>
             ↓ Maybe
           </button>
         )}
-        <button type="button" className="cozy-btn primary" onClick={() => onSwipe("yes")}>
+        <button type="button" className="cozy-btn primary" onClick={() => decide("yes")}>
           Yes →
         </button>
       </div>
@@ -322,19 +376,28 @@ function Compare({
   byId: Map<string, Chatter>;
   onChoose: (c: Choice) => void;
 }) {
+  // The pick shows for a moment (the winner pops, the other fades) before the next match.
+  const [picked, setPicked] = useState<Choice | null>(null);
+  const choose = (c: Choice) => {
+    if (picked) return;
+    setPicked(c);
+    if (c === "tie") sfx.tie();
+    else sfx.pick();
+    setTimeout(() => onChoose(c), reducedMotion() ? 0 : 200);
+  };
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       // One choice per press: holding a key down doesn't keep answering.
       if (e.repeat || e.target instanceof HTMLInputElement) return;
-      if (e.key === "ArrowLeft") onChoose("left");
-      else if (e.key === "ArrowRight") onChoose("right");
-      else if (e.key === "ArrowDown" || e.key === "=") onChoose("tie");
+      if (e.key === "ArrowLeft") choose("left");
+      else if (e.key === "ArrowRight") choose("right");
+      else if (e.key === "ArrowDown" || e.key === "=") choose("tie");
       else return;
       e.preventDefault();
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  }, [onChoose]);
+  });
   const placeOf = (id: string) => state.placed.findIndex((g) => g.includes(id)) + 1;
   /** "Unbeaten", or who they lost to, by place. */
   const record = (g: string[]) => {
@@ -343,12 +406,22 @@ function Compare({
     return `Lost to ${beatenBy.map((id) => `#${placeOf(id)} ${byId.get(id)!.name}`).join(", ")}`;
   };
   const cols = (g: string[]) => Math.min(g.length, 3);
-  const side = (g: string[], c: Choice) => (
+  const side = (g: string[], c: Choice) => {
+    const won = picked === c || picked === "tie";
+    const lost = picked !== null && !won;
+    return (
     <button
       type="button"
-      onClick={() => onChoose(c)}
-      className="cozy-card block w-full space-y-2 rounded-[20px] border-2 p-3 text-left"
-      style={{ background: "var(--cream)", borderColor: "var(--panel-border)", boxShadow: "0 5px 0 var(--cream-shadow)" }}
+      onClick={() => choose(c)}
+      className="cozy-card block w-full space-y-3 rounded-[20px] border-2 p-4 text-left"
+      style={{
+        background: "var(--cream)",
+        borderColor: won ? "var(--primary-shadow)" : "var(--panel-border)",
+        boxShadow: `0 5px 0 ${won ? "var(--primary-shadow)" : "var(--cream-shadow)"}`,
+        transform: won ? "scale(1.025)" : lost ? "scale(0.97)" : undefined,
+        opacity: lost ? 0.45 : 1,
+        transition: "transform 150ms ease, opacity 150ms ease, border-color 150ms ease",
+      }}
     >
       <span className="flex flex-wrap gap-1.5">
         <span className="cozy-chip">{record(g)}</span>
@@ -360,13 +433,14 @@ function Compare({
         ))}
       </div>
     </button>
-  );
+    );
+  };
   const heading =
     match.placing === 1
       ? `Round ${match.round} of ${match.rounds}: who's better?`
       : `Finding ${ordinal(match.placing)} place: who's better?`;
   return (
-    <section className="space-y-4">
+    <section className="rank-card-in space-y-4">
       <p className="text-center text-lg font-black">{heading}</p>
       <div
         className="rank-pair mx-auto grid items-start gap-4"
@@ -377,13 +451,13 @@ function Compare({
         {side(match.right, "right")}
       </div>
       <div className="flex flex-wrap items-center justify-center gap-3">
-        <button type="button" className="cozy-btn" onClick={() => onChoose("left")}>
+        <button type="button" className="cozy-btn" onClick={() => choose("left")}>
           ← Left is better
         </button>
-        <button type="button" className="cozy-btn primary" onClick={() => onChoose("tie")}>
+        <button type="button" className="cozy-btn primary" onClick={() => choose("tie")}>
           Equal
         </button>
-        <button type="button" className="cozy-btn" onClick={() => onChoose("right")}>
+        <button type="button" className="cozy-btn" onClick={() => choose("right")}>
           Right is better →
         </button>
       </div>
@@ -418,7 +492,10 @@ function Pick({
   onKeep: (ids: string[]) => void;
 }) {
   const [picked, setPicked] = useState<string[]>([]);
-  const toggle = (id: string) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length < need ? [...p, id] : p));
+  const toggle = (id: string) => {
+    sfx.maybe();
+    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length < need ? [...p, id] : p));
+  };
   return (
     <section className="space-y-4">
       <p className="cozy-panel px-5 py-3 font-bold" style={{ background: "var(--highlight)" }}>
@@ -451,7 +528,7 @@ function Pick({
         })}
       </div>
       <div className="flex justify-center">
-        <button type="button" className="cozy-btn primary" disabled={picked.length !== need} onClick={() => onKeep(picked)}>
+        <button type="button" className="cozy-btn primary" disabled={picked.length !== need} onClick={() => (sfx.pick(), onKeep(picked))}>
           {picked.length === need ? `Keep these ${need}` : `Pick ${need - picked.length} more`}
         </button>
       </div>
@@ -499,54 +576,83 @@ function Standings({ state, byId }: { state: RankState; byId: Map<string, Chatte
   );
 }
 
+/** "November 10, 2020" → "November 10, 2020 · 6 years". */
+function since(memberSince: string) {
+  const t = Date.parse(memberSince);
+  if (Number.isNaN(t)) return memberSince;
+  const years = Math.floor((Date.now() - t) / (365.25 * 24 * 3600 * 1000));
+  return `${memberSince} · ${years < 1 ? "under a year" : `${years} year${years === 1 ? "" : "s"}`}`;
+}
+
 /**
- * A chatter with everything their destiny.gg profile shows (bar nationality,
- * gender and age, which the site never reads): their picture or emote, the
- * profile photo, tier, team, member since, bio and signature.
+ * A chatter, with everything their destiny.gg profile shows (bar nationality,
+ * gender and age, which the site never reads), as a labelled list so it's
+ * clear what's what. The emote is the big picture (most profile photos are
+ * destiny.gg's default drawing); the photo is the small one by the link.
+ * Missing values say so, in grey: destiny.gg's own "It's a secret..." bio
+ * counts as no bio. `large` is the swipe card, with the room of one person.
  */
-function ProfileCard({ chatter }: { chatter: Chatter }) {
+function ProfileCard({ chatter, large = false }: { chatter: Chatter; large?: boolean }) {
   const p = useProfile(chatter.name);
-  const face = chatter.image || chatter.emote;
+  const bio = p?.bio && !/^it'?s a secret/i.test(p.bio.trim()) ? p.bio : null;
+  const none = (text: string) => <span style={{ color: "var(--muted)" }}>{text}</span>;
+  const row = (label: string, value: React.ReactNode) => (
+    <>
+      <dt className={`${large ? "text-sm" : "text-xs"} pt-0.5 font-bold`} style={{ color: "var(--muted)" }}>
+        {label}
+      </dt>
+      <dd className="min-w-0 break-words font-semibold">{value}</dd>
+    </>
+  );
   return (
-    <div className="min-w-0 space-y-2">
-      <div className="flex flex-wrap items-center gap-3">
-        {face && (
-          <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[14px]" style={{ background: "var(--panel-border)" }}>
-            <Face chatter={chatter} size={1.9} />
+    <div className={`min-w-0 ${large ? "space-y-6" : "space-y-4"}`}>
+      <div className={`flex gap-4 ${large ? "flex-col items-start sm:flex-row sm:items-center" : "items-center"}`}>
+        {/* Wide emotes widen the box rather than being cut off. */}
+        <div
+          className={`flex shrink-0 items-center justify-center overflow-hidden rounded-[18px] px-2 ${large ? "h-28 min-w-28 max-w-80 sm:h-32 sm:min-w-32" : "h-20 min-w-20 max-w-52"}`}
+          style={{ background: "var(--panel-border)" }}
+        >
+          <Face chatter={chatter} size={large ? 3 : 1.9} />
+        </div>
+        <div className="min-w-0 space-y-1">
+          <div className={`font-black leading-tight [overflow-wrap:anywhere] ${large ? "text-3xl sm:text-4xl" : "text-2xl"}`}>{chatter.name}</div>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            {p?.photoUrl && <img src={p.photoUrl} alt="" title="Profile photo" className="h-7 w-7 rounded-full object-cover" />}
+            {p?.url && (
+              <a href={p.url} target="_blank" rel="noopener noreferrer" className="font-bold underline" onClick={(e) => e.stopPropagation()}>
+                destiny.gg profile ↗
+              </a>
+            )}
           </div>
-        )}
-        {p?.photoUrl && <img src={p.photoUrl} alt="" className="h-20 w-20 shrink-0 rounded-[14px] object-cover" />}
-        <div className="min-w-[9rem] flex-1">
-          <div className="break-words text-2xl font-black leading-tight">{chatter.name}</div>
-          {p?.url && (
-            <a href={p.url} target="_blank" rel="noopener noreferrer" className="text-xs font-bold underline" onClick={(e) => e.stopPropagation()}>
-              destiny.gg profile ↗
-            </a>
+          {chatter.emote && (
+            <div className="text-xs font-semibold" style={{ color: "var(--muted)" }}>
+              Emote: <b>{chatter.emote}</b>
+            </div>
           )}
         </div>
       </div>
       {p === undefined && <p className="text-sm" style={{ color: "var(--muted)" }}>Loading the profile…</p>}
-      {p === null && <p className="text-sm" style={{ color: "var(--muted)" }}>No destiny.gg profile found.</p>}
+      {p === null && <p className="text-sm font-semibold" style={{ color: "var(--muted)" }}>No destiny.gg profile found under this name.</p>}
       {p && (
-        <>
-          <p className="flex flex-wrap gap-1.5">
-            {p.tier && <span className="cozy-chip green">{p.tier}</span>}
-            {p.team && <span className="cozy-chip">{/^team /i.test(p.team) ? p.team : `Team ${p.team}`}</span>}
-            {p.memberSince && <span className="cozy-chip">Member since {p.memberSince}</span>}
-            {!p.tier && !p.team && !p.memberSince && !p.bio && !p.signatureSvg && (
-              <span className="text-sm" style={{ color: "var(--muted)" }}>Private profile.</span>
-            )}
-          </p>
-          {p.bio && <p className="whitespace-pre-line break-words font-semibold">{p.bio}</p>}
-          {p.signatureSvg && (
-            <div
-              className="h-16 max-w-full [&_svg]:h-full [&_svg]:max-w-full [&_svg]:w-auto"
-              style={{ color: "var(--text)" }}
-              // Rebuilt by the server from path data only (src/server/dgg-profile.ts).
-              dangerouslySetInnerHTML={{ __html: p.signatureSvg }}
-            />
+        <dl className={`grid items-start gap-x-5 gap-y-2.5 ${large ? "grid-cols-[6.5rem_1fr] text-base sm:grid-cols-[8rem_1fr]" : "grid-cols-[6rem_1fr] text-sm"}`}>
+          {row("Subscription", p.tier ? p.tier.replace(/\s*Subscriber$/i, "") : none("Not subscribed"))}
+          {row("Team", p.team ? p.team.replace(/^Team\s+/i, "") : none("No team"))}
+          {row("Member since", p.memberSince ? since(p.memberSince) : none("Unknown"))}
+          {row("Bio", bio ? <span className="whitespace-pre-line">{bio}</span> : none("No bio"))}
+          {row(
+            "Signature",
+            p.signatureSvg ? (
+              <div
+                className={`rounded-[12px] border-2 border-dashed p-2 [&_svg]:h-full [&_svg]:w-full ${large ? "h-28" : "h-20"}`}
+                style={{ color: "var(--text)", borderColor: "var(--panel-border)", background: "var(--panel)" }}
+                // Rebuilt by the server from path data only (src/server/dgg-profile.ts).
+                dangerouslySetInnerHTML={{ __html: p.signatureSvg }}
+              />
+            ) : (
+              none("No signature")
+            ),
           )}
-        </>
+        </dl>
       )}
     </div>
   );

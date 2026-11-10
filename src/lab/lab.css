@@ -501,3 +501,32 @@ input[type="range"].cozy-range {
     grid-template-columns: var(--cols);
   }
 }
+
+/* Ranking the wildcards: each new card (or match) rises in; the stamps on a swiped card. */
+.rank-card-in {
+  animation: rank-card-in 220ms ease-out;
+}
+@keyframes rank-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+}
+.rank-stamp {
+  position: absolute;
+  top: 1.25rem;
+  z-index: 1;
+  pointer-events: none;
+  border: 3px solid currentColor;
+  border-radius: 10px;
+  padding: 0 0.6rem;
+  font-family: "Gaegu", "Nunito Variable", cursive;
+  font-size: 2.25rem;
+  font-weight: 700;
+  background: color-mix(in oklab, var(--panel) 85%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .rank-card-in {
+    animation: none;
+  }
+}
