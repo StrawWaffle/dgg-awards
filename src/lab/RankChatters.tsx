@@ -150,6 +150,15 @@ export function RankChatters() {
     save(key, nextSaved);
   };
   const held = useHeldKey();
+  // A yes cheers with the chatter's emote in the strip under the controls:
+  // out of the way of the card, and on the page, so it outlasts the card
+  // (each card is a fresh Swipe).
+  const [cheer, fire] = useBursts();
+  const strip = useRef<HTMLDivElement>(null);
+  const onYes = (emote: string) => {
+    const el = strip.current;
+    if (el) fire(emote, el.clientWidth / 2 - 20, el.clientHeight - 48, 7, 2600);
+  };
   // Backspace steps back, like the button.
   useKeydown((e) => {
     if (e.key !== "Backspace" || e.repeat || e.target instanceof HTMLInputElement) return;
@@ -218,7 +227,13 @@ export function RankChatters() {
           next={at === "again" ? state.again![swiping.n] : state.order[swiping.n]}
           byId={byId}
           onSwipe={(v) => step({ swipe: v })}
+          onYes={onYes}
         />
+      )}
+      {swiping && (
+        <div ref={strip} className="relative mx-auto h-40 max-w-6xl">
+          {cheer}
+        </div>
       )}
       {bracket && match && <Compare key={bracket.asked} state={bracket} match={match} byId={byId} onChoose={step} />}
       {bracket && at === "pick" && cross && <Pick group={cross.group} need={cross.need} place={cross.place} top={top} byId={byId} onKeep={(ids) => step({ keep: ids })} />}
@@ -325,18 +340,18 @@ function Swipe({
   next,
   byId,
   onSwipe,
+  onYes,
 }: {
   id: string;
   again: boolean;
   next: string | undefined;
   byId: Map<string, Chatter>;
   onSwipe: (v: Verdict) => void;
+  onYes: (emote: string) => void;
 }) {
   const [dx, setDx] = useState(0);
   const [gone, setGone] = useState<Verdict | null>(null);
   const from = useRef<number | null>(null);
-  const box = useRef<HTMLElement>(null);
-  const [layer, fire] = useBursts();
   const held = useHeldKey();
   const chatter = byId.get(id)!;
   // Load the next card's profile while this one is up.
@@ -350,7 +365,7 @@ function Swipe({
     answered.current = true;
     setGone(v);
     sfx[v]();
-    if (v === "yes" && chatter.emote && box.current) fire(chatter.emote, box.current.clientWidth / 2 - 20, 160, 7);
+    if (v === "yes" && chatter.emote) onYes(chatter.emote);
     setTimeout(() => onSwipe(v), reducedMotion() ? 0 : 230);
   };
   useKeydown((e) => {
@@ -372,8 +387,7 @@ function Swipe({
           ? "translateY(70px) scale(0.92)"
           : `translateX(${dx}px) rotate(${dx / 30}deg)`;
   return (
-    <section ref={box} className="relative mx-auto max-w-6xl space-y-5">
-      {layer}
+    <section className="relative mx-auto max-w-6xl space-y-5">
       <p className="flex items-center justify-center gap-3 text-2xl font-black">
         <Emote name={again ? "Hmm" : "PepoThink"} size={1.2} title="" />
         {again ? "Too many yeses: still a yes?" : "Top 10 material?"}
