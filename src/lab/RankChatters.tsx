@@ -294,10 +294,18 @@ function Shell({ children }: { children: React.ReactNode }) {
  * Mr. Breakfast's Free Prompts (CC0), in src/media/key-*.svg. Hidden on
  * touch screens, which have no keys.
  */
+/** Spelt out in full, so tests/data.test.ts can check each file exists. */
+const KEY_SVG = {
+  left: "/Media/key-left.svg",
+  right: "/Media/key-right.svg",
+  down: "/Media/key-down.svg",
+  equals: "/Media/key-equals.svg",
+  backspace: "/Media/key-backspace.svg",
+};
 function Key({ name, label, small = false }: { name: "left" | "right" | "down" | "equals" | "backspace"; label: string; small?: boolean }) {
   return (
     <img
-      src={`/Media/key-${name}.svg`}
+      src={KEY_SVG[name]}
       alt={label}
       title={`Key: ${label}`}
       className={`rank-key w-auto shrink-0 ${small ? "h-9" : "h-14"}`}

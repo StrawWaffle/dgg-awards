@@ -49,8 +49,7 @@ try {
   await insertCategory({
     id: TO,
     title: "DGGer wildcards",
-    description:
-      "Your top 10 of the wildcards: swipe through them, then pick between your favourites two at a time. 10 points for your first down to 1 for your tenth; everyone's points are added up.",
+    description: "The best of the wildcard chatters, from everyone's top 10.",
     votingStyle: "points",
   });
   created = true;

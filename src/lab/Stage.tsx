@@ -720,7 +720,7 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
                   {bursts}
                   <div className="mb-4 flex flex-wrap items-center gap-2">
                     <span className="cozy-chip coral">Results</span>
-                    <span className="cozy-chip green hand text-base!">{award.total.toLocaleString()} votes</span>
+                    <span className="cozy-chip green hand text-base!">{award.total.toLocaleString()} {award.unit === "points" ? "ballots" : "votes"}</span>
                   </div>
                   <Board key={`${award.id}-${run}`} award={award} target={target} onWinner={cheer} onFinished={() => setRevealed(true)} />
                 </div>
