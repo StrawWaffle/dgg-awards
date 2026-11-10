@@ -136,6 +136,7 @@ type RowEls = {
   fill: SVGGElement | null;
   outline: SVGGElement | null;
   count: HTMLSpanElement | null;
+  unit: HTMLSpanElement | null;
   share: HTMLSpanElement | null;
   name: HTMLSpanElement | null;
 };
@@ -220,12 +221,20 @@ export function Board({
       if (!e) continue;
       const w = s.phase === "hidden" ? 0 : Math.max(s.v > 0 ? 4 : 0, (s.v / most) * (barW - 8));
       e.clip?.setAttribute("width", String(w));
-      if (e.count) {
-        if (s.phase === "hidden") e.count.textContent = "?";
-        else if (award.unit === "points") e.count.textContent = amountLabel(award, Math.round(s.v * 2) / 2);
-        else {
+      // The number on the left, its unit on the right, so the units line up
+      // down the board while the numbers count up.
+      if (e.count && e.unit) {
+        if (s.phase === "hidden") {
+          e.count.textContent = "?";
+          e.unit.textContent = "";
+        } else if (award.unit === "points") {
+          const v = Math.round(s.v * 2) / 2;
+          e.count.textContent = Number.isInteger(v) ? v.toLocaleString() : v.toFixed(1);
+          e.unit.textContent = v === 1 ? "point" : "points";
+        } else {
           const v = Math.round(s.v);
-          e.count.textContent = `${v.toLocaleString()} ${v === 1 ? "vote" : "votes"}`;
+          e.count.textContent = v.toLocaleString();
+          e.unit.textContent = v === 1 ? "vote" : "votes";
         }
       }
       if (e.share) {
@@ -370,7 +379,7 @@ export function Board({
       {award.results.map((r) => {
         const slot = slots.indexOf(r.id);
         const colour = crown && r.isWinner && settled ? "var(--coral)" : "var(--primary-shadow)";
-        const e = els.current.get(r.id) ?? { clip: null, fill: null, outline: null, count: null, share: null, name: null };
+        const e = els.current.get(r.id) ?? { clip: null, fill: null, outline: null, count: null, unit: null, share: null, name: null };
         els.current.set(r.id, e);
         const hidden = state.current.get(r.id)!.phase === "hidden" && !active?.split(" ").includes(r.id);
         return (
@@ -400,8 +409,9 @@ export function Board({
             </div>
             {/* The count, and under it what the percentage is of. */}
             <span className="flex flex-col leading-none">
-              <span ref={(el) => void (e.count = el)} className="hand text-xl font-bold tabular-nums">
-                ?
+              <span className="hand flex items-baseline justify-between gap-2 text-xl font-bold tabular-nums">
+                <span ref={(el) => void (e.count = el)}>?</span>
+                <span ref={(el) => void (e.unit = el)} />
               </span>
               <span ref={(el) => void (e.share = el)} className="text-xs font-bold tabular-nums" style={{ color: "var(--muted)" }} />
             </span>

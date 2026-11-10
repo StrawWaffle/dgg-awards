@@ -22,8 +22,11 @@ type Npc = {
   nick: string;
   emote: string;
   x: number;
-  /** 0 (back) to 1 (front): lane on the floor. */
+  /** 0 (back) to 1 (front): lane on the floor, drawn now. */
   depth: number;
+  /** Their own lane, and a fixed roll that decides whether they make room. */
+  home: number;
+  roll: number;
   vx: number;
   hop: number;
   /** A small bounce on each beat, apart from the hop on the one. */
@@ -322,6 +325,7 @@ export function Stage({
     // In from the left or the right edge, walking onto the stage.
     const fromLeft = Math.random() < 0.5;
     const width = box.clientWidth;
+    const lane = Math.random();
     const npc: Npc = {
       el,
       emoteEl,
@@ -329,7 +333,9 @@ export function Stage({
       nick,
       emote,
       x: fromLeft ? -50 : box.clientWidth + 10,
-      depth: Math.random(),
+      depth: lane,
+      home: lane,
+      roll: Math.random(),
       vx: (fromLeft ? 1 : -1) * (70 + Math.random() * 40),
       targetX: 40 + Math.random() * Math.max(40, width - 120),
       bornAt: performance.now(),
@@ -545,7 +551,17 @@ export function Stage({
     // The floor runs from the horizon to near the bottom.
     const top = height * 0.42;
     const depthRange = Math.max(40, height - 70 - top);
+    // A panel (a scene, or a clip) leaves only narrow strips beside it in the
+    // rows it covers. So the crowd spreads by free space, not by height: of
+    // those whose lane is in those rows, only the share the strips' width is
+    // of the floor's stays, and the rest step down into the open rows below,
+    // keeping their order. They go back to their own lane when it lifts.
+    const panel = still ? (clipOn.current && clipBox.current ? boxOnFloor(clipBox.current, box) : null) : keep;
+    const cut = panel ? Math.min(1, Math.max(0, (panel.bottom + 36 - top) / depthRange)) : 0;
+    const stays = panel ? Math.max(0, width - (panel.right - panel.left) - 60) / Math.max(1, width) : 1;
     for (const n of everyone) {
+      const lane = panel && cut > 0 && cut < 0.9 && n.home < cut && n.roll > stays ? cut + (n.home / cut) * (1 - cut) : n.home;
+      n.depth += (lane - n.depth) * Math.min(1, dt * 1.5);
       const ground = top + n.depth * depthRange;
       // The music: a jump on the one of each bar, a little bob on the others.
       if (!n.entering && !n.leaving && !still) {
