@@ -160,7 +160,12 @@ export const thumbnailUpload = z.object({
   categoryId: required,
   id: required,
   file: z.instanceof(File),
+  /** The picture is (cropped from) the clip's frame this many seconds in. */
+  at: z.coerce.number().int().min(0).optional(),
 });
+
+/** A frame of a nominee's clip, at full size, to crop in the editor. */
+export const clipFrameQuery = z.object({ categoryId: required, id: required, at: z.coerce.number().int().min(0) });
 
 /** A video to make the clip from; start and end in seconds, either optional. */
 export const clipUpload = z.object({

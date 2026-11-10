@@ -328,6 +328,26 @@ export async function thumbnailFromClip(categoryId: string, id: string, at: numb
   }
 }
 
+/**
+ * The clip's frame `at` seconds in, at full size, as a JPEG: for the editor
+ * to crop and then upload as the picture. Nothing is stored.
+ */
+export async function clipFrame(categoryId: string, id: string, at: number): Promise<Uint8Array> {
+  const n = await getNominee(categoryId, id);
+  if (!n?.clipKey || n.clipStatus !== "ready") throw new UserError("This nominee has no ready clip.");
+  const dir = await mkdtemp(join(tmpdir(), "frame-"));
+  try {
+    const clip = await localCopy(n.clipKey, dir);
+    const duration = await probeDuration(clip);
+    if (at < 0 || at >= duration) throw new UserError(`Pick a time between 0 and ${Math.floor(duration)} seconds.`);
+    const out = join(dir, "frame.jpg");
+    await run("ffmpeg", ["-y", "-ss", String(at), "-i", clip, "-frames:v", "1", "-q:v", "2", out], 60_000);
+    return await Bun.file(out).bytes();
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
 /** What an upload really is, from its first bytes (the browser's type can lie). */
 function sniffImage(bytes: Uint8Array): { type: "png" | "jpeg" | "gif" | "webp"; animated: boolean } | null {
   const ascii = (from: number, to: number) => String.fromCharCode(...bytes.subarray(from, to));
@@ -350,7 +370,7 @@ const PICTURE_TYPES = { png: "image/png", jpeg: "image/jpeg", gif: "image/gif", 
  * - GIF and animated PNG or WebP: kept byte for byte, so emotes keep moving,
  *   once ffmpeg has confirmed they decode as an image.
  */
-export async function thumbnailFromUpload(categoryId: string, id: string, file: File) {
+export async function thumbnailFromUpload(categoryId: string, id: string, file: File, at: number | null = null) {
   const n = await getNominee(categoryId, id);
   if (!n) throw new UserError("No such nominee.");
   if (file.size > MAX_UPLOAD_BYTES) throw new UserError("Images can be at most 5 MB.");
@@ -386,7 +406,7 @@ export async function thumbnailFromUpload(categoryId: string, id: string, file: 
     const digest = (await sha256(await Bun.file(out).bytes())).slice(0, 10);
     const thumbnailKey = `thumbs/${categoryId}/${id}-upload-${digest}.${ext}`;
     await storage.put(thumbnailKey, Bun.file(out), type);
-    await setNomineeMedia(categoryId, id, { thumbnailKey, thumbnailAt: null });
+    await setNomineeMedia(categoryId, id, { thumbnailKey, thumbnailAt: at });
     await removeReplaced([n.thumbnailKey], [thumbnailKey]);
     return thumbnailKey;
   } finally {

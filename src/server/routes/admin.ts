@@ -53,6 +53,7 @@ import {
   enqueueLibrary,
   thumbnailFromClip,
   thumbnailFromUpload,
+  clipFrame,
   clearThumbnail,
 } from "@/server/clips";
 import { DGG_NAME, fetchDggProfile } from "@/server/dgg-profile";
@@ -80,6 +81,7 @@ import {
   settingsPatch,
   thumbnailAt,
   thumbnailUpload,
+  clipFrameQuery,
   clipUpload,
   restoreForm,
   clipFromLibrary,
@@ -443,12 +445,23 @@ export const adminRoutes = new Hono<SessionEnv>()
     }
   })
   .post("/thumbnail/upload", zValidator("form", thumbnailUpload, rejectInvalid), async (c) => {
-    const { categoryId, id, file } = c.req.valid("form");
+    const { categoryId, id, file, at } = c.req.valid("form");
     try {
       const before = await getNominee(categoryId, id);
-      const key = await thumbnailFromUpload(categoryId, id, file);
+      const key = await thumbnailFromUpload(categoryId, id, file, at ?? null);
       await recordNomineeUpdate(await actor(c), before);
       return c.json({ thumbnailUrl: storage.url(key) }, 200);
+    } catch (error) {
+      if (error instanceof UserError) return c.text(error.message, 400);
+      throw error;
+    }
+  })
+  /** A frame of the clip at full size, for the editor's cropper (nothing is stored). */
+  .get("/clip/frame", zValidator("query", clipFrameQuery, rejectInvalid), async (c) => {
+    const { categoryId, id, at } = c.req.valid("query");
+    try {
+      const bytes = await clipFrame(categoryId, id, at);
+      return c.body(bytes.slice().buffer as ArrayBuffer, 200, { "Content-Type": "image/jpeg", "Cache-Control": "private, no-store" });
     } catch (error) {
       if (error instanceof UserError) return c.text(error.message, 400);
       throw error;

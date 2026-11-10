@@ -14,8 +14,8 @@ import {
   type Issue,
   buildClip,
   deleteNominee,
+  fetchClipFrame,
   fetchDggProfile,
-  pickThumbnail,
   removeThumbnail,
   saveNominee,
   uploadThumbnail,
@@ -403,8 +403,14 @@ function ClipSection({ nominee, unsaved }: { nominee: AdminNominee; unsaved: boo
   const run = (fn: () => Promise<void>) => fn().then(refresh);
 
   const build = useMutation({ mutationFn: () => run(() => buildClip(nominee.categoryId, nominee.id)) });
+  // The frame at full size opens in the cropper; the cropped picture is
+  // uploaded, remembering which frame it came from.
+  const [cropFrame, setCropFrame] = useState<{ file: File; at: number } | null>(null);
   const frame = useMutation({
-    mutationFn: (at: number) => run(() => pickThumbnail(nominee.categoryId, nominee.id, at)),
+    mutationFn: async (at: number) => setCropFrame({ file: await fetchClipFrame(nominee.categoryId, nominee.id, at), at }),
+  });
+  const saveFrame = useMutation({
+    mutationFn: ({ file, at }: { file: File; at: number }) => run(() => uploadThumbnail(nominee.categoryId, nominee.id, file, at)),
   });
   const working = nominee.clipStatus === "pending" || nominee.clipStatus === "processing";
 
@@ -454,11 +460,21 @@ function ClipSection({ nominee, unsaved }: { nominee: AdminNominee; unsaved: boo
                 />
                 <Button
                   onClick={() => frame.mutate(Math.floor(video.current?.currentTime ?? 0))}
-                  disabled={frame.isPending}
+                  disabled={frame.isPending || saveFrame.isPending}
                 >
-                  Use this frame as the picture
+                  {frame.isPending ? "Getting the frame…" : saveFrame.isPending ? "Saving…" : "Use this frame as the picture…"}
                 </Button>
-                <ErrorText>{frame.error?.message}</ErrorText>
+                <ErrorText>{frame.error?.message ?? saveFrame.error?.message}</ErrorText>
+                {cropFrame && (
+                  <PictureCropper
+                    file={cropFrame.file}
+                    onCancel={() => setCropFrame(null)}
+                    onDone={(file) => {
+                      saveFrame.mutate({ file, at: cropFrame.at });
+                      setCropFrame(null);
+                    }}
+                  />
+                )}
               </div>
               <div className="space-y-2">
                 {nominee.thumbnailUrl && (

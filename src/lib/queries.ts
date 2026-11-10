@@ -246,11 +246,19 @@ export async function pickThumbnail(categoryId: string, id: string, at: number) 
   );
 }
 
-export async function uploadThumbnail(categoryId: string, id: string, file: File) {
+/** `at`: the picture is (cropped from) the clip's frame this many seconds in. */
+export async function uploadThumbnail(categoryId: string, id: string, file: File, at?: number) {
   await ok(
-    await client.api.admin.thumbnail.upload.$post({ form: { categoryId, id, file } }),
+    await client.api.admin.thumbnail.upload.$post({ form: { categoryId, id, file, ...(at != null ? { at: String(at) } : {}) } }),
     "Couldn't use that image",
   );
+}
+
+/** The clip's frame `at` seconds in, at full size, as a file for the cropper. */
+export async function fetchClipFrame(categoryId: string, id: string, at: number) {
+  const res = await client.api.admin.clip.frame.$get({ query: { categoryId, id, at: String(at) } });
+  if (!res.ok) throw new Error((await res.text()) || "Couldn't get that frame");
+  return new File([await res.blob()], `frame-${at}s.jpg`, { type: "image/jpeg" });
 }
 
 export async function removeThumbnail(categoryId: string, id: string) {
