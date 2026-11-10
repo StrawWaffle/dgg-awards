@@ -23,12 +23,16 @@ export function LabPage({
   view,
   chatOpen,
   onChat,
+  full,
+  onFull,
   onView,
 }: {
   admin: boolean;
   view: LabView;
   chatOpen: boolean;
   onChat: () => void;
+  full: boolean;
+  onFull: (on: boolean) => void;
   onView: (v: LabView) => void;
 }) {
   if (!admin) {
@@ -44,10 +48,24 @@ export function LabPage({
       </main>
     );
   }
-  return <Experiments view={view} chatOpen={chatOpen} onChat={onChat} onView={onView} />;
+  return <Experiments view={view} chatOpen={chatOpen} onChat={onChat} full={full} onFull={onFull} onView={onView} />;
 }
 
-function Experiments({ view, chatOpen, onChat, onView }: { view: LabView; chatOpen: boolean; onChat: () => void; onView: (v: LabView) => void }) {
+function Experiments({
+  view,
+  chatOpen,
+  onChat,
+  full,
+  onFull,
+  onView,
+}: {
+  view: LabView;
+  chatOpen: boolean;
+  onChat: () => void;
+  full: boolean;
+  onFull: (on: boolean) => void;
+  onView: (v: LabView) => void;
+}) {
   const [emotes, setEmotes] = useState<string[]>([]);
   const [source, setSource] = useSourceChoice();
   // In the lab the music starts on the first click anywhere (not on the
@@ -59,7 +77,7 @@ function Experiments({ view, chatOpen, onChat, onView }: { view: LabView; chatOp
       .then(setEmotes)
       .catch(() => setEmotes([]));
   }, []);
-  if (view === "stage") return <Stage source={source} emotes={emotes} chatOpen={chatOpen} onChat={onChat} />;
+  if (view === "stage") return <Stage source={source} emotes={emotes} chatOpen={chatOpen} onChat={onChat} full={full} onFull={onFull} />;
   if (view === "rank-top") return <RankChatters />;
   return (
     <main className="mx-auto max-w-7xl space-y-5 px-4 py-6">

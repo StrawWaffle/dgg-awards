@@ -17,15 +17,37 @@ const QUIET = 0.1;
 const FULL = 0.995;
 /** How long the volume emote stays after the last change. */
 const LINGER_MS = 1200;
-export function MusicBar() {
-  const state = useMusic();
+export type MusicState = { playing: boolean; muted: boolean; volume: number };
+
+/** The music button's action: start it (unmuted) if it isn't playing, else mute or unmute. */
+export function toggleMusic() {
+  const state = music.getSnapshot();
+  if (!state.playing) {
+    music.setMuted(false);
+    music.play();
+  } else music.setMuted(!state.muted);
+}
+
+/**
+ * `small` for the big screen's control box. The pop-out window passes the big
+ * screen's `state` and sends the changes over (`onToggle`, `onVolume`); the
+ * music itself only plays in the big screen's window.
+ */
+export function MusicBar({
+  small = false,
+  state: shown,
+  onToggle = toggleMusic,
+  onVolume = (v: number) => music.setVolume(v),
+}: {
+  small?: boolean;
+  state?: MusicState;
+  onToggle?: () => void;
+  onVolume?: (v: number) => void;
+} = {}) {
+  const local = useMusic();
+  const state = shown ?? local;
   const audible = state.playing && !state.muted;
-  const toggle = () => {
-    if (!state.playing) {
-      music.setMuted(false);
-      music.play();
-    } else music.setMuted(!state.muted);
-  };
+  const toggle = onToggle;
   const label = audible ? "Mute the music" : "Play the music";
   const level = state.muted ? 0 : state.volume;
 
@@ -51,7 +73,7 @@ export function MusicBar() {
       : "MMMM";
   return (
     <div className="flex items-center gap-2">
-      <button type="button" onClick={toggle} className="cozy-btn round group relative h-10 w-10" aria-label={label} title={label}>
+      <button type="button" onClick={toggle} className={`cozy-btn round group relative ${small ? "h-8 w-8" : "h-10 w-10"}`} aria-label={label} title={label}>
         <span className="absolute inset-0 overflow-hidden rounded-full transition-opacity group-hover:opacity-0">
           <SwapEmote name={emote} rate={emote === "OOOO" ? level * 2 : 1} />
         </span>
@@ -66,7 +88,7 @@ export function MusicBar() {
         step={0.01}
         value={level}
         onChange={(e) => {
-          music.setVolume(Number(e.currentTarget.value));
+          onVolume(Number(e.currentTarget.value));
           changed();
         }}
         onPointerDown={() => setHeld(true)}
@@ -75,7 +97,7 @@ export function MusicBar() {
           changed();
         }}
         onPointerCancel={() => setHeld(false)}
-        className="cozy-range w-24"
+        className={`cozy-range ${small ? "w-16" : "w-24"}`}
         aria-label="Volume"
         title={`Volume ${Math.round(level * 100)}%`}
       />
