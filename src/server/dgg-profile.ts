@@ -40,6 +40,26 @@ export async function fetchDggProfile(
   return parseDggProfile(await res.text(), url);
 }
 
+/** A chatter nominee's destiny.gg name: its title without the list number ("12. Pizza" → "Pizza"). */
+export const chatterName = (title: string) => title.replace(/^\d+\.\s*/, "").trim();
+
+const cache = new Map<string, { at: number; profile: Promise<DggProfile | null> }>();
+const CACHE_MS = 6 * 3600 * 1000;
+/**
+ * `fetchDggProfile`, kept for six hours per name: voters all see the same
+ * cards, so destiny.gg is asked once per chatter, not once per voter. A
+ * failed fetch isn't kept.
+ */
+export function cachedDggProfile(name: string): Promise<DggProfile | null> {
+  const key = name.toLowerCase();
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < CACHE_MS) return hit.profile;
+  const profile = fetchDggProfile(name);
+  cache.set(key, { at: Date.now(), profile });
+  profile.catch(() => cache.delete(key));
+  return profile;
+}
+
 /** Parse the profile page HTML. Exported for tests. */
 export async function parseDggProfile(html: string, url: string): Promise<DggProfile | null> {
   const text: Record<string, string> = {};

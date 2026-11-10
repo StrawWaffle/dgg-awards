@@ -6,8 +6,12 @@ import { reducedMotion } from "@/lab/sketch";
 import { type Choice, type Ranking, type RankState, choicesLeft, crossing, current, inPlay, points } from "@/lab/rank";
 import { type Step, type TriageState, type Verdict, apply, card, comparisonsFor, phase, result, start } from "@/lab/triage";
 
-/** A wildcard chatter: the DGGer nominee, its name without the list number. */
-type Chatter = { id: string; name: string; emote: string | null; image: string | null };
+/**
+ * A chatter to rank: the nominee, its name without the list number, and
+ * where to load its destiny.gg profile (the admin route in the lab, the
+ * public one for nominees of a points award on the vote page).
+ */
+export type Chatter = { id: string; name: string; emote: string | null; image: string | null; profile: string | null };
 type Profile = {
   name: string;
   url: string;
@@ -51,23 +55,34 @@ function replay({ order, steps }: Saved): TriageState {
   return s;
 }
 
-/** The wildcards from the DGGer award (their description says "Wildcards"). */
+/** The award the wildcards are voted in (scripts/split-wildcards.ts). */
+export const WILDCARDS_ID = "dgger_wildcards";
+
+/** A nominee as a chatter to rank. */
+export const toChatter = (o: any, profile: (name: string) => string | null): Chatter => {
+  const name = String(o.title).replace(/^\d+\.\s*/, "").trim();
+  return {
+    id: o.id,
+    name,
+    emote: o.emote ?? null,
+    image: o.thumbnailUrl ?? (o.imageId ? `/Media/${o.imageId}` : null),
+    profile: name ? profile(name) : null,
+  };
+};
+
+/**
+ * The wildcards: the "DGGer wildcards" award, or before that existed, the
+ * DGGer nominees whose description says "Wildcards".
+ */
 function useWildcards() {
   const [chatters, setChatters] = useState<Chatter[] | null | "missing">(null);
   useEffect(() => {
     fetch("/api/admin/nominees")
       .then((r) => (r.ok ? r.json() : []))
       .then((data: any[]) => {
-        const options: any[] = data.find((c) => c.id === "dgger")?.options ?? [];
-        const list = options
-          .filter((o) => /wildcard/i.test(o.description ?? ""))
-          .map((o) => ({
-            id: o.id,
-            name: o.title.replace(/^\d+\.\s*/, "").trim(),
-            emote: o.emote ?? null,
-            image: o.thumbnailUrl ?? (o.imageId ? `/Media/${o.imageId}` : null),
-          }))
-          .filter((c) => c.name);
+        const own: any[] | undefined = data.find((c) => c.id === WILDCARDS_ID)?.options;
+        const options: any[] = own ?? (data.find((c) => c.id === "dgger")?.options ?? []).filter((o: any) => /wildcard/i.test(o.description ?? ""));
+        const list = options.map((o) => toChatter(o, (name) => `/api/admin/dgg-profile/${encodeURIComponent(name)}`)).filter((c) => c.name);
         setChatters(list.length ? list : "missing");
       })
       .catch(() => setChatters("missing"));
@@ -75,29 +90,30 @@ function useWildcards() {
   return chatters;
 }
 
-/** destiny.gg profiles, loaded once each, by name. */
+/** destiny.gg profiles, loaded once each, by address. */
 const profiles = new Map<string, Promise<Profile | null>>();
-function profileOf(name: string) {
-  if (!profiles.has(name)) {
+function profileOf(url: string | null) {
+  if (!url) return Promise.resolve(null);
+  if (!profiles.has(url)) {
     profiles.set(
-      name,
-      fetch(`/api/admin/dgg-profile/${encodeURIComponent(name)}`)
+      url,
+      fetch(url)
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null),
     );
   }
-  return profiles.get(name)!;
+  return profiles.get(url)!;
 }
-function useProfile(name: string) {
+function useProfile(url: string | null) {
   const [p, setP] = useState<Profile | null | undefined>(undefined);
   useEffect(() => {
     let live = true;
     setP(undefined);
-    profileOf(name).then((x) => live && setP(x));
+    profileOf(url).then((x) => live && setP(x));
     return () => {
       live = false;
     };
-  }, [name]);
+  }, [url]);
   return p;
 }
 
@@ -111,15 +127,39 @@ function useProfile(name: string) {
  * go; nothing is a vote.
  */
 export function RankChatters() {
-  const key = KEY;
-  const top = TOP;
   const chatters = useWildcards();
+  if (chatters === null) return <Shell>Loading the wildcards…</Shell>;
+  if (chatters === "missing") return <Shell>No wildcards found.</Shell>;
+  return (
+    <main className="mx-auto max-w-[110rem] px-4 py-6">
+      <TopTen chatters={chatters} storageKey={KEY} title={`Your top ${TOP} of the wildcards`} />
+    </main>
+  );
+}
+
+/**
+ * Your top ten of `chatters`, saved in this browser under `storageKey` as you
+ * go: the swipe, then the comparisons, then the list with points. `done` is
+ * shown under the finished list (the vote page puts its Cast button there).
+ */
+export function TopTen({
+  chatters,
+  storageKey,
+  title,
+  done,
+}: {
+  chatters: Chatter[];
+  storageKey: string;
+  title: string;
+  done?: (result: Ranking) => React.ReactNode;
+}) {
+  const key = storageKey;
+  const top = TOP;
   const [saved, setSaved] = useState<Saved | null>(() => load(key));
-  const byId = useMemo(() => new Map(chatters && chatters !== "missing" ? chatters.map((c) => [c.id, c]) : []), [chatters]);
+  const byId = useMemo(() => new Map(chatters.map((c) => [c.id, c])), [chatters]);
 
   // A saved run whose chatters changed since is started again.
   useEffect(() => {
-    if (!chatters || chatters === "missing") return;
     const ids = chatters.map((c) => c.id);
     if (!saved || saved.order.length !== ids.length || !saved.order.every((id) => byId.has(id))) {
       const fresh = { order: shuffled(ids), steps: [] };
@@ -166,7 +206,6 @@ export function RankChatters() {
     back();
   });
   const restart = () => {
-    if (!chatters || chatters === "missing") return;
     if (!confirm("Start over? Your answers so far are cleared.")) return;
     const fresh = { order: shuffled(chatters.map((c) => c.id)), steps: [] };
     setSaved(fresh);
@@ -182,9 +221,7 @@ export function RankChatters() {
     wasDone.current = isDone;
   }, [isDone]);
 
-  if (chatters === null) return <Shell>Loading the wildcards…</Shell>;
-  if (chatters === "missing") return <Shell>No wildcards found in DGGer of the Year.</Shell>;
-  if (!state) return <Shell>Loading…</Shell>;
+  if (!state) return <div className="cozy-panel p-8 font-semibold">Loading…</div>;
 
   const at = phase(state);
   const bracket = state.bracket;
@@ -194,9 +231,9 @@ export function RankChatters() {
   const left = bracket ? choicesLeft(bracket) : null;
   const compared = bracket?.asked ?? 0;
   return (
-    <main className="mx-auto max-w-[110rem] space-y-5 px-4 py-6">
+    <div className="space-y-5">
       <header className="cozy-panel flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4">
-        <h1 className="text-2xl font-black">Your top {top} of the wildcards</h1>
+        <h2 className="text-2xl font-black">{title}</h2>
         <span className="cozy-chip">{chatters.length} chatters</span>
         <span className="text-sm font-semibold" style={{ color: "var(--muted)" }}>
           {at === "done"
@@ -238,8 +275,9 @@ export function RankChatters() {
       {bracket && match && <Compare key={bracket.asked} state={bracket} match={match} byId={byId} onChoose={step} />}
       {bracket && at === "pick" && cross && <Pick group={cross.group} need={cross.need} place={cross.place} top={top} byId={byId} onKeep={(ids) => step({ keep: ids })} />}
       {at === "done" && <Final result={result(state)} byId={byId} top={top} />}
+      {at === "done" && done?.(result(state))}
       {bracket && at !== "done" && <Standings state={bracket} byId={byId} />}
-    </main>
+    </div>
   );
 }
 
@@ -256,10 +294,18 @@ function Shell({ children }: { children: React.ReactNode }) {
  * Mr. Breakfast's Free Prompts (CC0), in src/media/key-*.svg. Hidden on
  * touch screens, which have no keys.
  */
+/** Spelt out in full, so tests/data.test.ts can check each file exists. */
+const KEY_SVG = {
+  left: "/Media/key-left.svg",
+  right: "/Media/key-right.svg",
+  down: "/Media/key-down.svg",
+  equals: "/Media/key-equals.svg",
+  backspace: "/Media/key-backspace.svg",
+};
 function Key({ name, label, small = false }: { name: "left" | "right" | "down" | "equals" | "backspace"; label: string; small?: boolean }) {
   return (
     <img
-      src={`/Media/key-${name}.svg`}
+      src={KEY_SVG[name]}
       alt={label}
       title={`Key: ${label}`}
       className={`rank-key w-auto shrink-0 ${small ? "h-9" : "h-14"}`}
@@ -356,7 +402,7 @@ function Swipe({
   const chatter = byId.get(id)!;
   // Load the next card's profile while this one is up.
   useEffect(() => {
-    if (next) profileOf(byId.get(next)!.name);
+    if (next) profileOf(byId.get(next)!.profile);
   }, [next, byId]);
   // One answer per card, even from two presses before the next render.
   const answered = useRef(false);
@@ -773,7 +819,7 @@ function Nothing({ text, emote, size = 0.8 }: { text: string; emote: string; siz
  * destiny.gg's flair colours; teams their emote.
  */
 function HeroCard({ chatter }: { chatter: Chatter }) {
-  const p = useProfile(chatter.name);
+  const p = useProfile(chatter.profile);
   const team = teamOf(p?.team ?? null);
   const tier = tierOf(p?.tier ?? null);
   const bio = bioOf(p?.bio);
@@ -890,7 +936,7 @@ function HeroCard({ chatter }: { chatter: Chatter }) {
  * stack, so groups of equals in columns still fit.
  */
 function MatchCard({ chatter }: { chatter: Chatter }) {
-  const p = useProfile(chatter.name);
+  const p = useProfile(chatter.profile);
   const team = teamOf(p?.team ?? null);
   const tier = tierOf(p?.tier ?? null);
   const bio = bioOf(p?.bio);
@@ -989,7 +1035,7 @@ function MatchCard({ chatter }: { chatter: Chatter }) {
  * The final list: places shared by equals (1, 2, 2, 4), each one's points, and
  * who didn't make it.
  */
-function Final({ result, byId, top }: { result: Ranking; byId: Map<string, Chatter>; top: number }) {
+export function Final({ result, byId, top, title }: { result: Ranking; byId: Map<string, Chatter>; top: number; title?: string }) {
   const rows = points(result, top).map((r) => ({ place: r.place, ids: r.group, points: r.points }));
   const shown = new Set(result.flat());
   const rest = [...byId.values()].filter((c) => !shown.has(c.id)).sort((a, b) => a.name.localeCompare(b.name));
@@ -1001,7 +1047,7 @@ function Final({ result, byId, top }: { result: Ranking; byId: Map<string, Chatt
   return (
     <section className="cozy-panel space-y-4 p-5">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 className="text-xl font-black">Your top {top}</h2>
+        <h2 className="text-xl font-black">{title ?? `Your top ${top}`}</h2>
         <span className="text-sm font-semibold" style={{ color: "var(--muted)" }}>
           Points: {top} for 1st down to 1 for {top}th. Equals share the points of the places they take.
         </span>

@@ -5,10 +5,12 @@ import { originOf, useBursts } from "@/lab/Bursts";
 import { type Clip, ClipPlayer, nomineeClip } from "@/lab/ClipPlayer";
 import { Emote } from "@/lab/Emote";
 import { cssVar } from "@/lab/sketch";
+import { type Chatter, Final, TopTen } from "@/lab/RankChatters";
+import type { Places } from "@/lib/voting";
 import type { Me, SiteConfig } from "@/site/Site";
 
 type Nominee = { id: string; title: string; description: string; image: string | null; emote: string | null; clip: Clip | null };
-type Award = { id: string; title: string; description: string; ranked: boolean; nominees: Nominee[] };
+type Award = { id: string; title: string; description: string; ranked: boolean; points: boolean; nominees: Nominee[] };
 
 const toAwards = (data: any[]): Award[] =>
   data
@@ -18,6 +20,8 @@ const toAwards = (data: any[]): Award[] =>
       title: c.title,
       description: c.description ?? "",
       ranked: c.votingStyle === "ranked",
+      // A top 10 with points: made by swiping, then comparing (TopTen).
+      points: c.votingStyle === "points",
       nominees: c.options.map((o: any) => ({
         id: o.id,
         title: o.title,
@@ -34,7 +38,8 @@ const when = (ms: number) =>
 
 /**
  * The voting page: one award at a time, with the ballot on the side. Pick one
- * nominee, or rank several for ranked awards, then cast the vote: it's final
+ * nominee, rank several for ranked awards, or make a top 10 for points awards
+ * (swipe through everyone, then compare the finalists), then cast the vote: it's final
  * (the server takes one ballot per award). Emotes react: Klappa on a pick and
  * a cast, Skip on a skip, a cheer at the end.
  *
@@ -133,6 +138,15 @@ function Ballot({
   const [casting, setCasting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [watching, setWatching] = useState<Clip | null>(null);
+  // Points ballots as cast (groups of equals), to show them back.
+  const [places, setPlaces] = useState<Record<string, Places>>({});
+  useEffect(() => {
+    if (preview || !me || !awards.some((a) => a.points && voted[a.id])) return;
+    fetch("/api/vote/places")
+      .then((r) => (r.ok ? r.json() : {}))
+      .then(setPlaces)
+      .catch(() => {});
+  }, [preview, me, awards, voted]);
 
   const done = step >= awards.length;
   const award = awards[step];
@@ -174,8 +188,8 @@ function Ballot({
     setPicks({ ...picks, [award.id]: next });
     if (!current.includes(id)) fire("Klappa", ...originOf(e, box.current), award.ranked ? 3 : 6);
   };
-  const cast = async (e: React.MouseEvent) => {
-    if (!award || chosen.length === 0) return;
+  const cast = async (e: React.MouseEvent, top?: Places) => {
+    if (!award || (top ? top.length === 0 : chosen.length === 0)) return;
     const [x, y] = originOf(e, box.current);
     setCasting(true);
     setError(null);
@@ -184,7 +198,13 @@ function Ballot({
         const res = await fetch("/api/vote", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify(award.ranked ? { category_id: award.id, ranking: chosen } : { category_id: award.id, nominee_id: chosen[0] }),
+          body: JSON.stringify(
+            top
+              ? { category_id: award.id, places: top }
+              : award.ranked
+                ? { category_id: award.id, ranking: chosen }
+                : { category_id: award.id, nominee_id: chosen[0] },
+          ),
         });
         if (!res.ok) {
           const text = await res.text();
@@ -198,7 +218,13 @@ function Ballot({
           );
         }
       }
-      setVoted((v) => ({ ...v, [award.id]: chosen }));
+      setVoted((v) => ({ ...v, [award.id]: top ? top.flat() : chosen }));
+      if (top) {
+        setPlaces((p) => ({ ...p, [award.id]: top }));
+        try {
+          localStorage.removeItem(topTenKey(award.id, preview));
+        } catch {}
+      }
       fire("CHEERSTINY", x, y, 6);
       setTimeout(() => fire("Klappa", x + 60, y, 6), 200);
       setTimeout(() => go(step + 1), 900);
@@ -292,7 +318,7 @@ function Ballot({
                 <span className="cozy-chip coral">
                   Award {step + 1} of {awards.length}
                 </span>
-                <span className="cozy-chip">{award.ranked ? "Rank as many as you like" : "Pick one"}</span>
+                <span className="cozy-chip">{award.points ? "Your top 10" : award.ranked ? "Rank as many as you like" : "Pick one"}</span>
                 <span className="cozy-chip green">{award.nominees.length} nominees</span>
                 {mine && <span className="cozy-chip green">Voted</span>}
               </div>
@@ -308,8 +334,28 @@ function Ballot({
                     Click them in order: your favourite first. Click again to take one out.
                   </p>
                 )}
+                {award.points && !mine && (
+                  <p className="mt-1 text-sm font-semibold" style={{ color: "var(--muted)" }}>
+                    Swipe through everyone (yes, no or maybe), then pick between your yeses two at a time. Your top 10
+                    gets points: 10 for first down to 1 for tenth, shared by any you rank equal. Everyone's points are
+                    added up. Your progress is kept in this browser until you cast it.
+                  </p>
+                )}
               </div>
 
+              {award.points && (
+                <PointsBallot
+                  award={award}
+                  admin={!!me?.admin}
+                  preview={preview}
+                  mine={mine ? (places[award.id] ?? mine.map((id) => [id])) : null}
+                  canCast={!!me || preview}
+                  casting={casting}
+                  onCast={cast}
+                />
+              )}
+
+              {!award.points && (
               <div ref={grid} className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                 {award.nominees.map((n) => {
                   const rank = chosen.indexOf(n.id);
@@ -374,6 +420,7 @@ function Ballot({
                   );
                 })}
               </div>
+              )}
 
               <div className="flex flex-wrap items-center gap-3">
                 <button
@@ -392,6 +439,7 @@ function Ballot({
                   </button>
                 )}
                 {!mine &&
+                  !award.points &&
                   (me || preview ? (
                     <button type="button" className="cozy-btn primary" disabled={chosen.length === 0 || casting} onClick={cast}>
                       {casting ? "Casting…" : award.ranked && chosen.length > 1 ? `Cast my ranking (${chosen.length})` : "Cast my vote"}
@@ -401,7 +449,7 @@ function Ballot({
                       Sign in to vote
                     </a>
                   ))}
-                {!mine && (
+                {!mine && !award.points && (
                   <span className="text-sm font-semibold" style={{ color: "var(--muted)" }}>
                     Votes are final.
                   </span>
@@ -443,5 +491,75 @@ function Ballot({
         </section>
       </div>
     </div>
+  );
+}
+
+/** Where a points award's top 10 in progress is kept in this browser. */
+const topTenKey = (awardId: string, preview: boolean) => `${preview ? "preview" : "vote"}.top10.${awardId}`;
+
+/**
+ * A points award's ballot: the top 10 maker (swipe, then compare), then the
+ * finished list with Cast. Once cast, the list as cast.
+ */
+function PointsBallot({
+  award,
+  admin,
+  preview,
+  mine,
+  canCast,
+  casting,
+  onCast,
+}: {
+  award: Award;
+  admin: boolean;
+  preview: boolean;
+  mine: Places | null;
+  canCast: boolean;
+  casting: boolean;
+  onCast: (e: React.MouseEvent, top: Places) => void;
+}) {
+  const chatters: Chatter[] = award.nominees
+    .map((n) => {
+      const name = n.title.replace(/^\d+\.\s*/, "").trim();
+      return {
+        id: n.id,
+        name,
+        emote: n.emote,
+        image: n.image,
+        // Admins (and previews) read profiles from the admin route; voters from the award's.
+        profile: !name ? null : admin ? `/api/admin/dgg-profile/${encodeURIComponent(name)}` : `/api/nominees/${encodeURIComponent(award.id)}/${encodeURIComponent(n.id)}/profile`,
+      };
+    })
+    .filter((c) => c.name);
+  const byId = new Map(chatters.map((c) => [c.id, c]));
+  if (mine) {
+    return (
+      <div className="space-y-2">
+        <Final result={mine.filter((g) => g.every((id) => byId.has(id)))} byId={byId} top={10} title="Your top 10, as cast" />
+      </div>
+    );
+  }
+  return (
+    <TopTen
+      chatters={chatters}
+      storageKey={topTenKey(award.id, preview)}
+      title="Your top 10"
+      done={(top) => (
+        <div className="cozy-panel flex flex-wrap items-center gap-3 px-5 py-4">
+          {canCast ? (
+            <button type="button" className="cozy-btn primary" disabled={casting || top.length === 0} onClick={(e) => onCast(e, top)}>
+              {casting ? "Casting…" : "Cast my top 10"}
+            </button>
+          ) : (
+            <a className="cozy-btn primary" href="/signin?next=/vote">
+              Sign in to vote
+            </a>
+          )}
+          <span className="text-sm font-semibold" style={{ color: "var(--muted)" }}>
+            Votes are final. Not happy with it? Step back, or start over, before you cast.
+          </span>
+        </div>
+      )}
+    />
   );
 }

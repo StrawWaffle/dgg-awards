@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { PlayIcon } from "@radix-ui/react-icons";
 import { type Clip, nomineeClip } from "@/lab/ClipPlayer";
 import { Emote } from "@/lab/Emote";
-import type { Award } from "@/lab/Results";
+import { type Award, amountLabel } from "@/lab/Results";
 
 export type Nominee = { id: string; title: string; image: string | null; emote: string | null; clip: Clip | null };
 /** One award on the big screen: its results joined to its nominees' pictures and clips. */
@@ -172,7 +172,9 @@ export function WinnerCard({ award, onPlay, onCheer }: { award: ShowAward; onPla
       )}
       <h2 className="text-4xl font-black">{result.title}</h2>
       <p className="hand text-2xl font-bold" style={{ color: "var(--muted)" }}>
-        {result.count.toLocaleString()} votes · {result.percentage}%
+        {award.unit === "points"
+          ? `${amountLabel(award, result.count)} from ${award.total.toLocaleString()} ballots`
+          : `${result.count.toLocaleString()} votes · ${result.percentage}%`}
       </p>
       <div className="flex flex-wrap justify-center gap-3">
         {nominee?.clip && (

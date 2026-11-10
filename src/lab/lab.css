@@ -535,7 +535,7 @@ input[type="range"].cozy-range {
 }
 
 /* Keyboard keys on the ranking buttons: not on touch screens. */
-@media (hover: none) {
+@media (hover: none), (pointer: coarse) {
   .rank-key {
     display: none;
   }

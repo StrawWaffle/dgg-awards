@@ -17,6 +17,8 @@
 //
 // The state is plain data (JSON), so it can be saved and stepped back.
 
+import { pointsForPlaces } from "@/lib/voting";
+
 /** Equals, going on together. */
 export type Group = string[];
 /** Best first. */
@@ -164,17 +166,11 @@ export function inPlay(s: RankState): string[] {
 /**
  * Points for each place in the top: `top` for the first, down to 1. Equals
  * share the points of the places they take (tied for 3rd and 4th of ten:
- * (8 + 7) / 2 = 7.5 each).
+ * (8 + 7) / 2 = 7.5 each). The official vote counts the same way
+ * (`pointsForPlaces` in src/lib/voting.ts).
  */
 export function points(result: Ranking, top: number): { place: number; group: Group; points: number }[] {
-  const rows = [];
-  let place = 1;
-  for (const group of result) {
-    const taken = Array.from({ length: group.length }, (_, i) => Math.max(0, top + 1 - (place + i)));
-    rows.push({ place, group, points: taken.reduce((a, b) => a + b, 0) / group.length });
-    place += group.length;
-  }
-  return rows;
+  return pointsForPlaces(result, top);
 }
 
 /**

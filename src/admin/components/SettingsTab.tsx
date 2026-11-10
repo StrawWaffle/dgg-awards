@@ -347,6 +347,7 @@ function SettingsForm({ config }: { config: Config }) {
             >
               <option value="single">Single pick</option>
               <option value="ranked">Ranked (instant runoff)</option>
+              <option value="points">Top 10 (points: 10 for 1st down to 1 for 10th)</option>
             </select>
           </Field>
         </div>

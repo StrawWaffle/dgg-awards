@@ -5,7 +5,17 @@ import { type Levels, type Source, music, useFrame } from "@/lab/music";
 import { cssVar, reducedMotion } from "@/lab/sketch";
 
 export type Result = { id: string; title: string; count: number; percentage: number; isWinner: boolean };
-export type Award = { id: string; title: string; total: number; results: Result[] };
+/**
+ * `unit: "points"` for a top 10 by points (the wildcards): `count` is then
+ * points, and `total` ballots.
+ */
+export type Award = { id: string; title: string; total: number; results: Result[]; unit?: "points" };
+
+/** A bar's label: "123 · 45.6%", or for points "123.5 points". */
+export const amountLabel = (award: Pick<Award, "unit" | "total">, v: number, percentage?: number) =>
+  award.unit === "points"
+    ? `${Number.isInteger(v) ? v.toLocaleString() : v.toFixed(1)} points`
+    : `${Math.round(v).toLocaleString()} · ${(percentage ?? (v / Math.max(1, award.total)) * 100).toFixed(1)}%`;
 
 /** Every award's results, from the admin preview (so it works before voting closes). */
 export function loadResults(): Promise<Award[]> {
@@ -16,10 +26,11 @@ export function loadResults(): Promise<Award[]> {
         id: c.categoryId,
         title: c.categoryTitle,
         total: c.totalVotes,
+        ...(c.votingStyle === "points" ? { unit: "points" as const } : {}),
         results: c.options.map((o: any) => ({
           id: o.id,
           title: o.title,
-          count: o.count,
+          count: c.votingStyle === "points" ? o.points : o.count,
           percentage: o.percentage,
           isWinner: o.isWinner,
         })),
@@ -168,7 +179,7 @@ export function Board({
       e.clip?.setAttribute("width", String(w));
       if (e.count) {
         e.count.textContent =
-          s.phase === "hidden" ? "?" : `${Math.round(s.v).toLocaleString()} · ${((s.v / Math.max(1, award.total)) * 100).toFixed(1)}%`;
+          s.phase === "hidden" ? "?" : amountLabel(award, award.unit === "points" ? Math.round(s.v * 2) / 2 : s.v);
       }
       // The box follows the bar's length as later bars squish it, and
       // wobbles on the beat like the other drawn frames.

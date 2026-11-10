@@ -15,10 +15,14 @@ import { drizzle } from "drizzle-orm/bun-sqlite";
 import * as schema from "@/lib/data/schema";
 import { env } from "@/lib/util";
 import {
+  type Places,
+  type PointsResult,
   type RunoffResult,
   type VotingStyle,
+  countPoints,
   effectiveStyle,
   instantRunoff,
+  ranksToPlaces,
 } from "@/lib/voting";
 import type {
   API,
@@ -179,6 +183,17 @@ export async function getUserBallots(uid: number): Promise<Record<string, string
   return ballots;
 }
 
+/** The user's ballot per category as places: groups of equals, best first. */
+export async function getUserPlaces(uid: number): Promise<Record<string, Places>> {
+  const rows = await db.query.votesTable.findMany({
+    where: (vote, { eq }) => eq(vote.uid, uid),
+    columns: { categoryId: true, optionId: true, rank: true },
+  });
+  const byCategory: Record<string, { id: string; rank: number }[]> = {};
+  for (const r of rows) (byCategory[r.categoryId] ??= []).push({ id: r.optionId, rank: r.rank });
+  return Object.fromEntries(Object.entries(byCategory).map(([k, v]) => [k, ranksToPlaces(v)]));
+}
+
 /** A category with its style and nominee ids, for validating a ballot. */
 /** A category open for votes; hidden ones aren't. */
 export async function getCategoryForVoting(id: string) {
@@ -189,25 +204,26 @@ export async function getCategoryForVoting(id: string) {
 }
 
 /**
- * Store one ballot: choices in order (one for single pick). The first ballot
- * in a category also pins its voting style, so changing the site default
- * later can't change how its votes are counted.
+ * Store one ballot: each choice with its rank (one, rank 1, for a single
+ * pick; 1, 2, 3… for ranked; places shared by equals for points). The first
+ * ballot in a category also pins its voting style, so changing the site
+ * default later can't change how its votes are counted.
  */
 export async function insertBallot(
   session: Session,
   categoryId: string,
   style: VotingStyle,
-  choices: string[],
+  choices: { id: string; rank: number }[],
 ) {
   const at = new Date();
   db.transaction((tx) => {
     tx.insert(schema.votesTable)
       .values(
-        choices.map((optionId, i) => ({
+        choices.map(({ id: optionId, rank }) => ({
           uid: session.uid,
           categoryId,
           optionId,
-          rank: i + 1,
+          rank,
           at,
           sessionSnapshot: session,
         })),
@@ -255,6 +271,11 @@ export async function setSetting(key: string, val: string) {
 }
 
 const voteIp = sql<string>`json_extract(${schema.votesTable.sessionSnapshot}, '$.ip')`;
+/**
+ * Ballots: one voter's vote in one award. Counted over rank-1 rows, but by
+ * voter and award, since equals on a points ballot can share first place.
+ */
+const ballotCount = sql<number>`count(distinct case when ${schema.votesTable.rank} = 1 then ${schema.votesTable.uid} || ':' || ${schema.votesTable.categoryId} end)`;
 
 /**
  * One page of votes (100 rows), newest first, with the voter's name and the
@@ -305,7 +326,7 @@ export async function getVoteStats() {
   const [totals] = await db
     .select({
       voters: sql<number>`count(distinct ${v.uid})`,
-      ballots: sql<number>`count(*) filter (where ${v.rank} = 1)`,
+      ballots: ballotCount,
       users: sql<number>`(select count(*) from ${schema.usersTable})`,
     })
     .from(v);
@@ -313,7 +334,7 @@ export async function getVoteStats() {
     .select({
       id: schema.categoriesTable.id,
       title: schema.categoriesTable.title,
-      ballots: sql<number>`count(${v.uid})`,
+      ballots: sql<number>`count(distinct ${v.uid})`,
     })
     .from(schema.categoriesTable)
     .leftJoin(v, and(eq(v.categoryId, schema.categoriesTable.id), eq(v.rank, 1)))
@@ -321,7 +342,7 @@ export async function getVoteStats() {
     .orderBy(asc(schema.categoriesTable.position));
   const day = sql<string>`date(${v.at}, 'unixepoch')`;
   const days = await db
-    .select({ day, ballots: sql<number>`count(*)`, voters: sql<number>`count(distinct ${v.uid})` })
+    .select({ day, ballots: ballotCount, voters: sql<number>`count(distinct ${v.uid})` })
     .from(v)
     .where(eq(v.rank, 1))
     .groupBy(day)
@@ -349,12 +370,12 @@ export async function getVoteTally() {
   const [totals] = await db
     .select({
       voters: sql<number>`count(distinct ${v.uid})`,
-      ballots: sql<number>`count(*) filter (where ${v.rank} = 1)`,
+      ballots: ballotCount,
     })
     .from(v);
   const day = sql<string>`date(${v.at}, 'unixepoch')`;
   const days = await db
-    .select({ day, voters: sql<number>`count(distinct ${v.uid})`, ballots: sql<number>`count(*)` })
+    .select({ day, voters: sql<number>`count(distinct ${v.uid})`, ballots: ballotCount })
     .from(v)
     .where(eq(v.rank, 1))
     .groupBy(day)
@@ -392,6 +413,22 @@ export async function setNomineeFields(categoryId: string, id: string, fields: P
     .update(schema.optionsTable)
     .set(rest)
     .where(and(eq(schema.optionsTable.categoryId, categoryId), eq(schema.optionsTable.id, id)));
+}
+
+/**
+ * Move a nominee to another award, keeping everything it has (picture,
+ * emote, clip, links), at `position` there or last. Only for nominees
+ * without votes: votes point at (nominee, award). Throws if the id is taken
+ * in the other award.
+ */
+export async function moveNominee(fromCategory: string, id: string, toCategory: string, position?: number) {
+  if (await getNominee(toCategory, id)) throw new Error(`"${id}" is already in "${toCategory}"`);
+  if (await nomineeHasVotes(fromCategory, id)) throw new Error(`"${id}" in "${fromCategory}" has votes`);
+  const last = (await getCategoryNominees(toCategory)).reduce((n, o) => Math.max(n, o.position), -1);
+  await db
+    .update(schema.optionsTable)
+    .set({ categoryId: toCategory, position: position ?? last + 1 })
+    .where(and(eq(schema.optionsTable.categoryId, fromCategory), eq(schema.optionsTable.id, id)));
 }
 
 /** Set any of a category's columns, for undo. */
@@ -819,9 +856,10 @@ export function processVoteResults(
   return Array.from(categories.values()).map(({ meta, options }) => {
     const style = effectiveStyle(meta.votingStyle, defaultStyle);
     const firstChoices = (o: VoteEntry) => o.votes.filter((v) => v.rank === 1).length;
-    const totalVotes = options.reduce((n, o) => n + firstChoices(o), 0);
+    let totalVotes = options.reduce((n, o) => n + firstChoices(o), 0);
 
     let runoff: RunoffResult | undefined;
+    let tally: PointsResult | undefined;
     let place: (o: VoteEntry) => number; // higher is better
     let winners: Set<string>;
     if (style === "ranked") {
@@ -840,6 +878,18 @@ export function processVoteResults(
       runoff.rounds.forEach((r, i) => r.eliminated.forEach((id) => outInRound.set(id, i)));
       place = (o) => outInRound.get(o.id) ?? runoff!.rounds.length;
       winners = new Set(runoff.winners);
+    } else if (style === "points") {
+      const ballots = new Map<number, { id: string; rank: number }[]>();
+      for (const o of options) for (const v of o.votes) ballots.set(v.uid, [...(ballots.get(v.uid) ?? []), { id: o.id, rank: v.rank }]);
+      const t = countPoints(
+        options.map((o) => o.id),
+        [...ballots.values()].map(ranksToPlaces),
+      );
+      tally = t;
+      totalVotes = t.ballots;
+      // Best last, like the others: the reveal goes from last place up.
+      place = (o) => t.order.length - t.order.indexOf(o.id);
+      winners = new Set(t.winners);
     } else {
       const max = Math.max(...options.map(firstChoices));
       place = () => 0;
@@ -850,6 +900,12 @@ export function processVoteResults(
       (a, b) => place(a) - place(b) || firstChoices(a) - firstChoices(b),
     );
 
+    const allPoints = tally ? Object.values(tally.points).reduce((a, b) => a + b, 0) : 0;
+    const share = (opt: VoteEntry, count: number) => {
+      // For points awards: the share of all points given.
+      if (tally) return allPoints === 0 ? 0 : Number(((tally.points[opt.id]! / allPoints) * 100).toFixed(1));
+      return totalVotes === 0 ? 0 : Number(((count / totalVotes) * 100).toFixed(1));
+    };
     return {
       categoryId: meta.id,
       categoryTitle: meta.title,
@@ -863,9 +919,9 @@ export function processVoteResults(
           id: opt.id,
           title: opt.title,
           count,
-          percentage:
-            totalVotes === 0 ? 0 : Number(((count / totalVotes) * 100).toFixed(1)),
+          percentage: share(opt, count),
           isWinner: winners.has(opt.id),
+          ...(tally ? { points: tally.points[opt.id]!, placed: tally.placed[opt.id]! } : {}),
           payload,
         };
       }),

@@ -148,13 +148,19 @@ export type ResultsData = {
   totalVotes: number;
   /** Ranked categories only: the instant-runoff rounds and winner. */
   runoff?: RunoffResult;
-  /** Last place first. `count` is first choices. */
+  /**
+   * Last place first. `count` is first choices. Points awards add `points`
+   * (summed over ballots) and `placed` (ballots with them in their top 10),
+   * `percentage` is their share of all points, and `totalVotes` is ballots.
+   */
   options: {
     id: string;
     title: string;
     count: number;
     percentage: number;
     isWinner: boolean;
+    points?: number;
+    placed?: number;
     payload: Option;
   }[];
 }[];
