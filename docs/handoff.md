@@ -552,7 +552,7 @@ StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, an
   - typecheck and 92 unit tests; 49 API tests, with the preview addresses added
   - in the browser: both preview menus (hover, jump, close, current page marked, the admin one on a phone), every stage and page, a preview vote not saved, the old addresses rewritten, `/lab#sound` kept, non-admin and signed-out refusals, the big screen switched to simulated votes with the reveal running, and the music's first play starting at 6.02 s
 
-### Ranking the wildcards, second take: two at a time, the whole profile (2026-11-10, built, not deployed)
+### Ranking the wildcards, second take: two at a time, the whole profile (2026-11-10, deployed)
 
 StrawWaffle tried the first take: the more there is to go on, the easier the choice, and keys are the quick way. Ranking batches by clicking places felt slow, so:
 
