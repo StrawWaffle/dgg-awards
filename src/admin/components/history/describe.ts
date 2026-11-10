@@ -21,6 +21,7 @@ const fieldNames: Record<string, string> = {
   thumbnailKey: "thumbnail",
   thumbnailAt: "thumbnail frame",
   emote: "emote",
+  listNumber: "number on the list",
   votingStyle: "voting style",
   viewingMode: "mode",
   startTime: "voting opens",

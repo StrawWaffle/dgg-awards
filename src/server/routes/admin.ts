@@ -216,6 +216,7 @@ export const adminRoutes = new Hono<SessionEnv>()
           clipStatus: o.clipStatus === "ready" ? ("ready" as const) : null,
           thumbnailKey: o.thumbnailKey,
           thumbnailAt: o.thumbnailAt,
+          listNumber: o.listNumber,
         })),
       })),
     );
@@ -494,7 +495,7 @@ export const adminRoutes = new Hono<SessionEnv>()
     const config = await getConfig();
     const flags = await getCategoryFlags();
     const categories = categoriesWithMediaUrls(
-      withEffectiveStyles(await getNominees({ includeHidden: true }), config.defaultVotingStyle),
+      withEffectiveStyles(await getNominees({ includeHidden: true, admin: true }), config.defaultVotingStyle),
     );
     return c.json(
       categories.map((cat) => ({

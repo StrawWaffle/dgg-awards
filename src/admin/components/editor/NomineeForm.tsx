@@ -34,6 +34,7 @@ type Draft = {
   imageId: string;
   emote: string;
   renderType: "default" | "compact";
+  listNumber: string;
 };
 
 const draftOf = (n: AdminNominee): Draft => ({
@@ -47,6 +48,7 @@ const draftOf = (n: AdminNominee): Draft => ({
   imageId: n.imageId ?? "",
   emote: n.emote ?? "",
   renderType: n.renderType ?? "default",
+  listNumber: n.listNumber == null ? "" : String(n.listNumber),
 });
 
 /** Invalidate everything the editor shows, after any change. */
@@ -85,6 +87,7 @@ export function NomineeForm({ nominee, issues }: { nominee: AdminNominee; issues
         imageId: draft.imageId.trim() || null,
         emote: draft.emote.trim() || null,
         renderType: draft.renderType,
+        listNumber: draft.listNumber.trim() ? Number(draft.listNumber) : null,
       }),
     onSuccess: refresh,
   });
@@ -116,13 +119,23 @@ export function NomineeForm({ nominee, issues }: { nominee: AdminNominee; issues
 
       <Section id="nominee-details" title="Details" boxed={false}>
         <div className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-[2fr_1fr_1fr]">
             <Field label="Title">
               <input
                 className={inputClass}
                 value={draft.title}
                 required
                 onChange={(e) => set("title", e.currentTarget.value)}
+              />
+            </Field>
+            <Field label="Number on the list" hint="Admins only, never shown to voters. For keeping track against rinlux's list.">
+              <input
+                className={inputClass}
+                type="number"
+                min={1}
+                step={1}
+                value={draft.listNumber}
+                onChange={(e) => set("listNumber", e.currentTarget.value)}
               />
             </Field>
             <Field label="Date" hint="When it happened. Checked against the award year.">

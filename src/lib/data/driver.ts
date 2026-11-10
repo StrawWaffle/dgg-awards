@@ -646,14 +646,19 @@ export async function listUnfinishedClips() {
 }
 
 /** Every category with its nominees, in display order. */
-export async function getNominees({ includeHidden = false } = {}) {
+/**
+ * Every category with its nominees, in order. `admin` adds the admin-only
+ * fields (`listNumber`); everything public leaves it out, so voters never
+ * get them.
+ */
+export async function getNominees({ includeHidden = false, admin = false } = {}) {
   return await db.query.categoriesTable.findMany({
     columns: { position: false, hidden: false },
     where: includeHidden ? undefined : (c, { eq }) => eq(c.hidden, false),
     orderBy: (c, { asc }) => [asc(c.position)],
     with: {
       options: {
-        columns: { position: false },
+        columns: admin ? { position: false } : { position: false, listNumber: false },
         orderBy: (o, { asc }) => [asc(o.position)],
       },
     },
@@ -733,6 +738,7 @@ export async function updateNominee(d: API.PATCH_NomineeRequest) {
       clipStart: d.clipStart,
       clipEnd: d.clipEnd,
       emote: d.emote,
+      listNumber: d.listNumber,
     })
     .where(
       and(
@@ -914,7 +920,8 @@ export function processVoteResults(
       totalVotes,
       options: ordered.map((opt) => {
         const count = firstChoices(opt);
-        const { category, votes, position, ...payload } = opt;
+        // listNumber is admin-only: results are public.
+        const { category, votes, position, listNumber, ...payload } = opt;
         return {
           id: opt.id,
           title: opt.title,
