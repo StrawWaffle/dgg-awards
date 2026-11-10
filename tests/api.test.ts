@@ -976,6 +976,78 @@ describe("admin", () => {
     await req("/api/admin/category", json("PATCH", { id: "rankedcat", hidden: true }), admin);
   });
 
+  test("points voting: a top 10 with equals, points added up", async () => {
+    const json = (method: string, body: unknown) => ({
+      method,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const post = (path: string, fields: Record<string, string>) =>
+      req(path, { method: "POST", body: form(fields) }, admin);
+    expect(
+      (await post("/api/admin/category", {
+        category_id: "pointscat",
+        category_title: "Points Cat",
+        category_description: "d",
+        voting_style: "points",
+      })).status,
+    ).toBe(302);
+    for (const id of ["a", "b", "c", "d"]) {
+      await post("/api/admin/nominee", {
+        nominee_id: id,
+        category_id: "pointscat",
+        nominee_title: `${id === "d" ? "4. " : ""}${id.toUpperCase()}`,
+        nominee_description: "d",
+        url: "https://example.com",
+      });
+    }
+    const v1 = await signIn("Pointer1");
+    const ballot = (jar: Jar, body: unknown) => req("/api/vote", json("POST", body), jar);
+    // Places only, each nominee once, ten at most, no empty groups.
+    expect((await ballot(v1, { category_id: "pointscat", ranking: ["a"] })).status).toBe(400);
+    expect((await ballot(v1, { category_id: "pointscat", places: [["a"], ["a"]] })).status).toBe(400);
+    expect((await ballot(v1, { category_id: "pointscat", places: [["a"], []] })).status).toBe(400);
+    expect((await ballot(v1, { category_id: "pointscat", places: [["zee"]] })).status).toBe(400);
+    expect((await ballot(v1, { category_id: "ally", places: [["peter"]] })).status).toBe(400);
+
+    // Equals share the points of the places they take:
+    // a 10 + 8.5 = 18.5; b 8.5 + 10 + 8 = 26.5; c 8.5 + 9.5 = 18; d 8.5 + 9.5 = 18.
+    const ballots = [
+      [["a"], ["b", "c"]],
+      [["b"], ["a", "d"]],
+      [["c", "d"], ["b"]],
+    ];
+    for (const [i, places] of ballots.entries()) {
+      const jar = i === 0 ? v1 : await signIn(`Pointer${i + 1}`);
+      expect((await ballot(jar, { category_id: "pointscat", places })).status).toBe(200);
+    }
+    expect((await ballot(v1, { category_id: "pointscat", places: [["d"]] })).status).toBe(400);
+    expect((await (await req("/api/vote/places", {}, v1)).json()).pointscat).toEqual([["a"], ["b", "c"]]);
+    // The style is locked once voted.
+    expect((await req("/api/admin/category", json("PATCH", { id: "pointscat", votingStyle: "ranked" }), admin)).status).toBe(409);
+
+    // A nominee's profile is only for points awards, and for its own nominees.
+    expect((await req("/api/nominees/ally/peter/profile")).status).toBe(404);
+    expect((await req("/api/nominees/pointscat/zee/profile")).status).toBe(404);
+
+    await setMode(admin, "reviewing");
+    const result = (await (await req("/api/vote/results")).json()).find((c: any) => c.categoryId === "pointscat");
+    expect(result.votingStyle).toBe("points");
+    expect(result.totalVotes).toBe(3);
+    // Last place first. c and d tie on points, first places and placings.
+    expect(result.options.map((o: any) => [o.id, o.points, o.placed, o.isWinner])).toEqual([
+      ["d", 18, 2, false],
+      ["c", 18, 2, false],
+      ["a", 18.5, 2, false],
+      ["b", 26.5, 3, true],
+    ]);
+    // The tally counts ballots, not first places (two equals were first on one).
+    const tally = await (await req("/api/vote/tally")).json();
+    expect(tally.ballots).toBeGreaterThanOrEqual(3);
+    await setMode(admin, "voting");
+    await req("/api/admin/category", json("PATCH", { id: "pointscat", hidden: true }), admin);
+  });
+
   // Needs the dgga-files container serving tests/fixtures (see tests/run.sh).
   test(
     "clips: build in the background, serve with ranges, pick thumbnails",
