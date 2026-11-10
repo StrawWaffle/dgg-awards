@@ -7,6 +7,7 @@ import { type Stage, previewPath, stagePages, stages } from "@/lib/previews";
 import { useHoverMenu } from "@/lib/useHoverMenu";
 import { Summary, loadArchive2025 } from "@/lab/Summary";
 import { ChatReviewPage } from "@/site/ChatReviewPage";
+import { ChatStoryPage } from "@/site/ChatStory";
 import { Countdown } from "@/site/Countdown";
 import { LabPage, type LabView, labViews } from "@/site/LabPage";
 import { ResultsPage } from "@/site/ResultsPage";
@@ -22,9 +23,17 @@ export type SiteConfig = {
 };
 export type Me = { uid: number; name: string; admin: boolean } | null;
 
-type Page = "home" | "2025" | "vote" | "results" | "chat" | "lab";
-const order: Page[] = ["home", "vote", "results", "chat", "2025", "lab"];
-const paths: Record<Page, string> = { home: "/", "2025": "/2025", vote: "/vote", results: "/results", chat: "/chat", lab: "/lab" };
+type Page = "home" | "2025" | "vote" | "results" | "chat" | "chat-all" | "lab";
+const order: Page[] = ["home", "vote", "results", "chat", "chat-all", "2025", "lab"];
+const paths: Record<Page, string> = {
+  home: "/",
+  "2025": "/2025",
+  vote: "/vote",
+  results: "/results",
+  chat: "/chat",
+  "chat-all": "/chat/all",
+  lab: "/lab",
+};
 
 /**
  * Where an address leads. Previews live under `/preview/<stage>/<page>`
@@ -42,7 +51,7 @@ function routeOf(loc: Location): Route {
   if ((path === "/vote" && asked === "results") || (path === "/results" && asked === "1")) return { page: "results", preview: true, stage: "results" };
   if (path === "/lab") return { page: "lab", preview: true, stage: null };
   if (path === "/preview/lab") return { page: "lab", preview: true, stage: null };
-  const m = path.match(/^\/preview(?:\/([a-z]+))?(?:\/([0-9a-z]+))?$/);
+  const m = path.match(/^\/preview(?:\/([a-z]+))?(?:\/([0-9a-z-]+))?$/);
   if (m) {
     const stage = stages.find((x) => x.id === m[1])?.id ?? null;
     const page = m[2] === "home" ? "home" : (order.find((p) => p === m[2]) ?? "home");
@@ -145,6 +154,7 @@ export function Site() {
       vote: `Vote | DGG Awards${year}`,
       results: `Results | DGG Awards${year}`,
       chat: `The year in chat | DGG Awards${year}`,
+      "chat-all": `The year in chat, every number | DGG Awards${year}`,
       "2025": "2025 results | DGG Awards",
       lab: "Lab | DGG Awards",
     }[page];
@@ -223,7 +233,7 @@ export function Site() {
     { page: "home", label: "Home" },
     ...(mode === "voting" || page === "vote" ? [{ page: "vote" as Page, label: "Vote" }] : []),
     ...(mode === "reviewing" || page === "results" ? [{ page: "results" as Page, label: "Results" }] : []),
-    ...(mode === "reviewing" || page === "chat" ? [{ page: "chat" as Page, label: "Year in chat" }] : []),
+    ...(mode === "reviewing" || page === "chat" || page === "chat-all" ? [{ page: "chat" as Page, label: "Year in chat" }] : []),
     { page: "2025", label: "2025 results" },
   ];
 
@@ -247,7 +257,7 @@ export function Site() {
       );
     }
     if (p === "lab") {
-      return me === undefined ? null : <LabPage admin={admin} view={labView} chatOpen={chatOpen} onView={showLab} />;
+      return me === undefined ? null : <LabPage admin={admin} view={labView} chatOpen={chatOpen} />;
     }
     return (
       <>
@@ -267,8 +277,26 @@ export function Site() {
           </main>
         )}
         {p === "chat" && (
+          // The story fills the window under the header, one screen at a time.
+          <ChatStoryPage
+            me={me}
+            config={shown}
+            preview={previewing && stage === "results"}
+            onHome={go("home")}
+            allHref={pathOf("chat-all", stage)}
+            onAll={go("chat-all")}
+          />
+        )}
+        {p === "chat-all" && (
           <main className="mx-auto max-w-6xl px-4 py-6">
-            <ChatReviewPage me={me} config={shown} preview={previewing && stage === "results"} onHome={go("home")} />
+            <ChatReviewPage
+              me={me}
+              config={shown}
+              preview={previewing && stage === "results"}
+              onHome={go("home")}
+              storyHref={pathOf("chat", stage)}
+              onStory={go("chat")}
+            />
           </main>
         )}
         {p === "2025" && (
@@ -395,7 +423,13 @@ export function Site() {
           </div>
           <nav aria-label="Pages" className="flex flex-wrap gap-1">
             {tabs.map((t) => (
-              <a key={t.page} href={pathOf(t.page, stage)} onClick={go(t.page)} className="cozy-tab" aria-current={page === t.page ? "page" : undefined}>
+              <a
+                key={t.page}
+                href={pathOf(t.page, stage)}
+                onClick={go(t.page)}
+                className="cozy-tab"
+                aria-current={page === t.page || (t.page === "chat" && page === "chat-all") ? "page" : undefined}
+              >
                 {t.label}
               </a>
             ))}

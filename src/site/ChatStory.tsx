@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { originOf, useBursts } from "@/lab/Bursts";
-import { useChatReview } from "@/lab/ChatCalm";
 import { Emote } from "@/lab/Emote";
-import { type Review, day, fmt } from "@/site/ChatReviewPage";
+import { type Review, ReviewNotice, day, fmt, useReview } from "@/site/ChatReviewPage";
+import type { Me, SiteConfig } from "@/site/Site";
 
 type Slide = {
   key: string;
@@ -54,19 +54,39 @@ function slidesOf(d: Review): Slide[] {
   return s;
 }
 
+type Links = { allHref: string; onAll: (e: React.MouseEvent) => void };
+
 /**
- * Experiment: the year in chat as a story (rinlux: easier to focus on one
+ * The year in DGG chat (`/chat`), as a story (rinlux: easier to focus on one
  * thing). One highlight per screen, snapping from one to the next as you
- * scroll (or with the arrow keys), with dots to jump about, and the full
- * numbers at the end.
+ * scroll (or with the arrow keys), with dots to jump about, and every number
+ * at `/chat/all` (ChatReviewPage). Shown with the results, like the tally;
+ * admins see it in the "Results out" preview.
  */
-export function ChatStory({ onCalm }: { onCalm: () => void }) {
-  const data = useChatReview();
+export function ChatStoryPage({
+  me,
+  config,
+  preview,
+  onHome,
+  ...links
+}: { me: Me | undefined; config: SiteConfig | null; preview: boolean; onHome: (e: React.MouseEvent) => void } & Links) {
+  const data = useReview(config, me, preview);
+  if (data === null || typeof data === "string") {
+    return (
+      <main className="mx-auto max-w-6xl px-4 py-6">
+        <ReviewNotice data={data} onHome={onHome} />
+      </main>
+    );
+  }
+  return <ChatStory data={data} preview={preview} {...links} />;
+}
+
+function ChatStory({ data, preview, allHref, onAll }: { data: Review; preview: boolean } & Links) {
   const outer = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const [layer, fire] = useBursts();
   const [at, setAt] = useState(0);
-  const slides = data && data !== "missing" ? slidesOf(data) : [];
+  const slides = slidesOf(data);
 
   // Which slide is on screen, for the dots and the fade-in.
   useEffect(() => {
@@ -83,14 +103,13 @@ export function ChatStory({ onCalm }: { onCalm: () => void }) {
     return () => observer.disconnect();
   }, [slides.length]);
 
-  if (data === null) return <div className="cozy-panel m-6 p-8">Loading…</div>;
-  if (data === "missing") return <div className="cozy-panel m-6 p-8">Couldn't load the year in chat.</div>;
   const go = (i: number) => scroller.current?.querySelector(`[data-i="${i}"]`)?.scrollIntoView({ behavior: "smooth" });
   const total = slides.length + 2;
 
   return (
     <div ref={outer} className="relative">
       {layer}
+      {preview && <span className="cozy-chip coral absolute top-3 left-3 z-30">Preview: as it'll look once the results are out</span>}
       <div
         ref={scroller}
         tabIndex={0}
@@ -106,6 +125,9 @@ export function ChatStory({ onCalm }: { onCalm: () => void }) {
           <p className="mt-16 text-sm font-bold" style={{ color: "var(--muted)" }}>
             Scroll, or use the arrow keys ↓
           </p>
+          <a className="mt-3 text-sm font-bold underline" style={{ color: "var(--muted)" }} href={allHref} onClick={onAll}>
+            or see every number at once
+          </a>
         </Screen>
         {slides.map((s, i) => (
           <Screen key={s.key} i={i + 1} at={at} bg={SECTION_BG[s.section] ?? "var(--panel)"}>
@@ -138,9 +160,9 @@ export function ChatStory({ onCalm }: { onCalm: () => void }) {
             Every number, chart and table is on one page as well.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <button type="button" className="cozy-btn primary" onClick={onCalm}>
+            <a className="cozy-btn primary" href={allHref} onClick={onAll}>
               See all the numbers
-            </button>
+            </a>
             <button type="button" className="cozy-btn" onClick={() => go(0)}>
               Back to the start
             </button>

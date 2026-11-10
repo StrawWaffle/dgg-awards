@@ -14,6 +14,7 @@ import {
   type DggProfile,
   type Issue,
   buildClip,
+  removeClip,
   deleteNominee,
   fetchClipFrame,
   fetchDggProfile,
@@ -424,6 +425,7 @@ function ClipSection({ nominee, unsaved }: { nominee: AdminNominee; unsaved: boo
   const run = (fn: () => Promise<void>) => fn().then(refresh);
 
   const build = useMutation({ mutationFn: () => run(() => buildClip(nominee.categoryId, nominee.id)) });
+  const removeIt = useMutation({ mutationFn: () => run(() => removeClip(nominee.categoryId, nominee.id)) });
   // The frame at full size opens in the cropper; the cropped picture is
   // uploaded, remembering which frame it came from.
   const [cropFrame, setCropFrame] = useState<{ file: File; at: number } | null>(null);
@@ -447,6 +449,19 @@ function ClipSection({ nominee, unsaved }: { nominee: AdminNominee; unsaved: boo
             >
               {nominee.clipStatus === "ready" ? "Rebuild clip" : "Build clip"}
             </Button>
+            {(nominee.clipStatus === "ready" || nominee.clipStatus === "failed") && (
+              <Button
+                variant="danger"
+                disabled={removeIt.isPending}
+                onClick={() => {
+                  if (confirm(`Remove the clip from "${nominee.title}"? The site plays the source link again. The picture stays, and History can undo this.`)) {
+                    removeIt.mutate();
+                  }
+                }}
+              >
+                Remove clip
+              </Button>
+            )}
             <span className="text-neutral-700">
               {nominee.clipStatus === "pending" && "Waiting to download…"}
               {nominee.clipStatus === "processing" && "Making the clip…"}
@@ -466,7 +481,7 @@ function ClipSection({ nominee, unsaved }: { nominee: AdminNominee; unsaved: boo
             </span>
             {unsaved && <span className="text-neutral-500">Save first.</span>}
           </div>
-          <ErrorText>{build.error?.message}</ErrorText>
+          <ErrorText>{build.error?.message ?? removeIt.error?.message}</ErrorText>
           <ClipUpload categoryId={nominee.categoryId} id={nominee.id} busy={working} onStarted={refresh} driveId={driveFileId(nominee.url)} />
 
           {nominee.clipUrl && (

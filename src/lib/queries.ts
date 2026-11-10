@@ -210,6 +210,10 @@ export async function buildClip(categoryId: string, id: string) {
   await ok(await client.api.admin.clip.$post({ json: { categoryId, id } }), "Couldn't start the clip");
 }
 
+export async function removeClip(categoryId: string, id: string) {
+  await ok(await client.api.admin.clip.$delete({ query: { categoryId, id } }), "Couldn't remove the clip");
+}
+
 /** When the database and media last went to Google Drive. */
 export async function fetchBackupStatus() {
   return parseResponse(client.api.admin.backup.status.$get());
