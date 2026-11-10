@@ -117,6 +117,8 @@ export function Site() {
     const hash = location.hash.slice(1);
     return labViews.some((v) => v.id === hash) ? (hash as LabView) : "stage";
   });
+  /** The big screen in full screen: no header (src/lab/Stage.tsx). Not remembered: it starts off. */
+  const [stageFull, setStageFull] = useState(false);
   const [chatOpen, setChatOpen] = useState(() => {
     try {
       return localStorage.getItem("lab.chat") !== "off";
@@ -257,7 +259,7 @@ export function Site() {
       );
     }
     if (p === "lab") {
-      return me === undefined ? null : <LabPage admin={admin} view={labView} chatOpen={chatOpen} onChat={toggleChat} onView={showLab} />;
+      return me === undefined ? null : <LabPage admin={admin} view={labView} chatOpen={chatOpen} onChat={toggleChat} full={stageFull} onFull={setStageFull} onView={showLab} />;
     }
     return (
       <>
@@ -342,7 +344,11 @@ export function Site() {
   return (
     <>
       <EmoteBackdrop />
-      <header ref={header} className="sticky top-0 z-30 px-4 py-2.5" style={{ background: "var(--header)" }}>
+      <header
+        ref={header}
+        className={`sticky top-0 z-30 px-4 py-2.5 ${stageFull && page === "lab" && labView === "stage" ? "hidden" : ""}`}
+        style={{ background: "var(--header)" }}
+      >
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <div ref={jumpMenu.box} className="relative" {...(previewing ? jumpMenu.hover : {})}>
             <a

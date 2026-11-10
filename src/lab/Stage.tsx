@@ -4,7 +4,8 @@ import { Emote, emoteElement, loopRepeating } from "@/lab/Emote";
 import { type Clip, ClipPlayer } from "@/lab/ClipPlayer";
 import { Sketch } from "@/lab/sketch";
 import { type FeedStatus, liveFeed, simulatedFeed } from "@/lab/chatFeed";
-import { type Levels, type Source, useFrame } from "@/lab/music";
+import { type Levels, type Source, music, useFrame, useMusic } from "@/lab/music";
+import { toggleMusic } from "@/lab/MusicBar";
 import { useBursts } from "@/lab/Bursts";
 import { type Award, boardOf, decidedByRunoff, loadResults } from "@/lab/Results";
 import { DvdMenu, type ShowAward, TitleCard, WinnerCard, loadShow } from "@/lab/Scenes";
@@ -152,7 +153,22 @@ const nickClass = (flair: string | null) => `nick${flair ? ` nick-${flair}` : ""
  * there are at most `max` of them; the busiest chat costs the same as a quiet
  * one. The chat column and the numbers update four times a second.
  */
-export function Stage({ source, emotes, chatOpen, onChat }: { source: Source; emotes: string[]; chatOpen: boolean; onChat: () => void }) {
+export function Stage({
+  source,
+  emotes,
+  chatOpen,
+  onChat,
+  full,
+  onFull,
+}: {
+  source: Source;
+  emotes: string[];
+  chatOpen: boolean;
+  onChat: () => void;
+  /** Full screen: the site's header hidden (Site.tsx), and the browser's own full screen where it allows. */
+  full: boolean;
+  onFull: (on: boolean) => void;
+}) {
   const floor = useRef<HTMLDivElement>(null);
   const npcs = useRef(new Map<string, Npc>());
   const [feed, setFeed] = useState<"sim" | "live">("sim");
@@ -181,6 +197,32 @@ export function Stage({ source, emotes, chatOpen, onChat }: { source: Source; em
   const [winner, setWinner] = useState<string | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const musicState = useMusic();
+  // Full screen: the header goes (Site.tsx), and the browser's own full screen
+  // is asked for too. That needs a click in this window, so from the pop-out
+  // it's the header only. Leaving the browser's full screen (Esc) leaves ours.
+  const inBrowserFull = useRef(false);
+  const enterFull = () => {
+    onFull(true);
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
+  };
+  const leaveFull = () => {
+    onFull(false);
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  };
+  const fullRef = useRef(full);
+  fullRef.current = full;
+  useEffect(() => {
+    const changed = () => {
+      if (document.fullscreenElement) inBrowserFull.current = true;
+      else if (inBrowserFull.current) {
+        inBrowserFull.current = false;
+        if (fullRef.current) onFull(false);
+      }
+    };
+    document.addEventListener("fullscreenchange", changed);
+    return () => document.removeEventListener("fullscreenchange", changed);
+  }, [onFull]);
   const [clips, setClips] = useState<Clip[]>([]);
   const [playing, setPlaying] = useState<Clip | null>(null);
   /** The clip being raised away after it's closed. */
@@ -702,6 +744,15 @@ export function Stage({ source, emotes, chatOpen, onChat }: { source: Source; em
       const clip = award?.nominees[c.i]?.clip;
       if (clip) setPlaying(clip);
     } else if (c.t === "close") closeClip();
+    else if (c.t === "music") toggleMusic();
+    else if (c.t === "volume") music.setVolume(Math.min(1, Math.max(0, c.v)));
+    else if (c.t === "chat") {
+      if (c.on !== chatOpen) onChat();
+    } else if (c.t === "frame") setFrameOn(c.on);
+    else if (c.t === "votes") setVotes(c.v);
+    else if (c.t === "full") (c.on ? enterFull : leaveFull)();
+    else if (c.t === "settings") setSettingsOpen(c.open);
+    else if (c.t === "resetLayout") resetLayout();
   };
   const showState: ShowState = {
     awards: show?.map((a) => a.title) ?? [],
@@ -714,6 +765,12 @@ export function Stage({ source, emotes, chatOpen, onChat }: { source: Source; em
     clips: (award?.nominees ?? []).flatMap((n, i) => (n.clip ? [{ i, title: n.title }] : [])),
     playing: !!playing,
     simulated: votes === "simulated",
+    music: { playing: musicState.playing, muted: musicState.muted, volume: musicState.volume },
+    chatOpen,
+    frameOn,
+    votes,
+    full,
+    settingsOpen,
   };
   const poppedOut = useStageChannel(showState, runCommand);
   const popup = useRef<Window | null>(null);
@@ -728,8 +785,21 @@ export function Stage({ source, emotes, chatOpen, onChat }: { source: Source; em
     setTimeout(() => fire("Klappa", r.left - frame.left + 180, r.top - frame.top, 8), 200);
   };
 
-  const settingsMenu = (
-    <SettingsMenu open={settingsOpen} setOpen={setSettingsOpen}>
+  // Esc leaves full screen (when the browser's own full screen isn't on: then
+  // the browser takes Esc, and "fullscreenchange" above leaves ours), unless
+  // Settings is open or the layout is being arranged.
+  useEffect(() => {
+    if (!full) return;
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || settingsOpen || arranging) return;
+      leaveFull();
+    };
+    addEventListener("keydown", esc);
+    return () => removeEventListener("keydown", esc);
+  });
+  // Leaving the big screen leaves full screen too.
+  useEffect(() => () => onFull(false), [onFull]);
+  const settingsBody = (
       <div className="space-y-3">
         <label className="flex items-center justify-between gap-3">
           Votes
@@ -743,6 +813,9 @@ export function Stage({ source, emotes, chatOpen, onChat }: { source: Source; em
         </label>
         <label className="flex items-center gap-2">
           <input type="checkbox" checked={frameOn} onChange={(e) => setFrameOn(e.currentTarget.checked)} /> Camera frame and "Place camera here"
+        </label>
+        <label className="flex items-center gap-2" title="Hides the site's header, and asks the browser for full screen. Esc leaves.">
+          <input type="checkbox" checked={full} onChange={(e) => (e.currentTarget.checked ? enterFull() : leaveFull())} /> Full screen
         </label>
         <div className="flex flex-wrap gap-2">
           <button
@@ -854,7 +927,6 @@ export function Stage({ source, emotes, chatOpen, onChat }: { source: Source; em
           </div>
         </details>
       </div>
-    </SettingsMenu>
   );
 
   return (
@@ -862,9 +934,25 @@ export function Stage({ source, emotes, chatOpen, onChat }: { source: Source; em
       ref={screen}
       // Its own stacking context, so the header's Settings menu opens over it.
       className="relative isolate overflow-hidden"
-      style={{ height: "calc(100dvh - var(--lab-header, 64px))", background: "linear-gradient(to bottom, var(--sky-top), var(--sky-bottom))" }}
+      style={{
+        height: full ? "100dvh" : "calc(100dvh - var(--lab-header, 64px))",
+        background: "linear-gradient(to bottom, var(--sky-top), var(--sky-bottom))",
+      }}
     >
-      {toolsEl && createPortal(settingsMenu, toolsEl)}
+      {/* Settings: from the header's tab row, or in full screen (no header) a panel by the camera slot. */}
+      {!full &&
+        toolsEl &&
+        createPortal(
+          <SettingsMenu open={settingsOpen} setOpen={setSettingsOpen}>
+            {settingsBody}
+          </SettingsMenu>,
+          toolsEl,
+        )}
+      {full && settingsOpen && (
+        <FloatingSettings near={layout.camera} setOpen={setSettingsOpen}>
+          {settingsBody}
+        </FloatingSettings>
+      )}
       <div
         className="absolute inset-x-0 bottom-0 h-[52%]"
         style={{ background: "var(--ground)", borderTop: "6px solid var(--ground-edge)", borderRadius: "50% 50% 0 0 / 28px 28px 0 0" }}
@@ -1029,13 +1117,55 @@ export function Stage({ source, emotes, chatOpen, onChat }: { source: Source; em
   );
 }
 
+/** Clicks on the controls' gear toggle Settings themselves, so they don't count as clicking away. */
+const onGear = (e: PointerEvent) => !!(e.target as Element | null)?.closest?.('[aria-label="Settings"]');
+
+/** In full screen: Settings as a panel beside the camera slot (above it when it's low on the screen). */
+function FloatingSettings({ near, setOpen, children }: { near: Layout["camera"]; setOpen: (v: boolean) => void; children: React.ReactNode }) {
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const away = (e: PointerEvent) => {
+      if (!box.current?.contains(e.target as Node) && !onGear(e)) setOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    addEventListener("pointerdown", away);
+    addEventListener("keydown", esc);
+    return () => {
+      removeEventListener("pointerdown", away);
+      removeEventListener("keydown", esc);
+    };
+  }, [setOpen]);
+  const low = near.y + near.h / 2 > 0.5;
+  return (
+    <div
+      ref={box}
+      className="cozy-panel absolute z-[700] w-[min(440px,92vw)] overflow-y-auto p-4 text-sm font-bold"
+      style={{
+        color: "var(--text)",
+        left: `max(8px, ${near.x * 100}%)`,
+        ...(low
+          ? { bottom: `calc(${(1 - near.y) * 100}% + 8px)`, maxHeight: `calc(${near.y * 100}% - 16px)` }
+          : { top: `calc(${(near.y + near.h) * 100}% + 8px)`, maxHeight: `calc(${(1 - near.y - near.h) * 100}% - 16px)` }),
+      }}
+    >
+      <div className="mb-3 flex items-center justify-between">
+        <span className="font-black">Settings</span>
+        <button type="button" className="cozy-btn py-1!" onClick={() => setOpen(false)}>
+          Close
+        </button>
+      </div>
+      {children}
+    </div>
+  );
+}
+
 /** The big screen's Settings: a button in the lab's header row, opening a panel under it. */
 function SettingsMenu({ open, setOpen, children }: { open: boolean; setOpen: (v: boolean) => void; children: React.ReactNode }) {
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
     const away = (e: PointerEvent) => {
-      if (!box.current?.contains(e.target as Node)) setOpen(false);
+      if (!box.current?.contains(e.target as Node) && !onGear(e)) setOpen(false);
     };
     const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     addEventListener("pointerdown", away);

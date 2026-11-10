@@ -1,4 +1,6 @@
+import { ChatBubbleIcon, EnterFullScreenIcon, ExitFullScreenIcon, GearIcon } from "@radix-ui/react-icons";
 import { useEffect, useRef, useState } from "react";
+import { MusicBar, type MusicState } from "@/lab/MusicBar";
 import { useLabTheme } from "@/lab/theme";
 
 /**
@@ -32,6 +34,13 @@ export type ShowState = {
   clips: { i: number; title: string }[];
   playing: boolean;
   simulated: boolean;
+  /** What the header used to give, for full screen: the music (it plays in the big screen's window), the chat, Settings. */
+  music: MusicState;
+  chatOpen: boolean;
+  frameOn: boolean;
+  votes: "real" | "simulated" | null;
+  full: boolean;
+  settingsOpen: boolean;
 };
 export type ShowCommand =
   | { t: "goto"; index: number; scene: Scene; back?: boolean }
@@ -42,7 +51,18 @@ export type ShowCommand =
   /** Show the runoff's round (0-based), or null for the board. */
   | { t: "runoff"; round: number | null }
   | { t: "play"; i: number }
-  | { t: "close" };
+  | { t: "close" }
+  /** Play, or mute and unmute, the music; and its volume (0-1). */
+  | { t: "music" }
+  | { t: "volume"; v: number }
+  | { t: "chat"; on: boolean }
+  | { t: "frame"; on: boolean }
+  | { t: "votes"; v: "real" | "simulated" }
+  /** Full screen: the big screen fills the window, without the site's header. */
+  | { t: "full"; on: boolean }
+  /** The big screen's Settings panel, open or closed. */
+  | { t: "settings"; open: boolean }
+  | { t: "resetLayout" };
 
 type Message =
   | { from: "stage"; state: ShowState }
@@ -56,7 +76,7 @@ const channel = () => (typeof BroadcastChannel === "function" ? new BroadcastCha
 
 /** Opens the pop-out controls (or brings them to the front). */
 export function popOutControls() {
-  return window.open(`${location.pathname}?remote=stage`, "dgga-stage-remote", "popup,width=560,height=320");
+  return window.open(`${location.pathname}?remote=stage`, "dgga-stage-remote", "popup,width=600,height=380");
 }
 
 /**
@@ -103,9 +123,24 @@ export function useStageChannel(state: ShowState, run: (c: ShowCommand) => void)
  * results Reveal next, All but the top 3 and Reveal all, then the runoff a
  * round at a time; clips to play where there are any.
  */
-export function ShowControls({ state, send }: { state: ShowState; send: (c: ShowCommand) => void }) {
+export function ShowControls({
+  state,
+  send,
+  remote = false,
+  onSettings,
+  settingsShown,
+}: {
+  state: ShowState;
+  send: (c: ShowCommand) => void;
+  /** In the pop-out: the music is the big screen's, changed over the channel. */
+  remote?: boolean;
+  /** The gear: the big screen's Settings, unless the pop-out shows its own. */
+  onSettings?: () => void;
+  settingsShown?: boolean;
+}) {
   const at = SCENES.findIndex((x) => x.id === state.scene);
   const done = state.target >= state.rows;
+  const gearOn = settingsShown ?? state.settingsOpen;
   return (
     <div className="space-y-2 text-sm">
       <div className="flex items-center gap-2">
@@ -122,11 +157,27 @@ export function ShowControls({ state, send }: { state: ShowState; send: (c: Show
             </option>
           ))}
         </select>
-        {state.simulated && (
-          <span className="shrink-0 font-bold" style={{ color: "var(--muted)" }} title="Made-up votes, never saved">
-            Simulated votes
-          </span>
-        )}
+        {/* What the header gives, so full screen loses nothing. */}
+        <span className="flex shrink-0 items-center gap-1.5">
+          {remote ? (
+            <MusicBar small state={state.music} onToggle={() => send({ t: "music" })} onVolume={(v) => send({ t: "volume", v })} />
+          ) : (
+            <MusicBar small />
+          )}
+          <IconButton
+            on={state.chatOpen}
+            label={state.chatOpen ? "Hide the website chat" : "Show the website chat"}
+            onClick={() => send({ t: "chat", on: !state.chatOpen })}
+          >
+            <ChatBubbleIcon />
+          </IconButton>
+          <IconButton on={gearOn} label="Settings" onClick={onSettings ?? (() => send({ t: "settings", open: !state.settingsOpen }))}>
+            <GearIcon />
+          </IconButton>
+          <IconButton on={state.full} label={state.full ? "Leave full screen (Esc)" : "Full screen"} onClick={() => send({ t: "full", on: !state.full })}>
+            {state.full ? <ExitFullScreenIcon /> : <EnterFullScreenIcon />}
+          </IconButton>
+        </span>
       </div>
       <nav aria-label="Scenes" className="flex gap-1">
         {SCENES.map((x, i) => (
@@ -174,6 +225,11 @@ export function ShowControls({ state, send }: { state: ShowState; send: (c: Show
         <button type="button" className="cozy-btn py-1!" onClick={() => send({ t: "step", by: -1 })} disabled={!state.awards.length}>
           ← Back
         </button>
+        {state.simulated && (
+          <span className="mx-auto font-bold" style={{ color: "var(--muted)" }} title="Made-up votes, never saved">
+            Simulated votes
+          </span>
+        )}
         <button
           type="button"
           className={`cozy-btn ml-auto py-1! ${state.scene !== "results" || state.revealed ? "primary" : ""}`}
@@ -183,6 +239,65 @@ export function ShowControls({ state, send }: { state: ShowState; send: (c: Show
           {NEXT_LABEL[state.scene]} →
         </button>
       </div>
+    </div>
+  );
+}
+
+function IconButton({ on, label, onClick, children }: { on: boolean; label: string; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      className={`cozy-btn round h-8 w-8 ${on ? "primary" : ""}`}
+      onClick={onClick}
+      aria-label={label}
+      aria-pressed={on}
+      title={label}
+    >
+      {children}
+    </button>
+  );
+}
+
+/**
+ * Settings' basics, for the pop-out (the big screen's own Settings panel has
+ * these too, plus Arrange and Advanced).
+ */
+function RemoteSettings({ state, send }: { state: ShowState; send: (c: ShowCommand) => void }) {
+  return (
+    <div className="space-y-2 rounded-xl p-3 text-sm font-bold" style={{ background: "var(--cream)" }}>
+      <label className="flex items-center justify-between gap-3">
+        Votes
+        <select
+          value={state.votes ?? "real"}
+          onChange={(e) => send({ t: "votes", v: e.currentTarget.value as "real" | "simulated" })}
+          className="cozy-input py-1!"
+        >
+          <option value="real">Real votes</option>
+          <option value="simulated">Simulated (made up, never saved)</option>
+        </select>
+      </label>
+      <label className="flex items-center gap-2">
+        <input type="checkbox" checked={state.chatOpen} onChange={(e) => send({ t: "chat", on: e.currentTarget.checked })} /> Website chat
+      </label>
+      <label className="flex items-center gap-2">
+        <input type="checkbox" checked={state.frameOn} onChange={(e) => send({ t: "frame", on: e.currentTarget.checked })} /> Camera frame and
+        "Place camera here"
+      </label>
+      <label className="flex items-center gap-2">
+        <input type="checkbox" checked={state.full} onChange={(e) => send({ t: "full", on: e.currentTarget.checked })} /> Full screen
+      </label>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className="cozy-btn py-1!" onClick={() => send({ t: "resetLayout" })}>
+          Reset layout
+        </button>
+        <button type="button" className="cozy-btn py-1!" onClick={() => send({ t: "settings", open: !state.settingsOpen })}>
+          {state.settingsOpen ? "Close Settings on the big screen" : "Open Settings on the big screen"}
+        </button>
+      </div>
+      <p className="text-xs font-semibold" style={{ color: "var(--muted)" }}>
+        Arrange layout and Advanced are in the big screen's Settings. From here, full screen hides the site's header but can't make the
+        browser itself full screen: use the button on the big screen for that.
+      </p>
     </div>
   );
 }
@@ -264,6 +379,7 @@ export function StageRemote() {
     };
   }, []);
   const send = (cmd: ShowCommand) => ch.current?.postMessage({ from: "remote", cmd } satisfies Message);
+  const [settings, setSettings] = useState(false);
   return (
     <main className="min-h-dvh p-4" style={{ background: "var(--bg)" }}>
       <div className="cozy-panel space-y-3 p-4">
@@ -271,7 +387,10 @@ export function StageRemote() {
         {!ch.current && typeof BroadcastChannel !== "function" ? (
           <p className="font-semibold">This browser can't link windows. Use the controls on the big screen.</p>
         ) : state ? (
-          <ShowControls state={state} send={send} />
+          <>
+            <ShowControls state={state} send={send} remote onSettings={() => setSettings(!settings)} settingsShown={settings} />
+            {settings && <RemoteSettings state={state} send={send} />}
+          </>
         ) : (
           <p className="font-semibold" style={{ color: "var(--muted)" }}>
             Waiting for the big screen. Open the lab's Big screen in this browser.
