@@ -25,22 +25,11 @@ const SECTIONS = [
 ] as const;
 
 /**
- * The year in DGG chat: a look back at the chat's year (emotes, combos, tags,
- * greentext, links and the mods), shown with the results. Public once the
- * site is in reviewing mode; admins see it in the "Results out" preview.
- * Click any big emote for a burst of it.
+ * The year in chat's data, for the story (`/chat`) and this page (`/chat/all`):
+ * `null` while loading, `"locked"` until the results are out. Public once the
+ * site is in reviewing mode; admins get it in the "Results out" preview.
  */
-export function ChatReviewPage({
-  me,
-  config,
-  preview,
-  onHome,
-}: {
-  me: Me | undefined;
-  config: SiteConfig | null;
-  preview: boolean;
-  onHome: (e: React.MouseEvent) => void;
-}) {
+export function useReview(config: SiteConfig | null, me: Me | undefined, preview: boolean): Review | null | "missing" | "locked" {
   const published = config?.viewingMode === "reviewing";
   const [data, setData] = useState<Review | null | "missing">(null);
   useEffect(() => {
@@ -50,9 +39,15 @@ export function ChatReviewPage({
       .then(setData)
       .catch(() => setData("missing"));
   }, [config, me, published, preview]);
+  if (!config || me === undefined) return null;
+  return published ? data : "locked";
+}
 
-  if (!config || me === undefined) return <div className="cozy-panel p-8">Loading…</div>;
-  if (!published) {
+/** What the year in chat shows instead of itself: loading, not out yet, or an error. Null once there's data. */
+export function ReviewNotice({ data, onHome }: { data: ReturnType<typeof useReview>; onHome: (e: React.MouseEvent) => void }) {
+  if (data === null) return <div className="cozy-panel p-8">Loading…</div>;
+  if (data === "missing") return <div className="cozy-panel p-8">Couldn't load the year in chat. Try reloading.</div>;
+  if (data === "locked") {
     return (
       <div className="cozy-panel mx-auto max-w-2xl space-y-4 p-8 text-center">
         <Emote name="WWWWaiting" size={1.6} title="" />
@@ -63,12 +58,36 @@ export function ChatReviewPage({
       </div>
     );
   }
-  if (data === null) return <div className="cozy-panel p-8">Loading…</div>;
-  if (data === "missing") return <div className="cozy-panel p-8">Couldn't load the year in chat. Try reloading.</div>;
-  return <ChatReview data={data} preview={preview} />;
+  return null;
 }
 
-function ChatReview({ data, preview }: { data: Review; preview: boolean }) {
+/**
+ * The year in DGG chat, every number (`/chat/all`): emotes, combos, tags,
+ * greentext, links and the mods, with all the cards, bars and tables. The
+ * story at `/chat` shows the highlights and leads here. Click any big emote
+ * for a burst of it.
+ */
+export function ChatReviewPage({
+  me,
+  config,
+  preview,
+  onHome,
+  storyHref,
+  onStory,
+}: {
+  me: Me | undefined;
+  config: SiteConfig | null;
+  preview: boolean;
+  onHome: (e: React.MouseEvent) => void;
+  storyHref: string;
+  onStory: (e: React.MouseEvent) => void;
+}) {
+  const data = useReview(config, me, preview);
+  if (data === null || typeof data === "string") return <ReviewNotice data={data} onHome={onHome} />;
+  return <ChatReview data={data} preview={preview} storyHref={storyHref} onStory={onStory} />;
+}
+
+function ChatReview({ data, preview, storyHref, onStory }: { data: Review; preview: boolean; storyHref: string; onStory: (e: React.MouseEvent) => void }) {
   const box = useRef<HTMLDivElement>(null);
   const [layer, fire] = useBursts();
   const burst = (emote: string) => (e: React.MouseEvent) => fire(emote, ...originOf(e, box.current), 7);
@@ -82,6 +101,9 @@ function ChatReview({ data, preview }: { data: Review; preview: boolean }) {
           <span className="font-semibold">The year in chat, as it'll look once the results are out.</span>
         </div>
       )}
+      <a className="cozy-btn" href={storyHref} onClick={onStory}>
+        ← The year as a story
+      </a>
 
       {/* The cover. */}
       <Sketch pad={5} radius={26} strokeWidth={3} boil roughness={1.5}>
