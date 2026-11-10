@@ -13,12 +13,14 @@ viewingModes satisfies readonly ViewingMode[];
 
 /**
  * A ballot. Single-pick categories take `nominee_id` (the 2025 shape);
- * ranked ones take `ranking`, best first. Which one a category needs is
- * checked against its voting style in the route.
+ * ranked ones take `ranking`, best first; points ones (a top 10) take
+ * `places`, best first, each a group of equals. Which one a category needs
+ * is checked against its voting style in the route.
  */
 export const voteSubmit = z.union([
   z.object({ category_id: required, nominee_id: required }),
   z.object({ category_id: required, ranking: z.array(required).min(1).max(100) }),
+  z.object({ category_id: required, places: z.array(z.array(required).min(1).max(10)).min(1).max(10) }),
 ]);
 
 export const resultsQuery = z.object({ preview: z.literal("1").optional() });

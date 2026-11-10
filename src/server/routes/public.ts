@@ -4,7 +4,9 @@ import {
   getCategoryForVoting,
   getConfig,
   getNominees,
+  getNominee,
   getUserBallots,
+  getUserPlaces,
   getUserVotes,
   getVotingResults,
   getVoteTally,
@@ -12,7 +14,7 @@ import {
   userVoteExists,
 } from "@/lib/data/driver";
 import { nowS } from "@/lib/util";
-import { effectiveStyle, withEffectiveStyles } from "@/lib/voting";
+import { effectiveStyle, placesToRanks, validPlaces, withEffectiveStyles } from "@/lib/voting";
 import { categoriesWithMediaUrls, withMediaUrls } from "@/server/present";
 import { getCookie } from "hono/cookie";
 import { verifyAdminSession } from "@/lib/auth";
@@ -25,6 +27,7 @@ import {
 } from "@/server/middleware";
 import { resultsQuery, voteSubmit } from "@/server/schemas";
 import chatReview from "@/archive/chat-2026.json";
+import { DGG_NAME, cachedDggProfile, chatterName } from "@/server/dgg-profile";
 
 /** 401 with no body unless voting is open right now. */
 const requireVotingOpen = createMiddleware(async (c, next) => {
@@ -64,6 +67,31 @@ export const publicRoutes = new Hono<SessionEnv>()
     c.json(await getUserBallots(c.get("session").uid), 200),
   )
 
+  /** The same, as places: groups of equals, best first (for points ballots, which can tie). */
+  .get("/api/vote/places", requireSession, async (c) =>
+    c.json(await getUserPlaces(c.get("session").uid), 200),
+  )
+
+  // The destiny.gg profile of a nominee in a points award (the wildcards: the
+  // vote shows each chatter's card). Only those nominees, so it isn't an open
+  // proxy to destiny.gg, and only when the nominees are public. Cached.
+  .get("/api/nominees/:category/:id/profile", async (c) => {
+    const config = await getConfig();
+    if (config.viewingMode === "locked") return c.body(null, 401);
+    const category = await getCategoryForVoting(c.req.param("category"));
+    if (!category || effectiveStyle(category.votingStyle, config.defaultVotingStyle) !== "points") return c.body(null, 404);
+    const nominee = await getNominee(category.id, c.req.param("id"));
+    const name = nominee && chatterName(nominee.title);
+    if (!name || !DGG_NAME.test(name)) return c.body(null, 404);
+    try {
+      const profile = await cachedDggProfile(name);
+      return profile ? c.json(profile, 200) : c.body(null, 404);
+    } catch (error) {
+      console.error(error);
+      return c.body(null, 502);
+    }
+  })
+
   // Checks run in the old order: signed in, voting open, then the body.
   .post(
     "/api/vote",
@@ -80,13 +108,18 @@ export const publicRoutes = new Hono<SessionEnv>()
       const style = effectiveStyle(category.votingStyle, (await getConfig()).defaultVotingStyle);
 
       // The ballot must match the category's style and name its nominees,
-      // each once.
-      const choices = "ranking" in body ? body.ranking : [body.nominee_id];
+      // each once. A points ballot is a top 10 at most, equals sharing a place.
+      const rows =
+        "places" in body
+          ? placesToRanks(body.places)
+          : ("ranking" in body ? body.ranking : [body.nominee_id]).map((id, i) => ({ id, rank: i + 1 }));
+      const shape = "places" in body ? "points" : "ranking" in body ? "ranked" : "single";
       const nominees = new Set(category.options.map((o) => o.id));
       if (
-        (style === "single") !== ("nominee_id" in body) ||
-        new Set(choices).size !== choices.length ||
-        !choices.every((id) => nominees.has(id))
+        style !== shape ||
+        ("places" in body && !validPlaces(body.places)) ||
+        new Set(rows.map((r) => r.id)).size !== rows.length ||
+        !rows.every((r) => nominees.has(r.id))
       ) {
         return c.body(null, 400);
       }
@@ -94,7 +127,7 @@ export const publicRoutes = new Hono<SessionEnv>()
       if (await userVoteExists(session.uid, body.category_id)) {
         return c.text("You have already voted for this category.", 400);
       }
-      await insertBallot(session, body.category_id, style, choices);
+      await insertBallot(session, body.category_id, style, rows);
       return c.body(null, 200);
     },
   )

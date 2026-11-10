@@ -127,7 +127,8 @@ async function simulatedResults(): Promise<Award[]> {
     id: a.id,
     title: a.title,
     total: a.total ?? 0,
-    results: [...a.standings].reverse().map((r) => ({ id: r.id, title: r.title, count: r.count ?? 0, percentage: r.percentage, isWinner: r.isWinner })),
+    ...(a.points ? { unit: "points" as const } : {}),
+    results: [...a.standings].reverse().map((r) => ({ id: r.id, title: r.title, count: (a.points ? r.points : r.count) ?? 0, percentage: r.percentage, isWinner: r.isWinner })),
   }));
 }
 

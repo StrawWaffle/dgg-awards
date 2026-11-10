@@ -18,6 +18,7 @@ import {
   insertCategory,
   insertHistory,
   insertNominee,
+  moveNominee,
   nomineeHasVotes,
   reorderCategories,
   reorderNominees,
@@ -35,6 +36,20 @@ export type Actor = { uid: number | null; name: string };
 export type ImportedPicture = { categoryId: string; id: string; from: string | null; to: string };
 /** An emote an import gave a nominee: `from` is what it had. */
 export type ImportedEmote = ImportedPicture;
+/** A nominee an import moved to another award, and its place in the old one. */
+export type MovedNominee = { id: string; from: string; to: string; position: number };
+
+/** Move nominees back where they came from (undo), or on again (redo). Skips any changed since. */
+async function moveAll(moved: MovedNominee[], back: boolean) {
+  const done: MovedNominee[] = [];
+  for (const m of moved) {
+    const [from, to] = back ? [m.to, m.from] : [m.from, m.to];
+    if (!(await getNominee(from, m.id)) || (await getNominee(to, m.id)) || (await nomineeHasVotes(from, m.id))) continue;
+    await moveNominee(from, m.id, to, back ? m.position : undefined);
+    done.push(m);
+  }
+  return done;
+}
 type Snapshot = Record<string, unknown>;
 
 /** Clip builds finish in the background, after the request that started them. */
@@ -277,6 +292,8 @@ export async function undo(id: number, actor: Actor, force = false): Promise<num
             throw new UndoConflict(`"${a.id}" in "${a.categoryId}" has votes now, so the import can't be undone.`);
           }
         }
+        // Nominees it moved go back first, so they aren't deleted with a new category.
+        const moved = await moveAll((after.moved ?? []) as MovedNominee[], true);
         for (const categoryId of ids) {
           const snapshot = await categorySnapshot(categoryId);
           if (!snapshot) continue;
@@ -305,7 +322,7 @@ export async function undo(id: number, actor: Actor, force = false): Promise<num
           await setNomineeFields(e.categoryId, e.id, { emote: e.from });
           emotes.push(e);
         }
-        return record(actor, { ...base, action: "delete", before: { categories: snapshots, added: rows, pictures, emotes } });
+        return record(actor, { ...base, action: "delete", before: { categories: snapshots, added: rows, pictures, emotes, moved } });
       }
       // Undoing that undo: put the imported categories and nominees back.
       const snapshots = (before.categories ?? []) as (CategoryRow & { options?: NomineeRow[] })[];
@@ -321,6 +338,7 @@ export async function undo(id: number, actor: Actor, force = false): Promise<num
         for (const nominee of options) await insertNominee(nominee);
       }
       for (const row of rows) await insertNominee(row);
+      const moved = await moveAll((before.moved ?? []) as MovedNominee[], false);
       const pictures: ImportedPicture[] = [];
       for (const p of (before.pictures ?? []) as ImportedPicture[]) {
         const row = await getNominee(p.categoryId, p.id);
@@ -344,6 +362,7 @@ export async function undo(id: number, actor: Actor, force = false): Promise<num
           nominees: snapshots.reduce((n, s) => n + (s.options?.length ?? 0), 0) + rows.length,
           pictures,
           emotes,
+          moved,
         },
       });
     }

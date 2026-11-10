@@ -11,6 +11,9 @@ type Standing = {
   /** Null when only percentages are known (2025, from the wiki). */
   count: number | null;
   percentage: number;
+  /** Points awards: points, and how many ballots had them in their top 10. */
+  points?: number;
+  placed?: number;
   isWinner: boolean;
   image: string | null;
   /** An emote to show in place of a picture (New Emote of the Year). */
@@ -24,6 +27,8 @@ export type AwardResult = {
   description: string;
   /** Null when not known. */
   ranked: boolean | null;
+  /** A top 10 by points (the wildcards): standings by points; `total` is ballots. */
+  points?: boolean;
   /** Voters in the award; null when only percentages are known. */
   total: number | null;
   /** Shown under the title, e.g. where the numbers are off. */
@@ -80,11 +85,14 @@ export async function loadSimulated(): Promise<AwardResult[]> {
       const counts: number[] = weights.map((w: number) => Math.round((w / sum) * total));
       const most = Math.max(...counts);
       const counted = counts.reduce((a, b) => a + b, 0) || 1;
+      const isPoints = c.votingStyle === "points";
       const standings = c.options
         .map((o: any, i: number) => ({
           id: o.id,
           title: o.title,
           count: counts[i]!,
+          // Points awards: about five and a half points a placing.
+          ...(isPoints ? { points: Math.round(counts[i]! * 5.5 * 2) / 2, placed: counts[i]! } : {}),
           percentage: Number(((counts[i]! / counted) * 100).toFixed(1)),
           isWinner: counts[i] === most,
           image: o.thumbnailUrl ?? (o.imageId ? `/Media/${o.imageId}` : null),
@@ -92,7 +100,7 @@ export async function loadSimulated(): Promise<AwardResult[]> {
           clip: nomineeClip(o, `${o.title} · ${c.title}`),
         }))
         .sort((a: Standing, b: Standing) => b.count! - a.count!);
-      return { id: c.id, title: c.title, description: c.description ?? "", ranked: c.votingStyle === "ranked", total: counted, standings, rounds: null };
+      return { id: c.id, title: c.title, description: c.description ?? "", ranked: c.votingStyle === "ranked", points: isPoints, total: counted, standings, rounds: null };
     });
 }
 
@@ -103,6 +111,7 @@ export async function loadSummary(): Promise<AwardResult[]> {
     title: c.categoryTitle,
     description: c.categoryDescription ?? "",
     ranked: c.votingStyle === "ranked",
+    points: c.votingStyle === "points",
     total: c.totalVotes,
     // The API lists last place first.
     standings: [...c.options].reverse().map((o: any) => ({
@@ -110,6 +119,7 @@ export async function loadSummary(): Promise<AwardResult[]> {
       title: o.title,
       count: o.count,
       percentage: o.percentage,
+      ...(c.votingStyle === "points" ? { points: o.points, placed: o.placed } : {}),
       isWinner: o.isWinner,
       image: o.payload?.thumbnailUrl ?? (o.payload?.imageId ? `/Media/${o.payload.imageId}` : null),
       emote: o.payload?.emote ?? undefined,
@@ -126,8 +136,8 @@ export async function loadSummary(): Promise<AwardResult[]> {
 function margin(a: AwardResult): { winner: Standing; runnerUp: Standing; votes: number | null; points: number } | null {
   const winner = a.standings.find((s) => s.isWinner) ?? a.standings[0];
   if (!winner || a.total === 0) return null;
-  // Only percentages: the margin is the gap between them.
-  if (a.total === null || winner.count === null) {
+  // Only percentages (or points, by their share of all points): the margin is the gap between them.
+  if (a.total === null || winner.count === null || a.points) {
     const runnerUp = [...a.standings].filter((s) => s !== winner).sort((x, y) => y.percentage - x.percentage)[0];
     return runnerUp ? { winner, runnerUp, votes: null, points: winner.percentage - runnerUp.percentage } : null;
   }
@@ -146,6 +156,8 @@ function margin(a: AwardResult): { winner: Standing; runnerUp: Standing; votes: 
 }
 
 const votes = (n: number) => `${n.toLocaleString()} vote${n === 1 ? "" : "s"}`;
+const ballots = (n: number) => `${n.toLocaleString()} ballot${n === 1 ? "" : "s"}`;
+const pointsText = (n: number) => `${Number.isInteger(n) ? n.toLocaleString() : n.toFixed(1)} point${n === 1 ? "" : "s"}`;
 /** "by 34 votes", or "by 8.1 points" when there are no counts. */
 const by = (m: { votes: number | null; points: number }) => (m.votes === null ? `${m.points.toFixed(1)} points` : votes(m.votes));
 
@@ -322,7 +334,8 @@ export function Summary({
           <AwardSection key={a.id} award={a} onWatch={setWatching} />
         ))}
         <p className="text-center text-xs" style={{ color: "var(--muted)" }}>
-          {footer ?? "Percentages are of first choices. For ranked awards, the winner is decided by the runoff below each one."}
+          {footer ??
+            "Percentages are of first choices. For ranked awards, the winner is decided by the runoff below each one. Top 10 awards add up points: 10 for 1st down to 1 for 10th on each ballot."}
         </p>
       </div>
     </div>
@@ -387,8 +400,8 @@ function AwardSection({ award, onWatch }: { award: AwardResult; onWatch: (clip: 
   const m = margin(award);
   const winners = award.standings.filter((s) => s.isWinner);
   const winner = winners[0];
-  // Bars by count, or by percentage when there are no counts.
-  const value = (s: Standing) => s.count ?? s.percentage;
+  // Bars by count (points for a points award), or by percentage when there are no counts.
+  const value = (s: Standing) => (award.points ? (s.points ?? 0) : (s.count ?? s.percentage));
   const most = Math.max(1, ...award.standings.map(value));
 
   return (
@@ -396,8 +409,14 @@ function AwardSection({ award, onWatch }: { award: AwardResult; onWatch: (clip: 
       <header className="space-y-1">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="mr-2 text-2xl font-black">{award.title}</h2>
-          {award.total !== null && <span className="cozy-chip">{votes(award.total)}</span>}
-          {award.ranked !== null && <span className="cozy-chip">{award.ranked ? "Ranked choice" : "Single pick"}</span>}
+          {award.total !== null && <span className="cozy-chip">{award.points ? ballots(award.total) : votes(award.total)}</span>}
+          {award.points ? (
+            <span className="cozy-chip" title="Each ballot is a top 10: 10 points for 1st down to 1 for 10th, shared by equals. Everyone's points added up.">
+              Top 10 by points
+            </span>
+          ) : (
+            award.ranked !== null && <span className="cozy-chip">{award.ranked ? "Ranked choice" : "Single pick"}</span>
+          )}
           {award.stream && (
             <a className="cozy-chip" href={award.stream} target="_blank" rel="noopener noreferrer">
               ↗ The reveal on stream
@@ -431,11 +450,18 @@ function AwardSection({ award, onWatch }: { award: AwardResult; onWatch: (clip: 
             <span className="cozy-chip coral">{winners.length > 1 ? "Tied winners" : "Winner"}</span>
             <p className="text-2xl font-black">{winners.map((w) => w.title).join(" & ")}</p>
             <p className="font-semibold">
-              {winner.count === null
-                ? `${winner.percentage}% of the vote`
-                : `${votes(winner.count)} · ${winner.percentage}% of first choices`}
+              {award.points
+                ? `${pointsText(winner.points ?? 0)}, placed on ${ballots(winner.placed ?? 0)}`
+                : winner.count === null
+                  ? `${winner.percentage}% of the vote`
+                  : `${votes(winner.count)} · ${winner.percentage}% of first choices`}
             </p>
-            {m && winners.length === 1 && (
+            {award.points && m && winners.length === 1 && (
+              <p className="text-sm font-semibold" style={{ color: "var(--muted)" }}>
+                {`${pointsText((m.winner.points ?? 0) - (m.runnerUp.points ?? 0))} ahead of ${m.runnerUp.title}.`}
+              </p>
+            )}
+            {!award.points && m && winners.length === 1 && (
               <p className="text-sm font-semibold" style={{ color: "var(--muted)" }}>
                 {m.votes === null
                   ? `Won by ${m.points.toFixed(1)} points over ${m.runnerUp.title}.`
@@ -496,7 +522,7 @@ function AwardSection({ award, onWatch }: { award: AwardResult; onWatch: (clip: 
               />
             </span>
             <span className="hand w-28 text-right text-lg font-bold tabular-nums">
-              {s.count === null ? `${s.percentage}%` : `${s.count.toLocaleString()} · ${s.percentage}%`}
+              {award.points ? pointsText(s.points ?? 0) : s.count === null ? `${s.percentage}%` : `${s.count.toLocaleString()} · ${s.percentage}%`}
             </span>
           </li>
         ))}

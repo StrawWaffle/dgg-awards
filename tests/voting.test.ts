@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { effectiveStyle, instantRunoff } from "@/lib/voting";
+import { effectiveStyle, instantRunoff, countPoints, placesToRanks, pointsForPlaces, ranksToPlaces, validPlaces } from "@/lib/voting";
 
 const repeat = (n: number, ballot: string[]) => Array.from({ length: n }, () => ballot);
 
@@ -77,4 +77,59 @@ test("a category's own style beats the site default", () => {
   expect(effectiveStyle("ranked", "single")).toBe("ranked");
   expect(effectiveStyle(null, "ranked")).toBe("ranked");
   expect(effectiveStyle(null, undefined)).toBe("single");
+});
+
+describe("points (a top 10, equals sharing places)", () => {
+  test("10 for first down to 1 for tenth; equals share the places they take", () => {
+    const rows = pointsForPlaces([["a"], ["b", "c"], ["d"]]);
+    expect(rows.map((r) => [r.place, r.points])).toEqual([[1, 10], [2, 8.5], [4, 7]]);
+    const ten = pointsForPlaces([...Array(10).keys()].map((i) => [`n${i}`]));
+    expect(ten.map((r) => r.points)).toEqual([10, 9, 8, 7, 6, 5, 4, 3, 2, 1]);
+  });
+
+  test("stored as places shared by equals, and back", () => {
+    const places = [["a"], ["b", "c"], ["d"]];
+    const rows = placesToRanks(places);
+    expect(rows).toEqual([{ id: "a", rank: 1 }, { id: "b", rank: 2 }, { id: "c", rank: 2 }, { id: "d", rank: 4 }]);
+    expect(ranksToPlaces(rows)).toEqual(places);
+    // In any order: the places come back the same (equals in any order).
+    expect(ranksToPlaces([...rows].reverse()).map((g) => g.sort())).toEqual(places);
+  });
+
+  test("a ballot is up to ten, none twice, no empty groups", () => {
+    expect(validPlaces([["a"], ["b", "c"]])).toBe(true);
+    expect(validPlaces([])).toBe(false);
+    expect(validPlaces([["a"], []])).toBe(false);
+    expect(validPlaces([["a"], ["a"]])).toBe(false);
+    expect(validPlaces([...Array(11).keys()].map((i) => [`n${i}`]))).toBe(false);
+  });
+
+  test("points add up over ballots; most points wins", () => {
+    const r = countPoints(["a", "b", "c", "d"], [
+      [["a"], ["b"]],
+      [["b"], ["a"]],
+      [["b", "c"]],
+    ]);
+    expect(r.points).toEqual({ a: 19, b: 28.5, c: 9.5, d: 0 });
+    expect(r.placed).toEqual({ a: 2, b: 3, c: 1, d: 0 });
+    expect(r.ballots).toBe(3);
+    expect(r.winners).toEqual(["b"]);
+    expect(r.order).toEqual(["b", "a", "c", "d"]);
+  });
+
+  test("a tie on points goes to more first places, then more ballots; else it's shared", () => {
+    // a and b both 10 points: a from one first place, b from a second and a tenth.
+    const ids = "abcdefghijk".split("");
+    const r = countPoints(ids, [[["a"]], [["c"], ["b"]], "cdefghijkb".split("").map((x) => [x])]);
+    expect([r.points.a, r.points.b]).toEqual([10, 10]);
+    expect(r.order.indexOf("a")).toBeLessThan(r.order.indexOf("b"));
+    const even = countPoints(["a", "b"], [[["a"], ["b"]], [["b"], ["a"]]]);
+    expect(even.winners).toEqual(["a", "b"]);
+  });
+
+  test("no ballots, no winner; unknown and repeated nominees are ignored", () => {
+    expect(countPoints(["a"], []).winners).toEqual([]);
+    const r = countPoints(["a", "b"], [[["a", "x"], ["a"], ["b"]]]);
+    expect(r.points).toEqual({ a: 10, b: 9 });
+  });
 });

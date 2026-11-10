@@ -73,7 +73,7 @@ export function ResultsPage({
         footer={
           simulated
             ? "Simulated votes: made up for this preview, never saved."
-            : "Percentages are of first choices. For ranked awards, the winner is decided by the runoff below each one."
+            : "Percentages are of first choices. For ranked awards, the winner is decided by the runoff below each one. Top 10 awards add up points: 10 for 1st down to 1 for 10th on each ballot."
         }
         extra={!simulated && tally && tally.voters > 0 ? <TallyBox tally={tally} /> : undefined}
       />
