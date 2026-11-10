@@ -552,7 +552,7 @@ StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, an
   - typecheck and 92 unit tests; 49 API tests, with the preview addresses added
   - in the browser: both preview menus (hover, jump, close, current page marked, the admin one on a phone), every stage and page, a preview vote not saved, the old addresses rewritten, `/lab#sound` kept, non-admin and signed-out refusals, the big screen switched to simulated votes with the reveal running, and the music's first play starting at 6.02 s
 
-### Wildcards: top 10, with points (2026-11-10, built, not deployed)
+### Wildcards: top 10, with points (2026-11-10, deployed)
 
 A copy of the ranking for StrawWaffle's next idea: only each person's top 10 matters. Lab view "Wildcards: top 10" (`/preview/lab#rank-top`), next to the whole ranking, which is unchanged. Same page (`RankChatters top={10}`), saved under its own key (`lab.rank.wildcards.top10`).
 
