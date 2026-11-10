@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Emote } from "@/lab/Emote";
-import { type Choice, type Ranking, type RankState, type Step, apply, choicesLeft, crossing, current, inPlay, phase, points, start } from "@/lab/rank";
+import { type Choice, type Ranking, type RankState, choicesLeft, crossing, current, inPlay, points } from "@/lab/rank";
+import { type Step, type TriageState, type Verdict, apply, card, comparisonsFor, phase, result, start } from "@/lab/triage";
 
 /** A wildcard chatter: the DGGer nominee, its name without the list number. */
 type Chatter = { id: string; name: string; emote: string | null; image: string | null };
@@ -17,8 +18,8 @@ type Profile = {
 /** What's saved: the order dealt, and every answer, replayed to get back to where you were. */
 type Saved = { order: string[]; steps: Step[] };
 
-// v4, a knockout, from 2026-11-10 (v1 ranked batches, v2 was merge sort, v3 insertion).
-const KEY = "lab.rank.wildcards.v4";
+// v5, swipe then compare, from 2026-11-10 (v1 ranked batches, v2 merge sort, v3 insertion, v4 knockout only).
+const KEY = "lab.rank.wildcards.v5";
 const TOP = 10;
 const load = (key: string): Saved | null => {
   try {
@@ -41,7 +42,7 @@ const shuffled = <T,>(xs: T[]) => {
   }
   return a;
 };
-function replay({ order, steps }: Saved): RankState {
+function replay({ order, steps }: Saved): TriageState {
   let s = start(order, TOP);
   for (const step of steps) s = apply(s, step);
   return s;
@@ -98,13 +99,13 @@ function useProfile(name: string) {
 }
 
 /**
- * Experiment: your top ten of the 67 DGGer wildcards, as a knockout (see
- * src/lab/rank.ts). Everyone is paired off; winners meet winners; the last one
- * standing is first place. Then the people they beat play off for second, and
- * so on: about 123 choices in all. Equal sends both on together, sharing their
- * places and points (10 down to 1). A group of equals crossing the line is
- * split by picking exactly those who fit. Everything on the destiny.gg profile
- * is shown. Saved in this browser as you go; nothing is a vote.
+ * Experiment: your top ten of the 67 DGGer wildcards with the least effort
+ * (src/lab/triage.ts). First a swipe through everyone: yes, no or maybe, one
+ * card at a time. Then only the finalists are compared, two at a time, as a
+ * knockout (src/lab/rank.ts): equals share places and points (10 down to 1),
+ * and a group crossing the line is one pick of exactly those who fit.
+ * Everything on the destiny.gg profile is shown. Saved in this browser as you
+ * go; nothing is a vote.
  */
 export function RankChatters() {
   const key = KEY;
@@ -156,10 +157,13 @@ export function RankChatters() {
   if (chatters === "missing") return <Shell>No wildcards found in DGGer of the Year.</Shell>;
   if (!state) return <Shell>Loading…</Shell>;
 
-  const left = choicesLeft(state);
   const at = phase(state);
-  const match = current(state);
-  const cross = crossing(state);
+  const bracket = state.bracket;
+  const match = bracket && current(bracket);
+  const cross = bracket && crossing(bracket);
+  const swiping = card(state);
+  const left = bracket ? choicesLeft(bracket) : null;
+  const compared = bracket?.asked ?? 0;
   return (
     <main className="mx-auto max-w-[110rem] space-y-5 px-4 py-6">
       <header className="cozy-panel flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4">
@@ -167,10 +171,14 @@ export function RankChatters() {
         <span className="cozy-chip">{chatters.length} chatters</span>
         <span className="text-sm font-semibold" style={{ color: "var(--muted)" }}>
           {at === "done"
-            ? `Done in ${state.asked} choices.`
-            : at === "pick"
-              ? `Choice ${state.asked + 1} · the last one`
-              : `Choice ${state.asked + 1} · about ${left.about} to go, at most ${left.most} · every Equal means fewer`}
+            ? `Done: ${state.swipes} swipes, ${compared} comparisons.`
+            : swiping
+              ? at === "again"
+                ? `Still a yes? ${swiping.n} of ${swiping.of} · ${swiping.kept} kept`
+                : `Swipe ${swiping.n} of ${swiping.of} · ${swiping.yes} yes, ${swiping.maybe} maybe · then about ${comparisonsFor(Math.max(swiping.yes ?? 0, 10), 10)} comparisons`
+              : at === "pick"
+                ? `${state.finalists!.length} finalists · comparison ${compared + 1}, the last one`
+                : `${state.finalists!.length} finalists · comparison ${compared + 1} · about ${Math.max(1, left!.about)} to go, at most ${Math.max(1, left!.most)} · every Equal means fewer`}
         </span>
         <span className="ml-auto flex gap-2">
           <button type="button" className="cozy-btn" onClick={back} disabled={!saved?.steps.length}>
@@ -181,10 +189,20 @@ export function RankChatters() {
           </button>
         </span>
       </header>
-      {match && <Compare state={state} match={match} byId={byId} onChoose={step} />}
-      {at === "pick" && cross && <Pick group={cross.group} need={cross.need} place={cross.place} top={top} byId={byId} onKeep={(ids) => step({ keep: ids })} />}
-      {at === "done" && <Final result={state.placed} byId={byId} top={top} />}
-      {at !== "done" && <Standings state={state} byId={byId} />}
+      {swiping && (
+        <Swipe
+          key={`${at}-${swiping.n}`}
+          id={swiping.id}
+          again={at === "again"}
+          next={at === "again" ? state.again![swiping.n] : state.order[swiping.n]}
+          byId={byId}
+          onSwipe={(v) => step({ swipe: v })}
+        />
+      )}
+      {bracket && match && <Compare state={bracket} match={match} byId={byId} onChoose={step} />}
+      {bracket && at === "pick" && cross && <Pick group={cross.group} need={cross.need} place={cross.place} top={top} byId={byId} onKeep={(ids) => step({ keep: ids })} />}
+      {at === "done" && <Final result={result(state)} byId={byId} top={top} />}
+      {bracket && at !== "done" && <Standings state={bracket} byId={byId} />}
     </main>
   );
 }
@@ -201,6 +219,95 @@ function Face({ chatter, size }: { chatter: Chatter; size: number }) {
   if (chatter.image) return <img src={chatter.image} alt="" className="h-full w-full object-cover" />;
   if (chatter.emote) return <Emote name={chatter.emote} size={size} />;
   return null;
+}
+
+/**
+ * One card: yes (top ten material), no, or maybe. Keys ← ↓ →, the buttons, or
+ * dragging the card left or right. The second pass, over too many yeses, is
+ * yes or no only.
+ */
+function Swipe({
+  id,
+  again,
+  next,
+  byId,
+  onSwipe,
+}: {
+  id: string;
+  again: boolean;
+  next: string | undefined;
+  byId: Map<string, Chatter>;
+  onSwipe: (v: Verdict) => void;
+}) {
+  const [dx, setDx] = useState(0);
+  const from = useRef<number | null>(null);
+  // Load the next card's profile while this one is up.
+  useEffect(() => {
+    if (next) profileOf(byId.get(next)!.name);
+  }, [next, byId]);
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.repeat || e.target instanceof HTMLInputElement) return;
+      if (e.key === "ArrowLeft") onSwipe("no");
+      else if (e.key === "ArrowRight") onSwipe("yes");
+      else if (!again && (e.key === "ArrowDown" || e.key === "m")) onSwipe("maybe");
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [onSwipe, again]);
+  const lean = dx > 40 ? "yes" : dx < -40 ? "no" : null;
+  return (
+    <section className="mx-auto max-w-2xl space-y-4">
+      <p className="text-center text-lg font-black">{again ? "Too many yeses: still a yes?" : "Top 10 material?"}</p>
+      <div
+        className="cozy-panel touch-pan-y select-none space-y-2 p-5"
+        style={{
+          transform: `translateX(${dx}px) rotate(${dx / 40}deg)`,
+          transition: from.current === null ? "transform 150ms ease" : "none",
+          borderColor: lean === "yes" ? "var(--primary-shadow)" : lean === "no" ? "var(--coral)" : undefined,
+        }}
+        onPointerDown={(e) => {
+          if ((e.target as HTMLElement).closest("a")) return;
+          from.current = e.clientX;
+          (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+        }}
+        onPointerMove={(e) => from.current !== null && setDx(e.clientX - from.current)}
+        onPointerUp={() => {
+          from.current = null;
+          const d = dx;
+          setDx(0);
+          if (d > 100) onSwipe("yes");
+          else if (d < -100) onSwipe("no");
+        }}
+        onPointerCancel={() => {
+          from.current = null;
+          setDx(0);
+        }}
+      >
+        <ProfileCard chatter={byId.get(id)!} />
+      </div>
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <button type="button" className="cozy-btn" onClick={() => onSwipe("no")}>
+          ← No
+        </button>
+        {!again && (
+          <button type="button" className="cozy-btn" onClick={() => onSwipe("maybe")}>
+            ↓ Maybe
+          </button>
+        )}
+        <button type="button" className="cozy-btn primary" onClick={() => onSwipe("yes")}>
+          Yes →
+        </button>
+      </div>
+      <p className="text-center text-xs font-semibold" style={{ color: "var(--muted)" }}>
+        {again
+          ? "Keys: ← no, → yes. Only the ones you keep are compared."
+          : "Keys: ← no, ↓ maybe, → yes; or drag the card. Only the yeses get compared, two at a time, after this (the maybes too if there are fewer than ten yeses)."}
+      </p>
+    </section>
+  );
 }
 
 /** A match: two sides still in the running (each may be a group of equals). Pick one, or equal. */

@@ -17,7 +17,7 @@ export const labViews = [
   // Two takes on the year in chat (the live one is /chat), to pick from.
   { id: "chat-calm", label: "Year in chat: calm" },
   { id: "chat-story", label: "Year in chat: story" },
-  // Your top 10 of the DGGer wildcards, as a knockout (src/lab/rank.ts).
+  // Your top 10 of the DGGer wildcards: swipe, then compare the finalists (src/lab/triage.ts).
   { id: "rank-top", label: "Wildcards: top 10" },
 ] as const;
 export type LabView = (typeof labViews)[number]["id"];
