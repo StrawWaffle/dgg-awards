@@ -552,7 +552,7 @@ StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, an
   - typecheck and 92 unit tests; 49 API tests, with the preview addresses added
   - in the browser: both preview menus (hover, jump, close, current page marked, the admin one on a phone), every stage and page, a preview vote not saved, the old addresses rewritten, `/lab#sound` kept, non-admin and signed-out refusals, the big screen switched to simulated votes with the reveal running, and the music's first play starting at 6.02 s
 
-### Ranking, fourth take: a knockout for the top 10 (2026-11-10, built, not deployed)
+### Ranking, fourth take: a knockout for the top 10 (2026-11-10, deployed)
 
 StrawWaffle, after the insertion take: don't bother with splits until they're an issue; a newcomer is most likely not top 10, so comparing them with the top 9 teaches little; he proposed comparing every uncompared person with first place, and asked for research. A simulation (3,000 runs, ordered top 10 of 67; the script is in the session scratchpad, `topk-sim.ts`): knockout tournament 123 average, 126 worst; insertion with the cutoff first (then live) 143 / 183; replacement selection with a heap 182 / 238; comparing everyone with first place 345 / 531. The floor is about 60 bits. Comparing with first place is costly because losing to the first says almost nothing, while losing to the 10th settles it; and after the sweep only #1 is known. StrawWaffle agreed to the knockout and to dropping the whole-ranking view.
 
