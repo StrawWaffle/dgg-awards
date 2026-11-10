@@ -466,8 +466,8 @@ function Compare({
   /** "Unbeaten", or who they lost to, by place. */
   const record = (g: string[]) => {
     const beatenBy = [...new Set(g.flatMap((id) => state.lostTo[id] ?? []))];
-    if (!beatenBy.length) return "Unbeaten";
-    return `Lost to ${beatenBy.map((id) => `#${placeOf(id)} ${byId.get(id)!.name}`).join(", ")}`;
+    if (!beatenBy.length) return { text: "Unbeaten", emote: "GIGACHAD" };
+    return { text: `Lost to ${beatenBy.map((id) => `#${placeOf(id)} ${byId.get(id)!.name}`).join(", ")}`, emote: "PepeHands" };
   };
   const cols = (g: string[]) => Math.min(g.length, 3);
   const side = (g: string[], c: Choice) => {
@@ -488,12 +488,15 @@ function Compare({
       }}
     >
       <span className="flex flex-wrap gap-1.5">
-        <span className="cozy-chip">{record(g)}</span>
+        <span className="cozy-chip flex items-center gap-1.5">
+          <Emote name={record(g).emote} size={0.6} title="" />
+          {record(g).text}
+        </span>
         {g.length > 1 && <span className="cozy-chip green">{g.length} equal</span>}
       </span>
-      <div className="grid gap-x-5 gap-y-5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(15rem, 1fr))" }}>
+      <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(22rem, 1fr))" }}>
         {g.map((x) => (
-          <ProfileCard key={x} chatter={byId.get(x)!} />
+          <MatchCard key={x} chatter={byId.get(x)!} />
         ))}
       </div>
     </button>
@@ -512,7 +515,7 @@ function Compare({
       <div
         className="rank-pair mx-auto grid items-start gap-4"
         // As wide as the chatters showing need: two alone stay readable, groups spread out.
-        style={{ ["--cols" as string]: `${cols(match.left)}fr ${cols(match.right)}fr`, maxWidth: `${(cols(match.left) + cols(match.right)) * 24}rem` }}
+        style={{ ["--cols" as string]: `${cols(match.left)}fr ${cols(match.right)}fr`, maxWidth: `${(cols(match.left) + cols(match.right)) * 36}rem` }}
       >
         {side(match.left, "left")}
         {side(match.right, "right")}
@@ -576,7 +579,7 @@ function Pick({
           ? `Pick the one who stays, in ${ordinal(place)} place; the other${group.length > 2 ? "s" : ""} drop out.`
           : `Pick the ${need} who stay. They stay equal, sharing places ${place} to ${place + need - 1}; the others drop out.`}
       </p>
-      <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(18rem, 1fr))" }}>
+      <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(22rem, 1fr))" }}>
         {group.map((id) => {
           const on = picked.includes(id);
           return (
@@ -593,7 +596,7 @@ function Pick({
               }}
             >
               <span className={`cozy-chip ${on ? "green" : ""}`}>{on ? "Stays" : "Pick"}</span>
-              <ProfileCard chatter={byId.get(id)!} />
+              <MatchCard chatter={byId.get(id)!} />
             </button>
           );
         })}
@@ -850,36 +853,26 @@ function HeroCard({ chatter }: { chatter: Chatter }) {
 }
 
 /**
- * A chatter in a match: the same, smaller. The emote box is tinted by their
- * team; tier and team in their colours; a labelled list for the rest.
+ * A chatter in a match: the swipe card, smaller. A band tinted by their team
+ * (emote, name, profile link), then the same coloured tiles. The tiles go in
+ * a row of three when the card is wide enough (a container query), else
+ * stack, so groups of equals in columns still fit.
  */
-function ProfileCard({ chatter }: { chatter: Chatter }) {
+function MatchCard({ chatter }: { chatter: Chatter }) {
   const p = useProfile(chatter.name);
   const team = teamOf(p?.team ?? null);
   const tier = tierOf(p?.tier ?? null);
   const bio = bioOf(p?.bio);
   const years = p?.memberSince ? yearsSince(p.memberSince) : null;
   const hue = team?.color ?? "var(--primary)";
-  const none = (text: string) => <span style={{ color: "var(--muted)" }}>{text}</span>;
-  const row = (label: string, value: React.ReactNode) => (
-    <>
-      <dt className="pt-0.5 text-xs font-bold" style={{ color: "var(--muted)" }}>
-        {label}
-      </dt>
-      <dd className="min-w-0 font-semibold [overflow-wrap:anywhere]">{value}</dd>
-    </>
-  );
   return (
-    <div className="min-w-0 space-y-4">
-      <div className="flex items-center gap-4">
-        <div
-          className="flex h-20 min-w-20 max-w-52 shrink-0 items-center justify-center overflow-hidden rounded-[18px] border-2 px-2"
-          style={{ background: tint(hue, 22), borderColor: tint(hue, 50) }}
-        >
-          <Face chatter={chatter} size={1.9} />
+    <div className="@container min-w-0 space-y-3">
+      <div className="flex items-center gap-4 rounded-[18px] border-2 p-3" style={{ background: tint(hue, 22), borderColor: tint(hue, 50) }}>
+        <div className="rank-bob flex h-20 min-w-20 max-w-48 shrink-0 items-center justify-center overflow-hidden">
+          <Face chatter={chatter} size={2.2} />
         </div>
         <div className="min-w-0 space-y-1">
-          <div className="text-2xl font-black leading-tight [overflow-wrap:anywhere]">{chatter.name}</div>
+          <div className="text-3xl font-black leading-tight [overflow-wrap:anywhere]">{chatter.name}</div>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
             {p?.photoUrl && <img src={p.photoUrl} alt="" title="Profile photo" className="h-7 w-7 rounded-full object-cover" />}
             {p?.url && (
@@ -887,46 +880,75 @@ function ProfileCard({ chatter }: { chatter: Chatter }) {
                 destiny.gg profile ↗
               </a>
             )}
+            {chatter.emote && (
+              <span className="font-semibold" style={{ color: "var(--muted)" }}>
+                · Emote: <b>{chatter.emote}</b>
+              </span>
+            )}
           </div>
-          {chatter.emote && (
-            <div className="text-xs font-semibold" style={{ color: "var(--muted)" }}>
-              Emote: <b>{chatter.emote}</b>
-            </div>
-          )}
         </div>
       </div>
-      {p === undefined && <p className="text-sm" style={{ color: "var(--muted)" }}>Loading the profile…</p>}
-      {p === null && <Nothing text="No destiny.gg profile found under this name." emote="Hmm" />}
+      {p === undefined && <p className="text-sm font-semibold" style={{ color: "var(--muted)" }}>Loading the profile…</p>}
+      {p === null && (
+        <Tile label="Profile">
+          <Nothing text="No destiny.gg profile found under this name." emote="Hmm" />
+        </Tile>
+      )}
       {p && (
-        <dl className="grid grid-cols-[6rem_1fr] items-start gap-x-5 gap-y-2.5 text-sm">
-          {row("Subscription", tier ? <b style={{ color: tier.color }}>Tier {tier.n}</b> : none("Not subscribed"))}
-          {row(
-            "Team",
-            team ? (
-              <span className="inline-flex items-center gap-1.5 font-bold" style={{ color: team.color }}>
-                {team.emote && <Emote name={team.emote} size={0.65} title="" />}
-                {team.name}
-              </span>
+        <>
+          <div className="grid gap-2 @sm:grid-cols-3">
+            <Tile label="Subscription" color={tier?.color}>
+              {tier ? (
+                <div className="text-xl font-black" style={{ color: tier.color }}>
+                  Tier {tier.n}
+                </div>
+              ) : (
+                <div className="font-bold" style={{ color: "var(--muted)" }}>
+                  Not subscribed
+                </div>
+              )}
+            </Tile>
+            <Tile label="Team" color={team?.color}>
+              {team ? (
+                <div className="flex items-center gap-2 text-xl font-black" style={{ color: team.color }}>
+                  {team.emote && <Emote name={team.emote} size={0.8} title="" />}
+                  {team.name}
+                </div>
+              ) : (
+                <div className="font-bold" style={{ color: "var(--muted)" }}>
+                  No team
+                </div>
+              )}
+            </Tile>
+            <Tile label="Member since" color="var(--header)">
+              <div className="hand text-2xl font-bold leading-none">{years === null ? "?" : yearsText(years)}</div>
+              <div className="text-xs font-semibold" style={{ color: "var(--muted)" }}>
+                {p.memberSince ?? "Unknown"}
+              </div>
+            </Tile>
+          </div>
+          <Tile label="Bio">
+            {bio ? (
+              <p className="whitespace-pre-line font-semibold [overflow-wrap:anywhere]">{bio}</p>
             ) : (
-              none("No team")
-            ),
-          )}
-          {row("Member since", p.memberSince ? `${p.memberSince} · ${yearsText(years ?? 0).toLowerCase()}` : none("Unknown"))}
-          {row("Bio", bio ? <span className="whitespace-pre-line">{bio}</span> : <Nothing text="No bio" emote="SHRUGSTINY" size={0.6} />)}
-          {row(
-            "Signature",
-            p.signatureSvg ? (
+              <Nothing text="No bio" emote="SHRUGSTINY" size={0.8} />
+            )}
+          </Tile>
+          <Tile label="Signature">
+            {p.signatureSvg ? (
               <div
-                className="h-20 rounded-[12px] border-2 border-dashed p-2 [&_svg]:h-full [&_svg]:w-full"
-                style={{ color: "var(--text)", borderColor: "var(--panel-border)", background: "var(--panel)" }}
+                className="relative mt-1 h-20 [&_svg]:absolute [&_svg]:inset-0 [&_svg]:h-full [&_svg]:w-full"
+                style={{ color: "var(--text)" }}
                 // Rebuilt by the server from path data only (src/server/dgg-profile.ts).
                 dangerouslySetInnerHTML={{ __html: p.signatureSvg }}
               />
             ) : (
-              none("No signature")
-            ),
-          )}
-        </dl>
+              <div className="flex h-20 items-center justify-center">
+                <Nothing text="No signature" emote="Hmm" size={0.9} />
+              </div>
+            )}
+          </Tile>
+        </>
       )}
     </div>
   );
