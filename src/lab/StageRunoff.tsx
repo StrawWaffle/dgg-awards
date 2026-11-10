@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { annotate } from "rough-notation";
-import { type Award, Board, decidedByRunoff } from "@/lab/Results";
+import { type Award, Board, boardOf, decidedByRunoff } from "@/lab/Results";
 import { cssVar } from "@/lab/sketch";
 
 const ROW_H = 44;
@@ -10,45 +10,50 @@ const OUT_H = 26;
 /**
  * The results scene's board. A ranked award decided over several rounds
  * goes on, once its first choices are revealed, to the runoff, which the
- * presenter steps through round by round. Everything else is the plain
- * reveal. `onFinished` comes when there's nothing left to show: the board's
- * last row, or the runoff's last round.
+ * presenter steps through round by round from the show's controls (`round`:
+ * null for the board, else the runoff's round). Long awards show their top
+ * 10 and a line for the rest. `onBoardDone` comes when the board's last row
+ * is in; `onFinished` when there's nothing left to show: the board's last
+ * row, or the runoff's last round.
  */
 export function ResultsBoard({
   award,
   target,
+  round,
   onWinner,
+  onBoardDone,
   onFinished,
 }: {
   award: Award;
   target: number;
+  round: number | null;
   onWinner: (el: HTMLElement) => void;
+  onBoardDone: () => void;
   onFinished: () => void;
 }) {
   const runoff = decidedByRunoff(award);
-  const [boardDone, setBoardDone] = useState(false);
-  const [showRunoff, setShowRunoff] = useState(false);
-  if (showRunoff) return <Runoff award={award} onWinner={onWinner} onFinished={onFinished} />;
+  const { award: shown, rest } = boardOf(award);
+  if (runoff && round !== null) return <Runoff award={award} k={round} onWinner={onWinner} onFinished={onFinished} />;
   return (
     <>
       <Board
-        award={award}
+        award={shown}
         target={target}
         onWinner={onWinner}
         onFinished={() => {
-          setBoardDone(true);
+          onBoardDone();
           if (!runoff) onFinished();
         }}
       />
+      {rest > 0 && (
+        <p className="mt-3 text-center font-bold" style={{ color: "var(--muted)" }}>
+          {rest} more with fewer {award.unit === "points" ? "points" : "votes"}
+        </p>
+      )}
       {runoff && (
-        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t-2 pt-4" style={{ borderColor: "var(--panel-border)" }}>
-          <p className="font-bold" style={{ color: "var(--muted)" }}>
-            First choices only. Nobody has more than half, so it goes to an instant runoff ({award.rounds!.length} rounds).
-          </p>
-          <button type="button" className="cozy-btn primary" disabled={!boardDone} onClick={() => setShowRunoff(true)}>
-            Run the runoff →
-          </button>
-        </div>
+        <p className="mt-5 border-t-2 pt-4 font-bold" style={{ borderColor: "var(--panel-border)", color: "var(--muted)" }}>
+          First choices only. Nobody has more than half, so it goes to an instant runoff ({award.rounds!.length} rounds).
+        </p>
       )}
     </>
   );
@@ -60,9 +65,8 @@ export function ResultsBoard({
  * goes out at the end of a round turns coral, then grey with their name
  * struck through, and their ballots move on to the next choice.
  */
-function Runoff({ award, onWinner, onFinished }: { award: Award; onWinner: (el: HTMLElement) => void; onFinished: () => void }) {
+function Runoff({ award, k, onWinner, onFinished }: { award: Award; k: number; onWinner: (el: HTMLElement) => void; onFinished: () => void }) {
   const rounds = award.rounds!;
-  const [k, setK] = useState(0);
   const round = rounds[k]!;
   const last = k === rounds.length - 1;
   const name = (id: string) => award.results.find((r) => r.id === id)?.title ?? id;
@@ -133,14 +137,6 @@ function Runoff({ award, onWinner, onFinished }: { award: Award; onWinner: (el: 
         <span className="cozy-chip coral">Instant runoff</span>
         <span className="text-2xl font-black">
           Round {k + 1} of {rounds.length}
-        </span>
-        <span className="ml-auto flex gap-2">
-          <button type="button" className="cozy-btn" onClick={() => setK((x) => Math.max(0, x - 1))} disabled={k === 0}>
-            ← Round
-          </button>
-          <button type="button" className={`cozy-btn ${last ? "" : "primary"}`} onClick={() => setK((x) => Math.min(rounds.length - 1, x + 1))} disabled={last}>
-            Next round →
-          </button>
         </span>
       </div>
       <p key={k} className="lab-pop text-lg font-bold">

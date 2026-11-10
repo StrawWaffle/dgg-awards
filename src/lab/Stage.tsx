@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { GearIcon } from "@radix-ui/react-icons";
+import { createPortal } from "react-dom";
 import { Emote, emoteElement, loopRepeating } from "@/lab/Emote";
 import { type Clip, ClipPlayer } from "@/lab/ClipPlayer";
 import { Sketch } from "@/lab/sketch";
 import { type FeedStatus, liveFeed, simulatedFeed } from "@/lab/chatFeed";
 import { type Levels, type Source, useFrame } from "@/lab/music";
 import { useBursts } from "@/lab/Bursts";
-import { type Award, loadResults } from "@/lab/Results";
+import { type Award, boardOf, decidedByRunoff, loadResults } from "@/lab/Results";
 import { DvdMenu, type ShowAward, TitleCard, WinnerCard, loadShow } from "@/lab/Scenes";
 import { ResultsBoard } from "@/lab/StageRunoff";
 import { loadSimulated } from "@/lab/Summary";
+import { type Box, type Layout, Movable, defaultLayout, loadLayout, saveLayout } from "@/lab/StageLayout";
+import { SCENES, type Scene, type ShowCommand, ShowControls, type ShowState, popOutControls, useStageChannel } from "@/lab/StageControls";
 import type { ChatSummary } from "@/server/lab/chat-aggregator";
 
 type Npc = {
@@ -87,22 +89,23 @@ function setEmote(npc: Npc, emote: string) {
   setTimeout(() => loopRepeating(npc.emoteEl), 50);
 }
 
-/** The scenes of one award, in order; after the winner comes the next award's title. */
-const SCENES = [
-  { id: "title", label: "Title" },
-  { id: "options", label: "Nominees" },
-  { id: "results", label: "Results" },
-  { id: "winner", label: "Winner" },
-] as const;
-type Scene = (typeof SCENES)[number]["id"];
-const NEXT_LABEL: Record<Scene, string> = { title: "Nominees", options: "Results", results: "Winner", winner: "Next award" };
-/** How wide each scene's box is: narrow enough to leave the cast room at the sides. */
+/** How wide each scene's box is, within the layout's box for the scenes. */
 const SCENE_WIDTH: Record<Scene, string> = {
-  title: "min(900px, 92%)",
-  options: "min(1000px, 66%)",
-  results: "min(860px, 62%)",
-  winner: "min(560px, 46%)",
+  title: "min(900px, 100%)",
+  options: "min(1000px, 100%)",
+  results: "min(860px, 94%)",
+  winner: "min(560px, 72%)",
 };
+
+/** The camera slot's drawn frame and hint, on or off, remembered per browser. */
+const FRAME_KEY = "lab.stage.frame";
+function loadFrame() {
+  try {
+    return localStorage.getItem(FRAME_KEY) !== "off";
+  } catch {
+    return true;
+  }
+}
 
 /** A spot beside the middle box `sides`, on the left or the right. */
 function sideSpot(toLeft: boolean, sides: { left: number; right: number }, width: number, size = 44) {
@@ -120,6 +123,11 @@ function boxIn(el: HTMLElement, stage: Element | null) {
     top += e.offsetTop;
   }
   return { left, right: left + el.offsetWidth, top, bottom: top + el.offsetHeight };
+}
+/** The same, in the floor's coordinates (the floor may start right of the chat column). */
+function boxOnFloor(el: HTMLElement, floor: HTMLElement) {
+  const b = boxIn(el, floor.offsetParent);
+  return { left: b.left - floor.offsetLeft, right: b.right - floor.offsetLeft, top: b.top - floor.offsetTop, bottom: b.bottom - floor.offsetTop };
 }
 
 /** The results page's simulated votes, in the shape the reveal takes (last place first). */
@@ -144,7 +152,7 @@ const nickClass = (flair: string | null) => `nick${flair ? ` nick-${flair}` : ""
  * there are at most `max` of them; the busiest chat costs the same as a quiet
  * one. The chat column and the numbers update four times a second.
  */
-export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: string[]; chatOpen: boolean }) {
+export function Stage({ source, emotes, chatOpen, onChat }: { source: Source; emotes: string[]; chatOpen: boolean; onChat: () => void }) {
   const floor = useRef<HTMLDivElement>(null);
   const npcs = useRef(new Map<string, Npc>());
   const [feed, setFeed] = useState<"sim" | "live">("sim");
@@ -181,20 +189,32 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
   const clipOn = useRef(false);
   clipOn.current = !!playing;
   const clipBox = useRef<HTMLDivElement>(null);
-  // The controls' height, so the clip and the cast stay clear of them.
-  const controls = useRef<HTMLDivElement>(null);
-  const controlsH = useRef(0);
-  const [controlsHeight, setControlsHeight] = useState(0);
-  useEffect(() => {
-    const el = controls.current;
-    if (!el) return;
-    const observer = new ResizeObserver(() => {
-      controlsH.current = el.offsetHeight;
-      setControlsHeight(el.offsetHeight);
+  /** Where the chat, the camera slot, the scenes and clips sit (src/lab/StageLayout.tsx). */
+  const screen = useRef<HTMLDivElement>(null);
+  const [moved, setMoved] = useState<Partial<Layout>>(loadLayout);
+  const layout: Layout = { ...defaultLayout(chatOpen), ...moved };
+  const [arranging, setArranging] = useState(false);
+  const moveBox = (box: Box) => (r: Layout[Box]) =>
+    setMoved((l) => {
+      const next = { ...l, [box]: r };
+      saveLayout(next);
+      return next;
     });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+  const resetLayout = () => {
+    saveLayout(null);
+    setMoved({});
+  };
+  const [frameOn, setFrameOn] = useState(loadFrame);
+  useEffect(() => {
+    try {
+      localStorage.setItem(FRAME_KEY, frameOn ? "on" : "off");
+    } catch {}
+  }, [frameOn]);
+  // The characters walk beside the chat column when it runs down a side of
+  // the screen; behind the camera slot is fine (his camera covers it anyway).
+  const chatRect = layout.chat;
+  const floorLeft = chatOpen && chatRect.x <= 0.02 ? chatRect.x + chatRect.w : 0;
+  const floorRight = chatOpen && chatRect.x + chatRect.w >= 0.98 && floorLeft === 0 ? chatRect.x : 1;
   const [show, setShow] = useState<ShowAward[] | null>(null);
   /** Real votes, or simulated ones (as on the results preview); simulated while there are none. */
   const [votes, setVotes] = useState<"real" | "simulated" | null>(null);
@@ -225,6 +245,9 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
   const [target, setTarget] = useState(0);
   const [run, setRun] = useState(0);
   const [revealed, setRevealed] = useState(false);
+  /** The runoff's round on show (null: the board), and whether the board before it is all in. */
+  const [runoffRound, setRunoffRound] = useState<number | null>(null);
+  const [boardDone, setBoardDone] = useState(false);
   const award = show?.[awardIndex] ?? null;
   const sceneBox = useRef<HTMLDivElement>(null);
   const sceneNow = useRef(scene);
@@ -476,10 +499,10 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
     // size and the chat column opening or closing. Offsets ignore the
     // lowering animation's transform, so this is where it ends up.
     const middle = !still && sceneNow.current !== "title" ? sceneBox.current : null;
-    const keep = middle ? boxIn(middle, box.offsetParent) : null;
-    // The floor runs from the horizon to just above the controls.
+    const keep = middle ? boxOnFloor(middle, box) : null;
+    // The floor runs from the horizon to near the bottom.
     const top = height * 0.42;
-    const depthRange = Math.max(40, height - controlsH.current - 70 - top);
+    const depthRange = Math.max(40, height - 70 - top);
     for (const n of everyone) {
       const ground = top + n.depth * depthRange;
       // The music: a jump on the one of each bar, a little bob on the others.
@@ -580,7 +603,7 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
         }
         return;
       }
-      const keep = boxIn(middle, box.offsetParent);
+      const keep = boxOnFloor(middle, box);
       for (const n of npcs.current.values()) {
         const x = sideSpot(n.x + 20 < (keep.left + keep.right) / 2, keep, box.clientWidth, n.w || 44);
         n.entering = false;
@@ -645,8 +668,10 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
     setScene(next);
     if (next === "results") {
       // Coming back from the winner, the board is shown finished.
-      setTarget(backwards ? show[i]!.results.length : 0);
+      setTarget(backwards ? boardOf(show[i]!).award.results.length : 0);
       setRevealed(backwards);
+      setBoardDone(backwards);
+      setRunoffRound(null);
       setRun((r) => r + 1);
     }
     if (next === "winner") {
@@ -660,6 +685,41 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
     else if (at < 0) goTo(awardIndex - 1, "winner", true);
     else goTo(awardIndex, SCENES[at]!.id, by < 0);
   };
+  /** What the controls ask for, from the camera slot or the pop-out window. */
+  // Long awards reveal only their top 10 (`boardOf`).
+  const rows = award ? boardOf(award).award.results.length : 0;
+  const rounds = award && decidedByRunoff(award) ? award.rounds!.length : 0;
+  const runCommand = (c: ShowCommand) => {
+    if (c.t === "goto") goTo(c.index, c.scene, c.back);
+    else if (c.t === "step") step(c.by);
+    else if (c.t === "reveal") setTarget((t) => (c.all ? rows : t + 1 >= rows - 1 ? rows : t + 1));
+    else if (c.t === "allButTop3") setTarget((t) => Math.max(t, rows - 3));
+    else if (c.t === "runoff") {
+      if (!rounds || (c.round !== null && (c.round < 0 || c.round >= rounds))) return;
+      setRunoffRound(c.round);
+    }
+    else if (c.t === "play") {
+      const clip = award?.nominees[c.i]?.clip;
+      if (clip) setPlaying(clip);
+    } else if (c.t === "close") closeClip();
+  };
+  const showState: ShowState = {
+    awards: show?.map((a) => a.title) ?? [],
+    awardIndex,
+    scene,
+    target,
+    rows,
+    revealed,
+    runoff: rounds && scene === "results" ? { rounds, round: runoffRound, ready: boardDone } : null,
+    clips: (award?.nominees ?? []).flatMap((n, i) => (n.clip ? [{ i, title: n.title }] : [])),
+    playing: !!playing,
+    simulated: votes === "simulated",
+  };
+  const poppedOut = useStageChannel(showState, runCommand);
+  const popup = useRef<Window | null>(null);
+  // The Settings menu sits in the lab's header row (Site.tsx's #lab-tools).
+  const [toolsEl, setToolsEl] = useState<HTMLElement | null>(null);
+  useEffect(() => setToolsEl(document.getElementById("lab-tools")), []);
   const cheer = (el: HTMLElement) => {
     const frame = sceneBox.current?.getBoundingClientRect();
     const r = el.getBoundingClientRect();
@@ -668,48 +728,179 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
     setTimeout(() => fire("Klappa", r.left - frame.left + 180, r.top - frame.top, 8), 200);
   };
 
-  return (
-    <div className="flex" style={{ height: "calc(100dvh - var(--lab-header, 64px))" }}>
-      {/* The stage fills the window; the controls sit over its bottom edge. */}
-      <div
-        className="relative min-w-0 flex-1 overflow-hidden"
-        style={{ background: "linear-gradient(to bottom, var(--sky-top), var(--sky-bottom))" }}
-      >
-        <div
-          className="absolute inset-x-0 bottom-0 h-[52%]"
-          style={{ background: "var(--ground)", borderTop: "6px solid var(--ground-edge)", borderRadius: "50% 50% 0 0 / 28px 28px 0 0" }}
-        />
-        {/* The award's name along the top, except on its own title scene. */}
-        {award && (scene !== "title" || winner) && (
-          <div className="absolute inset-x-0 top-[5%] z-[200] text-center">
-            <Sketch className="inline-block" pad={3} radius={20} boil drawOn>
-              <div
-                key={winner ?? award.id}
-                className="lab-pop inline-block rounded-[20px] px-7 py-3 text-2xl font-black sm:text-4xl"
-                style={{ background: "var(--panel)" }}
-              >
-                {winner ? (
-                  <span className="flex items-center gap-3">
-                    <Emote name="CHEERSTINY" size={1.1} title="" /> {winner}
-                  </span>
-                ) : (
-                  award.title
-                )}
-              </div>
-            </Sketch>
+  const settingsMenu = (
+    <SettingsMenu open={settingsOpen} setOpen={setSettingsOpen}>
+      <div className="space-y-3">
+        <label className="flex items-center justify-between gap-3">
+          Votes
+          <select value={votes ?? "real"} onChange={(e) => setVotes(e.currentTarget.value as "real" | "simulated")} className="cozy-input py-1!">
+            <option value="real">Real votes</option>
+            <option value="simulated">Simulated (made up, never saved)</option>
+          </select>
+        </label>
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={chatOpen} onChange={onChat} /> Website chat
+        </label>
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={frameOn} onChange={(e) => setFrameOn(e.currentTarget.checked)} /> Camera frame and "Place camera here"
+        </label>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className={`cozy-btn py-1! ${arranging ? "primary" : ""}`}
+            onClick={() => {
+              setArranging(!arranging);
+              setSettingsOpen(false);
+            }}
+          >
+            {arranging ? "Done arranging" : "Arrange layout"}
+          </button>
+          <button type="button" className="cozy-btn py-1!" onClick={resetLayout}>
+            Reset layout
+          </button>
+          {poppedOut ? (
+            <button
+              type="button"
+              className="cozy-btn py-1!"
+              onClick={() => {
+                popup.current?.close();
+                popup.current = null;
+              }}
+            >
+              Close the pop-out controls
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="cozy-btn py-1!"
+              onClick={() => {
+                popup.current = popOutControls();
+                setSettingsOpen(false);
+              }}
+            >
+              Pop out controls
+            </button>
+          )}
+        </div>
+        <p className="text-xs font-semibold" style={{ color: "var(--muted)" }}>
+          The controls sit in the camera slot, under the streamer's camera on stream. Popped out, they're in a small window of their own,
+          and the slot shows only the frame.
+        </p>
+        <details className="rounded-xl p-3" style={{ background: "var(--cream)" }}>
+          <summary className="cursor-pointer">Advanced</summary>
+          <div className="mt-3 grid gap-3">
+            <label className="flex items-center justify-between gap-2">
+              Chat from
+              <select value={feed} onChange={(e) => setFeed(e.currentTarget.value as "sim" | "live")} className="cozy-input py-1!">
+                <option value="sim">Simulator</option>
+                <option value="live">Live destiny.gg chat</option>
+              </select>
+            </label>
+            <label className="flex items-center justify-between gap-2">
+              Who shows up
+              <select value={who} onChange={(e) => setWho(e.currentTarget.value as Cast["who"])} className="cozy-input py-1!">
+                <option value="everyone">Everyone who chats</option>
+                <option value="emotes">Only emote messages</option>
+              </select>
+            </label>
+            <label className="flex items-center justify-between gap-2">
+              When full
+              <select value={whenFull} onChange={(e) => setWhenFull(e.currentTarget.value as Cast["whenFull"])} className="cozy-input py-1!">
+                <option value="keep">Keep who's there</option>
+                <option value="swap">Swap in newcomers</option>
+              </select>
+            </label>
+            <label className="flex items-center gap-2">
+              <span className="w-36 shrink-0">Characters at most</span>
+              <input type="range" min={10} max={400} step={10} value={max} onChange={(e) => setMax(Number(e.currentTarget.value))} className="cozy-range min-w-0 flex-1" />
+              <span className="w-12 text-right tabular-nums">{max}</span>
+            </label>
+            <label className="flex items-center gap-2" title="How long someone stays after their last message">
+              <span className="w-36 shrink-0">Stays for</span>
+              <input type="range" min={1} max={30} step={1} value={stayMin} onChange={(e) => setStayMin(Number(e.currentTarget.value))} className="cozy-range min-w-0 flex-1" />
+              <span className="w-12 text-right tabular-nums">{stayMin} min</span>
+            </label>
+            <label className="flex items-center gap-2" title="New characters a second, at most">
+              <span className="w-36 shrink-0">Arrivals</span>
+              <input type="range" min={0.5} max={10} step={0.5} value={arrivalRate} onChange={(e) => setArrivalRate(Number(e.currentTarget.value))} className="cozy-range min-w-0 flex-1" />
+              <span className="w-12 text-right tabular-nums">{arrivalRate}/s</span>
+            </label>
+            {feed === "sim" && (
+              <>
+                <label className="flex items-center gap-2">
+                  <span className="w-36 shrink-0">Messages a second</span>
+                  <input type="range" min={1} max={5000} step={1} value={rate} onChange={(e) => setRate(Number(e.currentTarget.value))} className="cozy-range min-w-0 flex-1" />
+                  <span className="w-12 text-right tabular-nums">{rate}</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <span className="w-36 shrink-0">Emote-only</span>
+                  <input type="range" min={0} max={1} step={0.05} value={emoteShare} onChange={(e) => setEmoteShare(Number(e.currentTarget.value))} className="cozy-range min-w-0 flex-1" />
+                  <span className="w-12 text-right tabular-nums">{Math.round(emoteShare * 100)}%</span>
+                </label>
+              </>
+            )}
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={names} onChange={(e) => setNames(e.currentTarget.checked)} /> Names over characters
+            </label>
+            <label className="flex items-center gap-2" title="The Verified flair, Notable, Broadcaster and mods">
+              <input type="checkbox" checked={showSaid} onChange={(e) => setShowSaid(e.currentTarget.checked)} /> Verified messages
+            </label>
+            <p className="text-xs font-semibold" style={{ color: "var(--muted)" }}>
+              {stats.fps} fps · {stats.npcs} on stage · {stats.perSecond.toLocaleString()} messages/s ·{" "}
+              {feed === "live" ? (status.connected ? "live chat connected" : "live chat waiting") : "simulator"}. {status.note}{" "}
+              {stats.chatting.toLocaleString()} chatting in the last {stayMin} min.
+              {feed === "sim" && ` ${stats.emoteOnly.toLocaleString()} emote-only/s; the aggregator takes ${stats.ingestMs.toFixed(1)} ms each ¼ s.`}
+            </p>
           </div>
-        )}
+        </details>
+      </div>
+    </SettingsMenu>
+  );
+
+  return (
+    <div
+      ref={screen}
+      // Its own stacking context, so the header's Settings menu opens over it.
+      className="relative isolate overflow-hidden"
+      style={{ height: "calc(100dvh - var(--lab-header, 64px))", background: "linear-gradient(to bottom, var(--sky-top), var(--sky-bottom))" }}
+    >
+      {toolsEl && createPortal(settingsMenu, toolsEl)}
+      <div
+        className="absolute inset-x-0 bottom-0 h-[52%]"
+        style={{ background: "var(--ground)", borderTop: "6px solid var(--ground-edge)", borderRadius: "50% 50% 0 0 / 28px 28px 0 0" }}
+      />
+      {/* The award's name, above the scenes, except on its own title scene. */}
+      {award && (scene !== "title" || winner) && (
+        <div
+          className="absolute z-[200] text-center"
+          style={{ left: `${layout.show.x * 100}%`, width: `${layout.show.w * 100}%`, top: `max(8px, calc(${layout.show.y * 100}% - 92px))` }}
+        >
+          <Sketch className="inline-block" pad={3} radius={20} boil drawOn>
+            <div
+              key={winner ?? award.id}
+              className="lab-pop inline-block rounded-[20px] px-7 py-3 text-2xl font-black sm:text-4xl"
+              style={{ background: "var(--panel)" }}
+            >
+              {winner ? (
+                <span className="flex items-center gap-3">
+                  <Emote name="CHEERSTINY" size={1.1} title="" /> {winner}
+                </span>
+              ) : (
+                award.title
+              )}
+            </div>
+          </Sketch>
+        </div>
+      )}
+      {/* The scene, lowered in; out of sight while a clip plays over it. */}
+      <Movable box="show" rect={layout.show} arranging={arranging} frame={screen} onChange={moveBox("show")} className="pointer-events-none z-[150]">
         {show && show.length === 0 && (
-          <div className="absolute inset-x-0 top-[20%] z-[150] text-center">
+          <div className="flex justify-center">
             <span className="cozy-panel inline-block px-6 py-4 font-bold">No awards to present.</span>
           </div>
         )}
-        {/* The scene, lowered in; out of sight while a clip plays over it. */}
         {award && (
-          <div
-            className="pointer-events-none absolute inset-x-4 z-[150] flex justify-center"
-            style={{ top: scene === "title" ? "12%" : "calc(5% + 100px)", bottom: controlsHeight + 32 }}
-          >
+          <div className="flex h-full justify-center">
             <div
               key={`${scene}-${award.id}`}
               ref={sceneBox}
@@ -725,244 +916,147 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
                     <span className="cozy-chip coral">Results</span>
                     <span className="cozy-chip green hand text-base!">{award.total.toLocaleString()} {award.unit === "points" ? "ballots" : "votes"}</span>
                   </div>
-                  <ResultsBoard key={`${award.id}-${run}`} award={award} target={target} onWinner={cheer} onFinished={() => setRevealed(true)} />
+                  <ResultsBoard
+                    key={`${award.id}-${run}`}
+                    award={award}
+                    target={target}
+                    round={runoffRound}
+                    onWinner={cheer}
+                    onBoardDone={() => setBoardDone(true)}
+                    onFinished={() => setRevealed(true)}
+                  />
                 </div>
               )}
               {scene === "winner" && <WinnerCard award={award} onPlay={setPlaying} onCheer={() => winnerMoment(winnerOf(award))} />}
             </div>
           </div>
         )}
-        {shownClip && (
-          // Lowered from the top to just above the controls, and raised away.
-          <div
-            className="pointer-events-none absolute inset-x-4 z-[155] flex justify-center"
-            style={{ top: "calc(5% + 100px)", bottom: controlsHeight + 32 }}
-          >
-            <div
-              key={shownClip.clipUrl ?? shownClip.embedUrl}
-              ref={clipBox}
-              className={`pointer-events-auto aspect-[16/10] h-full max-w-full ${playing ? "lab-lower" : "lab-raise"}`}
-            >
-              <ClipPlayer clip={shownClip} fill onEnded={() => setTimeout(closeClip, 1500)} />
+      </Movable>
+      {/* A clip, lowered in to fit its box, and raised away. */}
+      {(shownClip || arranging) && (
+        <Movable box="clip" rect={layout.clip} arranging={arranging} frame={screen} onChange={moveBox("clip")} className="pointer-events-none z-[155]">
+          {shownClip && (
+            <div className="flex h-full justify-center">
+              <div
+                key={shownClip.clipUrl ?? shownClip.embedUrl}
+                ref={clipBox}
+                className={`pointer-events-auto aspect-[16/10] h-full max-w-full ${playing ? "lab-lower" : "lab-raise"}`}
+              >
+                <ClipPlayer clip={shownClip} fill onEnded={() => setTimeout(closeClip, 1500)} />
+              </div>
+            </div>
+          )}
+        </Movable>
+      )}
+      <div
+        ref={floor}
+        className="pointer-events-none absolute inset-y-0 z-[160]"
+        style={{ left: `${floorLeft * 100}%`, width: `${(floorRight - floorLeft) * 100}%` }}
+      />
+
+      {/* The camera slot: his camera goes over it on stream. The controls sit in it, so he sees them and viewers don't. */}
+      <Movable box="camera" rect={layout.camera} arranging={arranging} frame={screen} onChange={moveBox("camera")} className="z-[250]">
+        {(frameOn || !poppedOut) && (
+          <div className="absolute inset-0 p-2" style={{ background: "color-mix(in oklab, var(--panel) 92%, transparent)" }}>
+            {frameOn && (
+              <div className="absolute inset-2.5">
+                <Sketch className="h-full w-full" pad={0} radius={16} color="var(--muted)" drawOn>
+                  <div className="h-full w-full" />
+                </Sketch>
+              </div>
+            )}
+            <div className={`relative z-[2] flex h-full flex-col gap-2 overflow-y-auto p-3 ${poppedOut ? "items-center justify-center" : ""}`}>
+              {frameOn && (
+                <p className={`text-center font-bold ${poppedOut ? "text-lg" : "text-xs"}`} style={{ color: "var(--muted)" }}>
+                  Place camera here
+                </p>
+              )}
+              {!poppedOut && <ShowControls state={showState} send={runCommand} />}
             </div>
           </div>
         )}
-        <div ref={floor} className="pointer-events-none absolute inset-0 z-[160]" />
-        <div className="cozy-chip absolute top-3 left-3 z-[200] font-mono text-[11px]!">
-          {stats.fps} fps · {stats.npcs} on stage
-        </div>
+      </Movable>
 
-        {/* The presenter's controls, over the bottom of the stage. */}
-        <div ref={controls} className="absolute inset-x-4 bottom-4 z-[300] mx-auto max-w-4xl">
-          <div className="cozy-panel space-y-3 p-4">
-            {settingsOpen && (
-              <div className="grid gap-3 rounded-2xl p-4 text-sm font-bold sm:grid-cols-2" style={{ background: "var(--cream)" }}>
-                <label className="flex items-center gap-2">
-                  Chat from
-                  <select value={feed} onChange={(e) => setFeed(e.currentTarget.value as "sim" | "live")} className="cozy-input py-1!">
-                    <option value="sim">Simulator</option>
-                    <option value="live">Live destiny.gg chat</option>
-                  </select>
-                </label>
-                <label className="flex items-center gap-2">
-                  Votes
-                  <select value={votes ?? "real"} onChange={(e) => setVotes(e.currentTarget.value as "real" | "simulated")} className="cozy-input py-1!">
-                    <option value="real">Real votes</option>
-                    <option value="simulated">Simulated (made up, never saved)</option>
-                  </select>
-                </label>
-                <label className="flex items-center gap-2">
-                  Who shows up
-                  <select value={who} onChange={(e) => setWho(e.currentTarget.value as Cast["who"])} className="cozy-input py-1!">
-                    <option value="everyone">Everyone who chats</option>
-                    <option value="emotes">Only emote messages</option>
-                  </select>
-                </label>
-                <label className="flex items-center gap-2" title="How long someone stays after their last message">
-                  Stays for
-                  <input type="range" min={1} max={30} step={1} value={stayMin} onChange={(e) => setStayMin(Number(e.currentTarget.value))} className="cozy-range" />
-                  <span className="w-12 tabular-nums">{stayMin} min</span>
-                </label>
-                <label className="flex items-center gap-2" title="New characters a second, at most">
-                  Arrivals
-                  <input type="range" min={0.5} max={10} step={0.5} value={arrivalRate} onChange={(e) => setArrivalRate(Number(e.currentTarget.value))} className="cozy-range" />
-                  <span className="w-12 tabular-nums">{arrivalRate}/s</span>
-                </label>
-                <label className="flex items-center gap-2">
-                  When full
-                  <select value={whenFull} onChange={(e) => setWhenFull(e.currentTarget.value as Cast["whenFull"])} className="cozy-input py-1!">
-                    <option value="keep">Keep who's there</option>
-                    <option value="swap">Swap in newcomers</option>
-                  </select>
-                </label>
-                <label className="flex items-center gap-2">
-                  Characters at most
-                  <input type="range" min={10} max={400} step={10} value={max} onChange={(e) => setMax(Number(e.currentTarget.value))} className="cozy-range" />
-                  <span className="w-9 tabular-nums">{max}</span>
-                </label>
-                {feed === "sim" && (
-                  <>
-                    <label className="flex items-center gap-2">
-                      Messages a second
-                      <input type="range" min={1} max={5000} step={1} value={rate} onChange={(e) => setRate(Number(e.currentTarget.value))} className="cozy-range" />
-                      <span className="w-12 tabular-nums">{rate}</span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      Emote-only
-                      <input type="range" min={0} max={1} step={0.05} value={emoteShare} onChange={(e) => setEmoteShare(Number(e.currentTarget.value))} className="cozy-range" />
-                      <span className="w-10 tabular-nums">{Math.round(emoteShare * 100)}%</span>
-                    </label>
-                  </>
-                )}
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" checked={names} onChange={(e) => setNames(e.currentTarget.checked)} /> Names over characters
-                </label>
-                <label className="flex items-center gap-2" title="The Verified flair, Notable, Broadcaster and mods">
-                  <input type="checkbox" checked={showSaid} onChange={(e) => setShowSaid(e.currentTarget.checked)} /> Verified messages
-                </label>
-                <p className="sm:col-span-2" style={{ color: "var(--muted)" }}>
-                  {status.note} {stats.chatting.toLocaleString()} chatting in the last {stayMin} min.
-                  {feed === "sim" &&
-                    ` ${stats.emoteOnly.toLocaleString()} emote-only/s; the aggregator takes ${stats.ingestMs.toFixed(1)} ms each ¼ s.`}
-                </p>
-              </div>
-            )}
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="cozy-chip coral">Presenting</span>
-              <select
-                value={awardIndex}
-                onChange={(e) => goTo(Number(e.currentTarget.value), "title")}
-                className="cozy-input mr-auto max-w-80 py-1! font-extrabold"
-                aria-label="Award"
-              >
-                {show?.map((a, i) => (
-                  <option key={a.id} value={i}>
-                    {i + 1}. {a.title}
-                  </option>
-                ))}
-              </select>
-              <span className="cozy-chip">{stats.perSecond.toLocaleString()} msg/s</span>
-              {votes === "simulated" && <span className="cozy-chip">Simulated votes</span>}
-              <span className="cozy-chip green">{feed === "live" ? "Live chat" : "Simulator"}</span>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <nav
-                aria-label="Scenes"
-                className="flex gap-1 rounded-full p-1"
-                style={{ background: "var(--cream)", border: "2px solid var(--panel-border)" }}
-              >
-                {SCENES.map((x, i) => (
-                  <button
-                    key={x.id}
-                    type="button"
-                    onClick={() => scene !== x.id && goTo(awardIndex, x.id, i < sceneAt)}
-                    aria-current={scene === x.id ? "step" : undefined}
-                    className="cozy-row rounded-full px-3 py-1 text-sm font-extrabold"
-                    style={scene === x.id ? { background: "var(--header)", color: "white" } : { color: "var(--muted)" }}
-                  >
-                    {i + 1}. {x.label}
-                  </button>
-                ))}
-              </nav>
-              {scene === "results" && award && (
-                <>
-                  <button
-                    type="button"
-                    className="cozy-btn"
-                    // The last two are revealed together, so one click asks for both.
-                    onClick={() => setTarget((t) => (t + 1 >= award.results.length - 1 ? award.results.length : t + 1))}
-                    disabled={target >= award.results.length}
-                  >
-                    Reveal next
-                  </button>
-                  {award.results.length > 3 && (
-                    <button
-                      type="button"
-                      className="cozy-btn"
-                      // Everyone but the top three, from last place up; the three stay hidden for the moment.
-                      onClick={() => setTarget((t) => Math.max(t, award.results.length - 3))}
-                      disabled={target >= award.results.length - 3}
-                    >
-                      All but the top 3
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="cozy-btn"
-                    onClick={() => setTarget(award.results.length)}
-                    disabled={target >= award.results.length}
-                  >
-                    Reveal all
-                  </button>
-                </>
-              )}
-              {playing && (
-                <button type="button" className="cozy-btn" onClick={closeClip}>
-                  Close the clip
-                </button>
-              )}
-              <div className="ml-auto flex items-center gap-2">
-                <button type="button" className="cozy-btn" onClick={() => step(-1)} disabled={!show?.length}>
-                  ← Back
-                </button>
-                <button
-                  type="button"
-                  className={`cozy-btn ${scene !== "results" || revealed ? "primary" : ""}`}
-                  onClick={() => step(1)}
-                  disabled={!show?.length}
-                >
-                  {NEXT_LABEL[scene]} →
-                </button>
-                <button
-                  type="button"
-                  className={`cozy-btn round h-10 w-10 ${settingsOpen ? "primary" : ""}`}
-                  onClick={() => setSettingsOpen(!settingsOpen)}
-                  aria-expanded={settingsOpen}
-                  aria-label="Stage settings"
-                  title="Stage settings"
-                >
-                  <GearIcon />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* The chat column, toggled from the top bar. */}
+      {/* The chat column, toggled from the top bar or Settings. */}
       {chatOpen && (
-        <aside
-          className="flex w-[340px] shrink-0 flex-col overflow-hidden border-l-2"
-          style={{ background: "var(--panel)", borderColor: "var(--panel-border)" }}
+        <Movable box="chat" rect={layout.chat} arranging={arranging} frame={screen} onChange={moveBox("chat")} className="z-[250]">
+          <aside className="flex h-full w-full flex-col overflow-hidden border-r-2" style={{ background: "var(--panel)", borderColor: "var(--panel-border)" }}>
+            <div className="flex items-center justify-between border-b-2 px-4 py-3" style={{ borderColor: "var(--panel-border)" }}>
+              <span className="font-black">Chat</span>
+              <span className={`cozy-chip ${status.connected ? "green" : ""}`}>{status.connected ? "connected" : "waiting"}</span>
+            </div>
+            <div ref={chat} className="flex-1 space-y-1 overflow-y-auto px-3 py-2 text-sm">
+              {lines.map((l) =>
+                l.kind === "combo" ? (
+                  // As chat shows a combo: the emote, the count, and HITS or, from 5, C-C-C-COMBO.
+                  <div key={l.id} className="flex items-center gap-2 px-1.5 py-1">
+                    <Emote name={l.emote} size={0.95} />
+                    <span className="text-sm font-black">{l.count}×</span>
+                    <span key={l.count} className="lab-combo text-lg font-black italic">
+                      {l.count >= 5 ? "C-C-C-COMBO" : "HITS"}
+                    </span>
+                  </div>
+                ) : (
+                  <div
+                    key={l.id}
+                    className="rounded-lg px-1.5 py-0.5"
+                    style={l.kind === "said" ? { background: "var(--highlight)", borderLeft: "3px solid var(--primary-shadow)" } : undefined}
+                  >
+                    <span className={nickClass(l.flair)}>{l.nick}</span>:{" "}
+                    {l.kind === "emote" ? <Emote name={l.emote} size={0.85} /> : <span className="font-semibold">{l.text}</span>}
+                  </div>
+                ),
+              )}
+            </div>
+          </aside>
+        </Movable>
+      )}
+
+      {arranging && (
+        <div className="absolute top-3 left-1/2 z-[600] -translate-x-1/2">
+          <div className="cozy-panel flex flex-wrap items-center gap-3 px-4 py-2 text-sm font-bold">
+            <span>Drag a box to move it, or its corner to resize it. Kept in this browser.</span>
+            <button type="button" className="cozy-btn py-1!" onClick={resetLayout}>
+              Reset layout
+            </button>
+            <button type="button" className="cozy-btn primary py-1!" onClick={() => setArranging(false)}>
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The big screen's Settings: a button in the lab's header row, opening a panel under it. */
+function SettingsMenu({ open, setOpen, children }: { open: boolean; setOpen: (v: boolean) => void; children: React.ReactNode }) {
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    addEventListener("pointerdown", away);
+    addEventListener("keydown", esc);
+    return () => {
+      removeEventListener("pointerdown", away);
+      removeEventListener("keydown", esc);
+    };
+  }, [open, setOpen]);
+  return (
+    <div ref={box} className="relative">
+      <button type="button" className="cozy-tab text-sm" aria-expanded={open} aria-selected={open} onClick={() => setOpen(!open)}>
+        Settings
+      </button>
+      {open && (
+        <div
+          className="cozy-panel absolute top-full right-0 z-[700] mt-2 max-h-[calc(100dvh-var(--lab-header,64px))] w-[min(440px,92vw)] overflow-y-auto p-4 text-sm font-bold"
+          style={{ color: "var(--text)" }}
         >
-          <div className="flex items-center justify-between border-b-2 px-4 py-3" style={{ borderColor: "var(--panel-border)" }}>
-            <span className="font-black">Chat</span>
-            <span className={`cozy-chip ${status.connected ? "green" : ""}`}>{status.connected ? "connected" : "waiting"}</span>
-          </div>
-          <div ref={chat} className="flex-1 space-y-1 overflow-y-auto px-3 py-2 text-sm">
-            {lines.map((l) =>
-              l.kind === "combo" ? (
-                // As chat shows a combo: the emote, the count, and HITS or, from 5, C-C-C-COMBO.
-                <div key={l.id} className="flex items-center gap-2 px-1.5 py-1">
-                  <Emote name={l.emote} size={0.95} />
-                  <span className="text-sm font-black">{l.count}×</span>
-                  <span key={l.count} className="lab-combo text-lg font-black italic">
-                    {l.count >= 5 ? "C-C-C-COMBO" : "HITS"}
-                  </span>
-                </div>
-              ) : (
-                <div
-                  key={l.id}
-                  className="rounded-lg px-1.5 py-0.5"
-                  style={l.kind === "said" ? { background: "var(--highlight)", borderLeft: "3px solid var(--primary-shadow)" } : undefined}
-                >
-                  <span className={nickClass(l.flair)}>{l.nick}</span>:{" "}
-                  {l.kind === "emote" ? <Emote name={l.emote} size={0.85} /> : <span className="font-semibold">{l.text}</span>}
-                </div>
-              ),
-            )}
-          </div>
-        </aside>
+          {children}
+        </div>
       )}
     </div>
   );

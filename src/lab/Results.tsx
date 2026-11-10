@@ -30,6 +30,24 @@ export const amountLabel = (award: Pick<Award, "unit" | "total">, v: number, per
 /** What a percentage is of, said next to it. */
 export const shareOf = (award: Pick<Award, "ranked">) => (award.ranked ? "of first choices" : "of the votes");
 
+/** Rows on the board at most; an award with more shows its top ones and a note for the rest. */
+export const BOARD_MAX = 10;
+/** The longest board that's shown whole. */
+const BOARD_WHOLE = 12;
+
+/**
+ * The award as the board reveals it: a points award, or any with more than
+ * a dozen nominees, is cut to its top 10 (`rest` say how many more there
+ * are). Everything else is whole.
+ */
+export function boardOf(award: Award): { award: Award; rest: number } {
+  const n = award.results.length;
+  if (award.unit !== "points" && n <= BOARD_WHOLE) return { award, rest: 0 };
+  if (n <= BOARD_MAX) return { award, rest: 0 };
+  const top = [...award.results].sort((a, b) => b.count - a.count).slice(0, BOARD_MAX);
+  return { award: { ...award, results: top }, rest: n - BOARD_MAX };
+}
+
 /** A ranked award decided over more than one round: the board leaves the winner to the runoff. */
 export const decidedByRunoff = (award: Award) => Boolean(award.ranked && award.rounds && award.rounds.length > 1);
 

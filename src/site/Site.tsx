@@ -257,7 +257,7 @@ export function Site() {
       );
     }
     if (p === "lab") {
-      return me === undefined ? null : <LabPage admin={admin} view={labView} chatOpen={chatOpen} />;
+      return me === undefined ? null : <LabPage admin={admin} view={labView} chatOpen={chatOpen} onChat={toggleChat} onView={showLab} />;
     }
     return (
       <>
@@ -486,6 +486,8 @@ export function Site() {
                 {v.label}
               </button>
             ))}
+            {/* An experiment's own tools go here (the big screen's Settings). */}
+            <span id="lab-tools" className="ml-auto flex items-center gap-2" />
           </nav>
         )}
       </header>
