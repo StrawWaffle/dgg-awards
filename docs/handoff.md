@@ -552,6 +552,15 @@ StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, an
   - typecheck and 92 unit tests; 49 API tests, with the preview addresses added
   - in the browser: both preview menus (hover, jump, close, current page marked, the admin one on a phone), every stage and page, a preview vote not saved, the old addresses rewritten, `/lab#sound` kept, non-admin and signed-out refusals, the big screen switched to simulated votes with the reveal running, and the music's first play starting at 6.02 s
 
+### The wildcard cards, second pass: space, colour, emotes, big keys (2026-11-10, built, not deployed)
+
+StrawWaffle, from a screenshot of the dark theme: use the space better; keys twice as big, bigger buttons, and the button should show pressed while its key is held; the card was too plain, it needs colour; and emote flair like the rest of the site.
+
+- **The swipe card is two panels** (`HeroCard`, up to `max-w-6xl`): a hero tinted by their team (PEPE green, YEE amber, else the primary) with their emote big and gently bobbing (`rank-bob`; shrunk to fit if wide, `FitFace`), their name (smaller type for 11+ and 14+ letters, so it stays on one line), "Emote: X" and the profile link with their photo; then coloured tiles: **Subscription** in destiny.gg's own tier flair colours (the site's `--nick-flair*`: tier 1 flair13, 2 flair1, 3 flair3, 4 flair8, 5 flair42), **Team** with the team's emote, **Member since** as "8 years" big in the hand font with the date under it, **Bio**, and **Signature** filling the rest. All 67 come out one height (460 px at 1440 wide), no overflow (checked on a contact sheet again).
+- **Flair:** PepoThink by "Top 10 material?" (Hmm on the second pass) and the match heading; Klappa, NoThanks and Hmm on the Yes!/Nope/Maybe stamps; SHRUGSTINY on "No bio", Hmm on "No signature" and a missing profile. The comparison cards got the same colours (tier, team with its emote, an emote box tinted by team).
+- **Keys and buttons:** keys 56 px (`h-14`; Back's 36), answer buttons larger (`rank-btn`), and `is-pressed` while the key is held (`useHeldKey`).
+- **A bug this caught:** with the held key re-rendering mid-press, keydown listeners re-added on every render missed the press (a listener swapped out during an event isn't called), so arrow keys stopped answering. Every keydown handler is now registered once and reads the latest render through a ref (`useKeydown`), and each card or match takes one answer even from two quick presses (`answered`).
+
 ### The wildcard cards, polished, with motion and sound (2026-11-10, deployed)
 
 StrawWaffle liked swipe then compare, and asked for polish: the swipe card has one person, so more room; cleaner, labelled cards; checked against every chatter; cute animation and sound effects.

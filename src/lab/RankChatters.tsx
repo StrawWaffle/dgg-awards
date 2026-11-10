@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useBursts } from "@/lab/Bursts";
 import { Emote } from "@/lab/Emote";
 import { sfx } from "@/lab/sfx";
@@ -149,15 +149,12 @@ export function RankChatters() {
     setSaved(nextSaved);
     save(key, nextSaved);
   };
+  const held = useHeldKey();
   // Backspace steps back, like the button.
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => {
-      if (e.key !== "Backspace" || e.repeat || e.target instanceof HTMLInputElement) return;
-      e.preventDefault();
-      back();
-    };
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
+  useKeydown((e) => {
+    if (e.key !== "Backspace" || e.repeat || e.target instanceof HTMLInputElement) return;
+    e.preventDefault();
+    back();
   });
   const restart = () => {
     if (!chatters || chatters === "missing") return;
@@ -204,8 +201,8 @@ export function RankChatters() {
                 : `${state.finalists!.length} finalists · comparison ${compared + 1} · about ${Math.max(1, left!.about)} to go, at most ${Math.max(1, left!.most)} · every Equal means fewer`}
         </span>
         <span className="ml-auto flex gap-2">
-          <button type="button" className="cozy-btn gap-2" onClick={back} disabled={!saved?.steps.length}>
-            <Key name="backspace" label="Backspace" />
+          <button type="button" className={`cozy-btn gap-2${pressed(held, "Backspace")}`} onClick={back} disabled={!saved?.steps.length}>
+            <Key name="backspace" label="Backspace" small />
             Back
           </button>
           <button type="button" className="cozy-btn" onClick={restart}>
@@ -244,9 +241,51 @@ function Shell({ children }: { children: React.ReactNode }) {
  * Mr. Breakfast's Free Prompts (CC0), in src/media/key-*.svg. Hidden on
  * touch screens, which have no keys.
  */
-function Key({ name, label }: { name: "left" | "right" | "down" | "equals" | "backspace"; label: string }) {
-  return <img src={`/Media/key-${name}.svg`} alt={label} title={`Key: ${label}`} className="rank-key h-7 w-auto shrink-0" draggable={false} />;
+function Key({ name, label, small = false }: { name: "left" | "right" | "down" | "equals" | "backspace"; label: string; small?: boolean }) {
+  return (
+    <img
+      src={`/Media/key-${name}.svg`}
+      alt={label}
+      title={`Key: ${label}`}
+      className={`rank-key w-auto shrink-0 ${small ? "h-9" : "h-14"}`}
+      draggable={false}
+    />
+  );
 }
+
+/**
+ * A keydown handler, registered once and reading the latest render through a
+ * ref. (Re-registering on every render dropped presses: holding a key
+ * re-renders mid-press, and a listener swapped out during an event misses it.)
+ */
+function useKeydown(handler: (e: KeyboardEvent) => void) {
+  const latest = useRef(handler);
+  latest.current = handler;
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => latest.current(e);
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, []);
+}
+
+/** The key held down right now, so its button can show it pressed. */
+function useHeldKey() {
+  const [held, setHeld] = useState<string | null>(null);
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => setHeld(e.key);
+    const up = () => setHeld(null);
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    window.addEventListener("blur", up);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", up);
+    };
+  }, []);
+  return held;
+}
+const pressed = (held: string | null, ...keys: string[]) => (held && keys.includes(held) ? " is-pressed" : "");
 
 function Face({ chatter, size }: { chatter: Chatter; size: number }) {
   if (chatter.image) return <img src={chatter.image} alt="" className="h-full w-full object-cover" />;
@@ -281,29 +320,29 @@ function Swipe({
   const from = useRef<number | null>(null);
   const box = useRef<HTMLElement>(null);
   const [layer, fire] = useBursts();
+  const held = useHeldKey();
   const chatter = byId.get(id)!;
   // Load the next card's profile while this one is up.
   useEffect(() => {
     if (next) profileOf(byId.get(next)!.name);
   }, [next, byId]);
+  // One answer per card, even from two presses before the next render.
+  const answered = useRef(false);
   const decide = (v: Verdict) => {
-    if (gone) return;
+    if (gone || answered.current) return;
+    answered.current = true;
     setGone(v);
     sfx[v]();
     if (v === "yes" && chatter.emote && box.current) fire(chatter.emote, box.current.clientWidth / 2 - 20, 160, 7);
     setTimeout(() => onSwipe(v), reducedMotion() ? 0 : 230);
   };
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => {
-      if (e.repeat || e.target instanceof HTMLInputElement) return;
-      if (e.key === "ArrowLeft") decide("no");
-      else if (e.key === "ArrowRight") decide("yes");
-      else if (!again && (e.key === "ArrowDown" || e.key === "m")) decide("maybe");
-      else return;
-      e.preventDefault();
-    };
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
+  useKeydown((e) => {
+    if (e.repeat || e.target instanceof HTMLInputElement) return;
+    if (e.key === "ArrowLeft") decide("no");
+    else if (e.key === "ArrowRight") decide("yes");
+    else if (!again && (e.key === "ArrowDown" || e.key === "m")) decide("maybe");
+    else return;
+    e.preventDefault();
   });
   const lean = gone ?? (dx > 40 ? "yes" : dx < -40 ? "no" : null);
   const shown = (v: Verdict) => (gone === v ? 1 : v === "yes" ? Math.min(1, Math.max(0, (dx - 20) / 90)) : v === "no" ? Math.min(1, Math.max(0, (-dx - 20) / 90)) : 0);
@@ -316,12 +355,15 @@ function Swipe({
           ? "translateY(70px) scale(0.92)"
           : `translateX(${dx}px) rotate(${dx / 30}deg)`;
   return (
-    <section ref={box} className="relative mx-auto max-w-3xl space-y-4">
+    <section ref={box} className="relative mx-auto max-w-6xl space-y-5">
       {layer}
-      <p className="text-center text-lg font-black">{again ? "Too many yeses: still a yes?" : "Top 10 material?"}</p>
+      <p className="flex items-center justify-center gap-3 text-2xl font-black">
+        <Emote name={again ? "Hmm" : "PepoThink"} size={1.2} title="" />
+        {again ? "Too many yeses: still a yes?" : "Top 10 material?"}
+      </p>
       <div className="rank-card-in">
         <div
-          className="cozy-panel relative touch-pan-y select-none p-6 sm:min-h-[32rem] sm:p-8"
+          className="cozy-panel relative touch-pan-y select-none p-4 sm:p-5"
           style={{
             transform,
             opacity: gone ? 0 : 1,
@@ -349,31 +391,31 @@ function Swipe({
           }}
         >
           <span className="rank-stamp" style={{ left: "1.25rem", color: "var(--primary-shadow)", opacity: shown("yes"), transform: "rotate(-12deg)" }}>
-            Yes!
+            Yes! <Emote name="Klappa" size={1} title="" />
           </span>
           <span className="rank-stamp" style={{ right: "1.25rem", color: "var(--coral)", opacity: shown("no"), transform: "rotate(12deg)" }}>
-            Nope
+            Nope <Emote name="NoThanks" size={1} title="" />
           </span>
           {gone === "maybe" && (
             <span className="rank-stamp" style={{ left: "50%", translate: "-50% 0", color: "var(--muted)" }}>
-              Maybe
+              Maybe <Emote name="Hmm" size={1} title="" />
             </span>
           )}
-          <ProfileCard chatter={chatter} large />
+          <HeroCard chatter={chatter} />
         </div>
       </div>
       <div className="flex flex-wrap items-center justify-center gap-3">
-        <button type="button" className="cozy-btn gap-2" onClick={() => decide("no")}>
+        <button type="button" className={`cozy-btn rank-btn${pressed(held, "ArrowLeft")}`} onClick={() => decide("no")}>
           <Key name="left" label="Left arrow" />
           No
         </button>
         {!again && (
-          <button type="button" className="cozy-btn gap-2" onClick={() => decide("maybe")}>
+          <button type="button" className={`cozy-btn rank-btn${pressed(held, "ArrowDown", "m")}`} onClick={() => decide("maybe")}>
             <Key name="down" label="Down arrow" />
             Maybe
           </button>
         )}
-        <button type="button" className="cozy-btn primary gap-2" onClick={() => decide("yes")}>
+        <button type="button" className={`cozy-btn primary rank-btn${pressed(held, "ArrowRight")}`} onClick={() => decide("yes")}>
           Yes
           <Key name="right" label="Right arrow" />
         </button>
@@ -401,25 +443,24 @@ function Compare({
 }) {
   // The pick shows for a moment (the winner pops, the other fades) before the next match.
   const [picked, setPicked] = useState<Choice | null>(null);
+  const held = useHeldKey();
+  const answered = useRef(false);
   const choose = (c: Choice) => {
-    if (picked) return;
+    if (picked || answered.current) return;
+    answered.current = true;
     setPicked(c);
     if (c === "tie") sfx.tie();
     else sfx.pick();
     setTimeout(() => onChoose(c), reducedMotion() ? 0 : 200);
   };
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => {
-      // One choice per press: holding a key down doesn't keep answering.
-      if (e.repeat || e.target instanceof HTMLInputElement) return;
-      if (e.key === "ArrowLeft") choose("left");
-      else if (e.key === "ArrowRight") choose("right");
-      else if (e.key === "ArrowDown" || e.key === "=") choose("tie");
-      else return;
-      e.preventDefault();
-    };
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
+  useKeydown((e) => {
+    // One choice per press: holding a key down doesn't keep answering.
+    if (e.repeat || e.target instanceof HTMLInputElement) return;
+    if (e.key === "ArrowLeft") choose("left");
+    else if (e.key === "ArrowRight") choose("right");
+    else if (e.key === "ArrowDown" || e.key === "=") choose("tie");
+    else return;
+    e.preventDefault();
   });
   const placeOf = (id: string) => state.placed.findIndex((g) => g.includes(id)) + 1;
   /** "Unbeaten", or who they lost to, by place. */
@@ -464,7 +505,10 @@ function Compare({
       : `Finding ${ordinal(match.placing)} place: who's better?`;
   return (
     <section className="rank-card-in space-y-4">
-      <p className="text-center text-lg font-black">{heading}</p>
+      <p className="flex items-center justify-center gap-3 text-2xl font-black">
+        <Emote name="PepoThink" size={1.2} title="" />
+        {heading}
+      </p>
       <div
         className="rank-pair mx-auto grid items-start gap-4"
         // As wide as the chatters showing need: two alone stay readable, groups spread out.
@@ -474,16 +518,16 @@ function Compare({
         {side(match.right, "right")}
       </div>
       <div className="flex flex-wrap items-center justify-center gap-3">
-        <button type="button" className="cozy-btn gap-2" onClick={() => choose("left")}>
+        <button type="button" className={`cozy-btn rank-btn${pressed(held, "ArrowLeft")}`} onClick={() => choose("left")}>
           <Key name="left" label="Left arrow" />
           Left is better
         </button>
-        <button type="button" className="cozy-btn primary gap-2" onClick={() => choose("tie")}>
+        <button type="button" className={`cozy-btn primary rank-btn${pressed(held, "ArrowDown", "=")}`} onClick={() => choose("tie")}>
           <Key name="down" label="Down arrow" />
           Equal
           <Key name="equals" label="Equals" />
         </button>
-        <button type="button" className="cozy-btn gap-2" onClick={() => choose("right")}>
+        <button type="button" className={`cozy-btn rank-btn${pressed(held, "ArrowRight")}`} onClick={() => choose("right")}>
           Right is better
           <Key name="right" label="Right arrow" />
         </button>
@@ -603,46 +647,239 @@ function Standings({ state, byId }: { state: RankState; byId: Map<string, Chatte
   );
 }
 
-/** "November 10, 2020" → "November 10, 2020 · 6 years". */
-function since(memberSince: string) {
+/** "November 10, 2020" → whole years since, or null. */
+function yearsSince(memberSince: string) {
   const t = Date.parse(memberSince);
-  if (Number.isNaN(t)) return memberSince;
-  const years = Math.floor((Date.now() - t) / (365.25 * 24 * 3600 * 1000));
-  return `${memberSince} · ${years < 1 ? "under a year" : `${years} year${years === 1 ? "" : "s"}`}`;
+  if (Number.isNaN(t)) return null;
+  return Math.floor((Date.now() - t) / (365.25 * 24 * 3600 * 1000));
+}
+const yearsText = (y: number) => (y < 1 ? "Under a year" : `${y} year${y === 1 ? "" : "s"}`);
+
+/** destiny.gg's subscriber flair colours, by tier (the site has them for chat names). */
+const TIER_COLOR: Record<number, string> = {
+  1: "var(--nick-flair13)",
+  2: "var(--nick-flair1)",
+  3: "var(--nick-flair3)",
+  4: "var(--nick-flair8)",
+  5: "var(--nick-flair42)",
+};
+const tierOf = (tier: string | null) => {
+  const n = Number(tier?.match(/\d+/)?.[0]);
+  return n ? { n, color: TIER_COLOR[n] ?? "var(--nick-subscriber)" } : null;
+};
+/** The two teams, each with its emote and colour. */
+const teamOf = (team: string | null) => {
+  const name = team?.replace(/^Team\s+/i, "").trim();
+  if (!name) return null;
+  if (/^pepe$/i.test(name)) return { name: "PEPE", emote: "PEPE", color: "var(--green)" };
+  if (/^yee$/i.test(name)) return { name: "YEE", emote: "YEE", color: "var(--nick-moderator)" };
+  return { name, emote: null, color: "var(--header)" };
+};
+/** destiny.gg's own placeholder bio counts as none. */
+const bioOf = (bio: string | null | undefined) => (bio && !/^it'?s a secret/i.test(bio.trim()) ? bio : null);
+const tint = (color: string, amount: number) => `color-mix(in oklab, var(--panel), ${color} ${amount}%)`;
+
+/**
+ * The hero's emote, as big as `size` but shrunk to fit the panel's width:
+ * wide emotes (TornadoVernanda's, Bruhm's) would spill out at full size.
+ */
+function FitFace({ chatter, size }: { chatter: Chatter; size: number }) {
+  const box = useRef<HTMLDivElement>(null);
+  const [fit, setFit] = useState(size);
+  useLayoutEffect(() => {
+    setFit(size);
+    const measure = () => {
+      const outer = box.current;
+      const inner = outer?.querySelector(".emote, img") as HTMLElement | null;
+      if (!outer || !inner) return;
+      const room = outer.clientWidth;
+      const wide = inner.getBoundingClientRect().width;
+      if (wide > room && wide > 0) setFit((f) => (f * room) / wide);
+    };
+    measure();
+    // The emote stylesheet may still be on its way.
+    const t = setTimeout(measure, 300);
+    return () => clearTimeout(t);
+  }, [chatter.id, size]);
+  return (
+    <div ref={box} className="rank-bob flex h-36 w-full items-center justify-center overflow-hidden">
+      <Face chatter={chatter} size={fit} />
+    </div>
+  );
+}
+
+/** A coloured tile with a label. */
+function Tile({ label, color, className = "", children }: { label: string; color?: string; className?: string; children: React.ReactNode }) {
+  const c = color ?? "var(--panel-border)";
+  return (
+    <div className={`rounded-[16px] border-2 px-4 py-3 ${className}`} style={{ background: color ? tint(c, 12) : "var(--cream)", borderColor: color ? tint(c, 45) : "var(--panel-border)" }}>
+      <div className="text-sm font-bold" style={{ color: "var(--muted)" }}>
+        {label}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/** Empty, said kindly, with an emote. */
+function Nothing({ text, emote, size = 0.8 }: { text: string; emote: string; size?: number }) {
+  return (
+    <span className="flex items-center gap-2 font-semibold" style={{ color: "var(--muted)" }}>
+      <Emote name={emote} size={size} title="" />
+      {text}
+    </span>
+  );
 }
 
 /**
- * A chatter, with everything their destiny.gg profile shows (bar nationality,
- * gender and age, which the site never reads), as a labelled list so it's
- * clear what's what. The emote is the big picture (most profile photos are
- * destiny.gg's default drawing); the photo is the small one by the link.
- * Missing values say so, in grey: destiny.gg's own "It's a secret..." bio
- * counts as no bio. `large` is the swipe card, with the room of one person.
+ * The swipe card, with the room of one person: a hero panel tinted by their
+ * team (their emote, bobbing; their name; the profile link with their photo),
+ * and coloured tiles for everything their destiny.gg profile shows (bar
+ * nationality, gender and age, which the site never reads). Tiers wear
+ * destiny.gg's flair colours; teams their emote.
  */
-function ProfileCard({ chatter, large = false }: { chatter: Chatter; large?: boolean }) {
+function HeroCard({ chatter }: { chatter: Chatter }) {
   const p = useProfile(chatter.name);
-  const bio = p?.bio && !/^it'?s a secret/i.test(p.bio.trim()) ? p.bio : null;
+  const team = teamOf(p?.team ?? null);
+  const tier = tierOf(p?.tier ?? null);
+  const bio = bioOf(p?.bio);
+  const years = p?.memberSince ? yearsSince(p.memberSince) : null;
+  const hue = team?.color ?? "var(--primary)";
+  return (
+    <div className="grid gap-4 lg:min-h-[26rem] lg:grid-cols-[19rem_1fr]">
+      <div
+        className="flex flex-col items-center justify-center gap-2 rounded-[20px] border-2 px-5 py-6 text-center"
+        style={{ background: tint(hue, 22), borderColor: tint(hue, 50) }}
+      >
+        <FitFace chatter={chatter} size={4} />
+        <div
+          className={`font-black leading-tight [overflow-wrap:anywhere] ${chatter.name.length > 13 ? "text-2xl" : chatter.name.length > 10 ? "text-3xl" : "text-4xl"}`}
+        >
+          {chatter.name}
+        </div>
+        {chatter.emote && (
+          <div className="text-sm font-semibold" style={{ color: "var(--muted)" }}>
+            Emote: <b>{chatter.emote}</b>
+          </div>
+        )}
+        {p?.url && (
+          <a
+            href={p.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 flex items-center gap-2 text-sm font-bold underline"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {p.photoUrl && <img src={p.photoUrl} alt="" title="Profile photo" className="h-7 w-7 rounded-full object-cover" />}
+            destiny.gg profile ↗
+          </a>
+        )}
+      </div>
+      <div className="flex flex-col gap-3">
+        {p === undefined && (
+          <Tile label="Profile">
+            <span className="font-semibold" style={{ color: "var(--muted)" }}>
+              Loading the profile…
+            </span>
+          </Tile>
+        )}
+        {p === null && (
+          <Tile label="Profile">
+            <Nothing text="No destiny.gg profile found under this name." emote="Hmm" />
+          </Tile>
+        )}
+        {p && (
+          <>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Tile label="Subscription" color={tier?.color}>
+                {tier ? (
+                  <div className="text-2xl font-black" style={{ color: tier.color }}>
+                    Tier {tier.n}
+                  </div>
+                ) : (
+                  <div className="text-xl font-bold" style={{ color: "var(--muted)" }}>
+                    Not subscribed
+                  </div>
+                )}
+              </Tile>
+              <Tile label="Team" color={team?.color}>
+                {team ? (
+                  <div className="flex items-center gap-2 text-2xl font-black" style={{ color: team.color }}>
+                    {team.emote && <Emote name={team.emote} size={1} title="" />}
+                    {team.name}
+                  </div>
+                ) : (
+                  <div className="text-xl font-bold" style={{ color: "var(--muted)" }}>
+                    No team
+                  </div>
+                )}
+              </Tile>
+              <Tile label="Member since" color="var(--header)">
+                <div className="hand text-3xl font-bold leading-none">{years === null ? "?" : yearsText(years)}</div>
+                <div className="text-sm font-semibold" style={{ color: "var(--muted)" }}>
+                  {p.memberSince ?? "Unknown"}
+                </div>
+              </Tile>
+            </div>
+            <Tile label="Bio" className="min-h-[5.5rem]">
+              {bio ? (
+                <p className="whitespace-pre-line text-lg font-semibold [overflow-wrap:anywhere]">{bio}</p>
+              ) : (
+                <Nothing text="No bio" emote="SHRUGSTINY" size={1} />
+              )}
+            </Tile>
+            <Tile label="Signature" className="flex flex-1 flex-col">
+              {p.signatureSvg ? (
+                <div
+                  className="relative mt-1 min-h-28 flex-1 [&_svg]:absolute [&_svg]:inset-0 [&_svg]:h-full [&_svg]:w-full"
+                  style={{ color: "var(--text)" }}
+                  // Rebuilt by the server from path data only (src/server/dgg-profile.ts).
+                  dangerouslySetInnerHTML={{ __html: p.signatureSvg }}
+                />
+              ) : (
+                <div className="flex min-h-28 flex-1 items-center justify-center">
+                  <Nothing text="No signature" emote="Hmm" size={1} />
+                </div>
+              )}
+            </Tile>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A chatter in a match: the same, smaller. The emote box is tinted by their
+ * team; tier and team in their colours; a labelled list for the rest.
+ */
+function ProfileCard({ chatter }: { chatter: Chatter }) {
+  const p = useProfile(chatter.name);
+  const team = teamOf(p?.team ?? null);
+  const tier = tierOf(p?.tier ?? null);
+  const bio = bioOf(p?.bio);
+  const years = p?.memberSince ? yearsSince(p.memberSince) : null;
+  const hue = team?.color ?? "var(--primary)";
   const none = (text: string) => <span style={{ color: "var(--muted)" }}>{text}</span>;
   const row = (label: string, value: React.ReactNode) => (
     <>
-      <dt className={`${large ? "text-sm" : "text-xs"} pt-0.5 font-bold`} style={{ color: "var(--muted)" }}>
+      <dt className="pt-0.5 text-xs font-bold" style={{ color: "var(--muted)" }}>
         {label}
       </dt>
-      <dd className="min-w-0 break-words font-semibold">{value}</dd>
+      <dd className="min-w-0 font-semibold [overflow-wrap:anywhere]">{value}</dd>
     </>
   );
   return (
-    <div className={`min-w-0 ${large ? "space-y-6" : "space-y-4"}`}>
-      <div className={`flex gap-4 ${large ? "flex-col items-start sm:flex-row sm:items-center" : "items-center"}`}>
-        {/* Wide emotes widen the box rather than being cut off. */}
+    <div className="min-w-0 space-y-4">
+      <div className="flex items-center gap-4">
         <div
-          className={`flex shrink-0 items-center justify-center overflow-hidden rounded-[18px] px-2 ${large ? "h-28 min-w-28 max-w-80 sm:h-32 sm:min-w-32" : "h-20 min-w-20 max-w-52"}`}
-          style={{ background: "var(--panel-border)" }}
+          className="flex h-20 min-w-20 max-w-52 shrink-0 items-center justify-center overflow-hidden rounded-[18px] border-2 px-2"
+          style={{ background: tint(hue, 22), borderColor: tint(hue, 50) }}
         >
-          <Face chatter={chatter} size={large ? 3 : 1.9} />
+          <Face chatter={chatter} size={1.9} />
         </div>
         <div className="min-w-0 space-y-1">
-          <div className={`font-black leading-tight [overflow-wrap:anywhere] ${large ? "text-3xl sm:text-4xl" : "text-2xl"}`}>{chatter.name}</div>
+          <div className="text-2xl font-black leading-tight [overflow-wrap:anywhere]">{chatter.name}</div>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
             {p?.photoUrl && <img src={p.photoUrl} alt="" title="Profile photo" className="h-7 w-7 rounded-full object-cover" />}
             {p?.url && (
@@ -659,18 +896,28 @@ function ProfileCard({ chatter, large = false }: { chatter: Chatter; large?: boo
         </div>
       </div>
       {p === undefined && <p className="text-sm" style={{ color: "var(--muted)" }}>Loading the profile…</p>}
-      {p === null && <p className="text-sm font-semibold" style={{ color: "var(--muted)" }}>No destiny.gg profile found under this name.</p>}
+      {p === null && <Nothing text="No destiny.gg profile found under this name." emote="Hmm" />}
       {p && (
-        <dl className={`grid items-start gap-x-5 gap-y-2.5 ${large ? "grid-cols-[6.5rem_1fr] text-base sm:grid-cols-[8rem_1fr]" : "grid-cols-[6rem_1fr] text-sm"}`}>
-          {row("Subscription", p.tier ? p.tier.replace(/\s*Subscriber$/i, "") : none("Not subscribed"))}
-          {row("Team", p.team ? p.team.replace(/^Team\s+/i, "") : none("No team"))}
-          {row("Member since", p.memberSince ? since(p.memberSince) : none("Unknown"))}
-          {row("Bio", bio ? <span className="whitespace-pre-line">{bio}</span> : none("No bio"))}
+        <dl className="grid grid-cols-[6rem_1fr] items-start gap-x-5 gap-y-2.5 text-sm">
+          {row("Subscription", tier ? <b style={{ color: tier.color }}>Tier {tier.n}</b> : none("Not subscribed"))}
+          {row(
+            "Team",
+            team ? (
+              <span className="inline-flex items-center gap-1.5 font-bold" style={{ color: team.color }}>
+                {team.emote && <Emote name={team.emote} size={0.65} title="" />}
+                {team.name}
+              </span>
+            ) : (
+              none("No team")
+            ),
+          )}
+          {row("Member since", p.memberSince ? `${p.memberSince} · ${yearsText(years ?? 0).toLowerCase()}` : none("Unknown"))}
+          {row("Bio", bio ? <span className="whitespace-pre-line">{bio}</span> : <Nothing text="No bio" emote="SHRUGSTINY" size={0.6} />)}
           {row(
             "Signature",
             p.signatureSvg ? (
               <div
-                className={`rounded-[12px] border-2 border-dashed p-2 [&_svg]:h-full [&_svg]:w-full ${large ? "h-28" : "h-20"}`}
+                className="h-20 rounded-[12px] border-2 border-dashed p-2 [&_svg]:h-full [&_svg]:w-full"
                 style={{ color: "var(--text)", borderColor: "var(--panel-border)", background: "var(--panel)" }}
                 // Rebuilt by the server from path data only (src/server/dgg-profile.ts).
                 dangerouslySetInnerHTML={{ __html: p.signatureSvg }}
