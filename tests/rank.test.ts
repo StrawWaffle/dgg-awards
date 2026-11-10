@@ -30,14 +30,21 @@ const names = (n: number) => [...Array(n).keys()].map((i) => `n${i}`);
 const value = (id: string) => Number(id.slice(1));
 
 describe("a knockout for the top ten, with ties", () => {
+  // A lucky order needs fewer replays, so only the average is held to 111-129;
+  // no order needs more than 7 replays per place (the bracket is 7 rounds deep).
   test("67 distinct: the best ten in order, in about 111 to 129 choices", () => {
-    for (let i = 0; i < 20; i++) {
+    let total = 0;
+    const runs = 200;
+    for (let i = 0; i < runs; i++) {
       const { result, asked, picks } = run(shuffle(names(67)), value);
       expect(result).toEqual([...Array(10).keys()].map((i) => [`n${66 - i}`]));
-      expect(asked).toBeGreaterThanOrEqual(66 + 9 * 5);
+      expect(asked).toBeGreaterThanOrEqual(66 + 9);
       expect(asked).toBeLessThanOrEqual(66 + 9 * 7);
       expect(picks).toBe(0);
+      total += asked;
     }
+    expect(total / runs).toBeGreaterThanOrEqual(66 + 9 * 5);
+    expect(total / runs).toBeLessThanOrEqual(66 + 9 * 7);
   });
 
   test("first place takes exactly n - 1 matches, and the first round pairs everyone off", () => {

@@ -287,6 +287,23 @@ function useHeldKey() {
 }
 const pressed = (held: string | null, ...keys: string[]) => (held && keys.includes(held) ? " is-pressed" : "");
 
+/**
+ * The label for a chatter's emote, which isn't their most used one (that's
+ * OMEGALUL for most) but the one they use most out of proportion: see the
+ * handoff ("Emotes redone"). Hover (or focus) explains.
+ */
+function Trademark() {
+  return (
+    <span
+      tabIndex={0}
+      className="cursor-help underline decoration-dotted underline-offset-2"
+      title="The emote they use most out of proportion: how many times more often they post it than chat does overall, among emotes that are at least 1% of theirs. From this year's chat logs."
+    >
+      Trademark emote
+    </span>
+  );
+}
+
 function Face({ chatter, size }: { chatter: Chatter; size: number }) {
   if (chatter.image) return <img src={chatter.image} alt="" className="h-full w-full object-cover" />;
   if (chatter.emote) return <Emote name={chatter.emote} size={size} />;
@@ -762,7 +779,7 @@ function HeroCard({ chatter }: { chatter: Chatter }) {
         </div>
         {chatter.emote && (
           <div className="text-sm font-semibold" style={{ color: "var(--muted)" }}>
-            Emote: <b>{chatter.emote}</b>
+            <Trademark />: <b>{chatter.emote}</b>
           </div>
         )}
         {p?.url && (
@@ -882,7 +899,7 @@ function MatchCard({ chatter }: { chatter: Chatter }) {
             )}
             {chatter.emote && (
               <span className="font-semibold" style={{ color: "var(--muted)" }}>
-                · Emote: <b>{chatter.emote}</b>
+                · <Trademark />: <b>{chatter.emote}</b>
               </span>
             )}
           </div>
