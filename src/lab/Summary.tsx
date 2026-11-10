@@ -4,6 +4,7 @@ import { Dialog } from "radix-ui";
 import { type Clip, ClipPlayer, nomineeClip } from "@/lab/ClipPlayer";
 import { Emote } from "@/lab/Emote";
 import archive2025 from "@/archive/2025.json";
+import { instantRunoff } from "@/lib/voting";
 
 type Standing = {
   id: string;
@@ -66,6 +67,9 @@ export async function loadArchive2025(): Promise<AwardResult[]> {
  * Made-up results for this year's nominees, for admins to preview the page
  * before there are votes: per award, a few hundred voters shared out at
  * random (the same each time for an award). Never saved, never public.
+ * Ranked awards get made-up ballots (each voter ranks a few, leaning the same
+ * way as the first choices), counted by the real instant runoff, so the
+ * preview has rounds.
  */
 export async function loadSimulated(): Promise<AwardResult[]> {
   const data: any[] = await fetch("/api/admin/nominees").then((r) => (r.ok ? r.json() : []));
@@ -78,22 +82,49 @@ export async function loadSimulated(): Promise<AwardResult[]> {
       const weights = c.options.map(() => random() ** 2.2 + 0.02);
       const sum = weights.reduce((a: number, b: number) => a + b, 0);
       const counts: number[] = weights.map((w: number) => Math.round((w / sum) * total));
+      const ranked = c.votingStyle === "ranked";
+      const ids: string[] = c.options.map((o: any) => o.id);
+      const runoff = ranked ? instantRunoff(ids, madeUpBallots(ids, weights, total, random)) : null;
+      if (runoff) ids.forEach((id, i) => (counts[i] = runoff.rounds[0]?.counts[id] ?? 0));
       const most = Math.max(...counts);
       const counted = counts.reduce((a, b) => a + b, 0) || 1;
+      const outIn = new Map<string, number>();
+      runoff?.rounds.forEach((r, i) => r.eliminated.forEach((id) => outIn.set(id, i)));
+      // Later out ranks higher; the winners last of all.
+      const place = (id: string) => (runoff ? (outIn.get(id) ?? runoff.rounds.length) : 0);
       const standings = c.options
         .map((o: any, i: number) => ({
           id: o.id,
           title: o.title,
           count: counts[i]!,
           percentage: Number(((counts[i]! / counted) * 100).toFixed(1)),
-          isWinner: counts[i] === most,
+          isWinner: runoff ? runoff.winners.includes(o.id) : counts[i] === most,
           image: o.thumbnailUrl ?? (o.imageId ? `/Media/${o.imageId}` : null),
           emote: o.emote ?? undefined,
           clip: nomineeClip(o, `${o.title} · ${c.title}`),
         }))
-        .sort((a: Standing, b: Standing) => b.count! - a.count!);
-      return { id: c.id, title: c.title, description: c.description ?? "", ranked: c.votingStyle === "ranked", total: counted, standings, rounds: null };
+        .sort((a: Standing, b: Standing) => place(b.id) - place(a.id) || b.count! - a.count!);
+      return { id: c.id, title: c.title, description: c.description ?? "", ranked, total: counted, standings, rounds: runoff?.rounds ?? null };
     });
+}
+
+/**
+ * Ballots for a made-up ranked award: each voter ranks one to four nominees,
+ * picked in turn with odds by `weights`, so the favourites lead but not by
+ * so much that the first round settles it every time.
+ */
+function madeUpBallots(ids: string[], weights: number[], voters: number, random: () => number): string[][] {
+  return Array.from({ length: voters }, () => {
+    const left = ids.map((id, i) => ({ id, w: weights[i]! ** 0.6 }));
+    const ballot: string[] = [];
+    const length = 1 + Math.floor(random() * Math.min(4, ids.length));
+    while (ballot.length < length && left.length) {
+      let pick = random() * left.reduce((a, x) => a + x.w, 0);
+      const i = Math.max(0, left.findIndex((x) => (pick -= x.w) <= 0));
+      ballot.push(left.splice(i, 1)[0]!.id);
+    }
+    return ballot;
+  });
 }
 
 export async function loadSummary(): Promise<AwardResult[]> {

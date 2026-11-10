@@ -6,8 +6,9 @@ import { Sketch } from "@/lab/sketch";
 import { type FeedStatus, liveFeed, simulatedFeed } from "@/lab/chatFeed";
 import { type Levels, type Source, useFrame } from "@/lab/music";
 import { useBursts } from "@/lab/Bursts";
-import { type Award, Board, loadResults } from "@/lab/Results";
+import { type Award, loadResults } from "@/lab/Results";
 import { DvdMenu, type ShowAward, TitleCard, WinnerCard, loadShow } from "@/lab/Scenes";
+import { ResultsBoard } from "@/lab/StageRunoff";
 import { loadSimulated } from "@/lab/Summary";
 import type { ChatSummary } from "@/server/lab/chat-aggregator";
 
@@ -127,6 +128,8 @@ async function simulatedResults(): Promise<Award[]> {
     id: a.id,
     title: a.title,
     total: a.total ?? 0,
+    ranked: a.ranked ?? false,
+    rounds: a.rounds,
     results: [...a.standings].reverse().map((r) => ({ id: r.id, title: r.title, count: r.count ?? 0, percentage: r.percentage, isWinner: r.isWinner })),
   }));
 }
@@ -721,7 +724,7 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
                     <span className="cozy-chip coral">Results</span>
                     <span className="cozy-chip green hand text-base!">{award.total.toLocaleString()} votes</span>
                   </div>
-                  <Board key={`${award.id}-${run}`} award={award} target={target} onWinner={cheer} onFinished={() => setRevealed(true)} />
+                  <ResultsBoard key={`${award.id}-${run}`} award={award} target={target} onWinner={cheer} onFinished={() => setRevealed(true)} />
                 </div>
               )}
               {scene === "winner" && <WinnerCard award={award} onPlay={setPlaying} onCheer={() => winnerMoment(winnerOf(award))} />}
@@ -871,6 +874,17 @@ export function Stage({ source, emotes, chatOpen }: { source: Source; emotes: st
                   >
                     Reveal next
                   </button>
+                  {award.results.length > 3 && (
+                    <button
+                      type="button"
+                      className="cozy-btn"
+                      // Everyone but the top three, from last place up; the three stay hidden for the moment.
+                      onClick={() => setTarget((t) => Math.max(t, award.results.length - 3))}
+                      disabled={target >= award.results.length - 3}
+                    >
+                      All but the top 3
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="cozy-btn"

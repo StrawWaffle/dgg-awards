@@ -3,9 +3,24 @@ import rough from "roughjs";
 import { annotate } from "rough-notation";
 import { type Levels, type Source, music, useFrame } from "@/lab/music";
 import { cssVar, reducedMotion } from "@/lab/sketch";
+import type { RunoffRound } from "@/lib/voting";
 
 export type Result = { id: string; title: string; count: number; percentage: number; isWinner: boolean };
-export type Award = { id: string; title: string; total: number; results: Result[] };
+export type Award = {
+  id: string;
+  title: string;
+  total: number;
+  results: Result[];
+  /** Ranked: `count` is first choices, and the winner comes from the runoff. */
+  ranked?: boolean;
+  rounds?: RunoffRound[] | null;
+};
+
+/** What a percentage is of, said next to it. */
+export const shareOf = (award: Pick<Award, "ranked">) => (award.ranked ? "of first choices" : "of the votes");
+
+/** A ranked award decided over more than one round: the board leaves the winner to the runoff. */
+export const decidedByRunoff = (award: Award) => Boolean(award.ranked && award.rounds && award.rounds.length > 1);
 
 /** Every award's results, from the admin preview (so it works before voting closes). */
 export function loadResults(): Promise<Award[]> {
@@ -16,6 +31,8 @@ export function loadResults(): Promise<Award[]> {
         id: c.categoryId,
         title: c.categoryTitle,
         total: c.totalVotes,
+        ranked: c.votingStyle === "ranked",
+        rounds: c.runoff?.rounds ?? null,
         results: c.options.map((o: any) => ({
           id: o.id,
           title: o.title,
@@ -87,6 +104,7 @@ type RowEls = {
   fill: SVGGElement | null;
   outline: SVGGElement | null;
   count: HTMLSpanElement | null;
+  share: HTMLSpanElement | null;
   name: HTMLSpanElement | null;
 };
 
@@ -101,6 +119,8 @@ type RowEls = {
  * - First and second place are revealed together: they trade the lead a few
  *   times, then the winner pulls ahead. The winner's colour only shows once
  *   it's settled, so the bars don't give it away.
+ * - In a ranked award decided by the runoff, the bars are first choices
+ *   only, so no winner is marked here: the runoff (`Runoff`) does that.
  */
 export function Board({
   award,
@@ -115,6 +135,7 @@ export function Board({
   onFinished?: () => void;
 }) {
   const n = award.results.length;
+  const crown = !decidedByRunoff(award);
   // Last place first: the order they're revealed in.
   const [byRank] = useState(() => [...award.results].sort((a, b) => a.count - b.count));
   const [start] = useState(() => scrambled(award.results.map((r) => r.id), award.id));
@@ -167,9 +188,10 @@ export function Board({
       const w = s.phase === "hidden" ? 0 : Math.max(s.v > 0 ? 4 : 0, (s.v / most) * (barW - 8));
       e.clip?.setAttribute("width", String(w));
       if (e.count) {
-        e.count.textContent =
-          s.phase === "hidden" ? "?" : `${Math.round(s.v).toLocaleString()} · ${((s.v / Math.max(1, award.total)) * 100).toFixed(1)}%`;
+        const v = Math.round(s.v);
+        e.count.textContent = s.phase === "hidden" ? "?" : `${v.toLocaleString()} ${v === 1 ? "vote" : "votes"}`;
       }
+      if (e.share) e.share.textContent = s.phase === "hidden" ? "" : `${((s.v / Math.max(1, award.total)) * 100).toFixed(1)}% ${shareOf(award)}`;
       // The box follows the bar's length as later bars squish it, and
       // wobbles on the beat like the other drawn frames.
       if (e.outline && (s.phase === "box" || s.phase === "done")) {
@@ -216,7 +238,7 @@ export function Board({
           roughness: 1.3,
           stroke: "none",
           fill: "currentColor",
-          fillStyle: r.isWinner && settled ? "cross-hatch" : "hachure",
+          fillStyle: crown && r.isWinner && settled ? "cross-hatch" : "hachure",
           hachureGap: 6,
           fillWeight: 1.6,
         }),
@@ -224,7 +246,7 @@ export function Board({
       if (e.outline) delete e.outline.dataset.w;
     }
     paint();
-  }, [award, barW, paint, settled]);
+  }, [award, barW, paint, settled, crown]);
 
   // Work through the reveals one at a time until `target` are done; the last
   // two go together, as soon as either is asked for.
@@ -279,7 +301,7 @@ export function Board({
           setDone((d) => d + rows.length);
           for (const r of rows) {
             const name = els.current.get(r.id)?.name;
-            if (!final || !r.isWinner || !name) continue;
+            if (!final || !crown || !r.isWinner || !name) continue;
             const a = annotate(name, { type: "circle", color: cssVar("--coral"), strokeWidth: 3, padding: 10, animationDuration: 800 });
             timers.push(
               setTimeout(() => {
@@ -301,20 +323,20 @@ export function Board({
     // A reveal runs to the end; only a new Board (Start over, another award)
     // stops one midway, and that throws this one's elements away.
     requestAnimationFrame(tick);
-  }, [done, target, barW, byRank, n, paint, onWinner, wake]);
+  }, [done, target, barW, byRank, n, paint, onWinner, wake, crown]);
 
   return (
     <div className="relative mt-8" style={{ height: n * ROW_H }}>
       {award.results.map((r) => {
         const slot = slots.indexOf(r.id);
-        const colour = r.isWinner && settled ? "var(--coral)" : "var(--primary-shadow)";
-        const e = els.current.get(r.id) ?? { clip: null, fill: null, outline: null, count: null, name: null };
+        const colour = crown && r.isWinner && settled ? "var(--coral)" : "var(--primary-shadow)";
+        const e = els.current.get(r.id) ?? { clip: null, fill: null, outline: null, count: null, share: null, name: null };
         els.current.set(r.id, e);
         const hidden = state.current.get(r.id)!.phase === "hidden" && !active?.split(" ").includes(r.id);
         return (
           <div
             key={r.id}
-            className="absolute inset-x-0 grid grid-cols-[minmax(8rem,14rem)_1fr_8rem] items-center gap-4"
+            className="absolute inset-x-0 grid grid-cols-[minmax(8rem,14rem)_1fr_9.5rem] items-center gap-4"
             style={{ height: ROW_H, transform: `translateY(${slot * ROW_H}px)`, transition: "transform 700ms cubic-bezier(.3,.7,.3,1)" }}
           >
             <span className="truncate text-right font-extrabold">
@@ -336,8 +358,12 @@ export function Board({
                 <g ref={(el) => void (e.outline = el)} />
               </svg>
             </div>
-            <span ref={(el) => void (e.count = el)} className="hand text-xl font-bold tabular-nums">
-              ?
+            {/* The count, and under it what the percentage is of. */}
+            <span className="flex flex-col leading-none">
+              <span ref={(el) => void (e.count = el)} className="hand text-xl font-bold tabular-nums">
+                ?
+              </span>
+              <span ref={(el) => void (e.share = el)} className="text-xs font-bold tabular-nums" style={{ color: "var(--muted)" }} />
             </span>
           </div>
         );
