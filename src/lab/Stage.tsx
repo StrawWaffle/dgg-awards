@@ -187,7 +187,8 @@ export function Stage({
 }) {
   const floor = useRef<HTMLDivElement>(null);
   const npcs = useRef(new Map<string, Npc>());
-  const [feed, setFeed] = useState<Feed>("sim");
+  // Live chat from destiny.gg, Kick and YouTube unless picked otherwise.
+  const [feed, setFeed] = useState<Feed>("omnichat");
   const [rate, setRate] = useState(300);
   const [emoteShare, setEmoteShare] = useState(0.5);
   // Who's on stage, remembered per browser (the gear's settings).
