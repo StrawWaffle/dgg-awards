@@ -1,5 +1,27 @@
 # The Destiny Awards
 
+> [!IMPORTANT]
+> **Taking the site over? Read the [migration guide](docs/migration.md).**
+>
+> **What's needed:** a server with Docker, a domain with HTTPS (a Cloudflare tunnel is built in, or your own reverse proxy), a destiny.gg app for sign-in, a bucket for the clips, and the newest backup.
+>
+> **Clips:** the site keeps clips and thumbnails in any S3-compatible bucket.
+> - **AWS S3 behind CloudFront** works: point the `R2_*` settings at the bucket, and `R2_PUBLIC_URL` at the CloudFront address. It hasn't been tested against AWS yet, and the daily copy of the clips to Drive needs a small change first (both in the guide).
+> - **We suggest Cloudflare R2**, which the site runs on now. It doesn't charge for bandwidth, which matters on stream night when thousands of viewers play the clips, and this year's clips fit its free tier.
+>
+> **Export:**
+> - the database: Settings → Backups → "Download a full backup" in `/admin`, or the newest file in the backups Drive folder
+> - the clips: the Drive folder's `media/`, or a direct copy from the R2 bucket with rclone
+>
+> **Import:**
+> 1. Put the database in the data volume as `sqlite.db` before the first start. Newer database updates apply on start.
+> 2. Copy the clips to the root of your bucket as they are (`clips/…`, `thumbs/…`).
+> 3. Fill in `.env`, then run `docker compose up -d --build app`.
+>
+> The backup shows who voted for what, so keep it private. Everyone signs in again on the new site.
+>
+> The development notes below are from the 2025 site. For running it today, see [AGENTS.md](AGENTS.md).
+
 This project was made with [Bun](https://bun.com) via `bun init --react=tailwind`.
 _[Install bun here](https://bun.com/get)._
 
