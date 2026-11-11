@@ -85,6 +85,8 @@ export const publicRoutes = new Hono<SessionEnv>()
     if (!name || !DGG_NAME.test(name)) return c.body(null, 404);
     try {
       const profile = await cachedDggProfile(name);
+      // Kept by the browser for an hour, so coming back to the vote is instant.
+      if (profile) c.header("Cache-Control", "public, max-age=3600");
       return profile ? c.json(profile, 200) : c.body(null, 404);
     } catch (error) {
       console.error(error);

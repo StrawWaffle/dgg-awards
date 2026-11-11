@@ -104,6 +104,41 @@ function profileOf(url: string | null) {
   }
   return profiles.get(url)!;
 }
+/** Pictures loaded ahead, held so the browser keeps them. */
+const pictures = new Map<string, HTMLImageElement>();
+function preloadPicture(src: string | null | undefined) {
+  if (!src || pictures.has(src)) return;
+  const img = new Image();
+  img.decoding = "async";
+  img.src = src;
+  pictures.set(src, img);
+}
+
+/**
+ * Load every chatter's card ahead, in the order they'll come up: the
+ * destiny.gg profile, its photo and the nominee's picture, three at a time,
+ * so neither the swipes nor the comparisons wait on them.
+ */
+function usePreload(order: string[] | undefined, byId: Map<string, Chatter>) {
+  useEffect(() => {
+    if (!order) return;
+    let live = true;
+    const queue = order.map((id) => byId.get(id)).filter((c): c is Chatter => !!c);
+    const work = async () => {
+      while (live && queue.length) {
+        const c = queue.shift()!;
+        preloadPicture(c.image);
+        const p = await profileOf(c.profile);
+        if (live) preloadPicture(p?.photoUrl);
+      }
+    };
+    for (let i = 0; i < 3; i++) void work();
+    return () => {
+      live = false;
+    };
+  }, [order, byId]);
+}
+
 function useProfile(url: string | null) {
   const [p, setP] = useState<Profile | null | undefined>(undefined);
   useEffect(() => {
@@ -157,6 +192,10 @@ export function TopTen({
   const top = TOP;
   const [saved, setSaved] = useState<Saved | null>(() => load(key));
   const byId = useMemo(() => new Map(chatters.map((c) => [c.id, c])), [chatters]);
+  usePreload(saved?.order, byId);
+  // Every chatter's emote, drawn out of sight, so the browser fetches the
+  // emote sheets (destiny.gg's emotes.css) before a card needs them.
+  const emotes = useMemo(() => [...new Set(chatters.map((c) => c.emote).filter((e): e is string => !!e))], [chatters]);
 
   // A saved run whose chatters changed since is started again.
   useEffect(() => {
@@ -232,6 +271,13 @@ export function TopTen({
   const compared = bracket?.asked ?? 0;
   return (
     <div className="space-y-5">
+      <div aria-hidden className="pointer-events-none fixed top-0 -left-[9999px] opacity-0">
+        {emotes.map((e) => (
+          <span key={e} className="text">
+            <span className={`emote ${e}`} />
+          </span>
+        ))}
+      </div>
       <header className="cozy-panel flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4">
         <h2 className="text-2xl font-black">{title}</h2>
         <span className="cozy-chip">{chatters.length} chatters</span>
