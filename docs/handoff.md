@@ -552,6 +552,15 @@ StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, an
   - typecheck and 92 unit tests; 49 API tests, with the preview addresses added
   - in the browser: both preview menus (hover, jump, close, current page marked, the admin one on a phone), every stage and page, a preview vote not saved, the old addresses rewritten, `/lab#sound` kept, non-admin and signed-out refusals, the big screen switched to simulated votes with the reveal running, and the music's first play starting at 6.02 s
 
+### The big screen reads omnichat: destiny.gg, Kick and YouTube (2026-11-11)
+
+StrawWaffle asked whether the stage could use omnichat (https://omnichat.destiny.gg), which pools destiny.gg, Kick and YouTube chat; gum.vyneer.me runs the same software for another channel. His picks: draw other platforms' emotes as pictures, fall back to destiny.gg chat if omnichat goes down, and mark non-destiny.gg names with a small platform icon.
+- **Omnichat's socket:** `wss://<host>/ws?chat=<slug>` (`/api/chats` lists the slugs; Destiny's is `destinygg`). JSON frames; chat is `type: "message"` with `platform` (dgg, kick, youtube, twitch), `user.username`, `user.badges` (destiny.gg messages carry destiny.gg's flair ids, e.g. `flair13`), `user.subscription.tier`, and `content.originalText` with `blocks` marking emotes (`id`, `originalId` as typed, `platform`, `url`). Like destiny.gg it answers 403 to another site's Origin and works with none, so the server reads it. Its page pings (`{"platform":"system","type":"ping"}`) every 10 s; the relay does too.
+- **Summarizer** (`chat-aggregator.ts`): `ingestOmni` beside `ingest`, both into one `add`. Emotes come from the blocks (no catalogue needed); other platforms' emotes are named `<platform>:<name>` and their pictures sent in `summary.pictures` (plain https only). Events, speakers and said lines carry `platform` when not destiny.gg. Flairs count only for destiny.gg messages (Kick has its own "moderator" and "subscriber" badges), so Kick mods aren't "verified". The same name on two platforms is two people. Kick and YouTube bots are skipped by name (`BOT_NAMES`).
+- **Relay** (`chat-relay.ts`): one per source (`CHAT_SOURCES`: omnichat, gum as a test, dgg), chosen by `/api/lab/chat?source=`. After 3 failed reconnects, an omnichat relay passes on destiny.gg chat's summaries (`status.fallback`) and keeps retrying; it switches back when omnichat answers (tested: down to fallback in 7 s, back 18 s after it returned).
+- **Stage:** Advanced → "Chat from": Simulator, omnichat, destiny.gg chat only, or the gum test. `paintEmote` / `<Emote>` draw `<platform>:` emotes from their picture (`.emote-picture`); `.platform-mark` puts K, YT or TW before the name on characters and chat lines.
+- Tested live on gum (Anything Else on Kick plus destiny.gg chat): Kick chatters and their emotes on stage, no page errors. 3 new unit tests from recorded frames.
+
 ### Admin pass: finding problems, dates per award, who's leading (2026-11-11)
 
 StrawWaffle asked for all five of these after a look over the admin page.

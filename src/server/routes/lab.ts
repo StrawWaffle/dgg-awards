@@ -6,7 +6,7 @@ import { createBunWebSocket } from "hono/bun";
 import { getCookie } from "hono/cookie";
 import { join } from "node:path";
 import { verifyAdminSession } from "@/lib/auth";
-import { chatRelay } from "@/server/lab/chat-relay";
+import { isChatSource, relayFor } from "@/server/lab/chat-relay";
 import { emoteCatalogue } from "@/server/lab/emotes";
 import { SESSION_COOKIE } from "@/server/middleware";
 import { serveFile } from "@/server/storage";
@@ -33,11 +33,14 @@ export const labRoutes = new Hono()
       if (!(await verifyAdminSession(getCookie(c, SESSION_COOKIE)))) return c.body(null, 401);
       await next();
     },
-    upgradeWebSocket(() => {
+    // `?source=`: omnichat (the default), gum (a test channel) or dgg.
+    upgradeWebSocket((c) => {
+      const asked = c.req.query("source");
+      const source = isChatSource(asked) ? asked : "omnichat";
       let unsubscribe: (() => void) | null = null;
       return {
         onOpen(_event, ws) {
-          unsubscribe = chatRelay.subscribe((summary, status) => ws.send(JSON.stringify({ summary, status })));
+          unsubscribe = relayFor(source).subscribe((summary, status) => ws.send(JSON.stringify({ summary, status })));
         },
         onClose() {
           unsubscribe?.();

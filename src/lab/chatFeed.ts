@@ -13,20 +13,24 @@ const EMPTY = (): ChatSummary => ({ at: Date.now(), messages: 0, emoteOnly: 0, e
  * reconnects by itself, waiting a little longer each time (up to 30 s).
  * Returns a function that disconnects for good.
  */
-export function liveFeed(onSummary: OnSummary) {
+export function liveFeed(onSummary: OnSummary, source: "omnichat" | "gum" | "dgg" = "omnichat") {
   let socket: WebSocket | null = null;
   let retry: ReturnType<typeof setTimeout> | undefined;
   let tries = 0;
   let stopped = false;
   const connect = () => {
-    const s = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/lab/chat`);
+    const s = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/lab/chat?source=${source}`);
     socket = s;
     s.onmessage = (e) => {
       tries = 0;
       const { summary, status } = JSON.parse(e.data);
       onSummary(summary, {
         connected: status.connected,
-        note: status.connected ? "Connected to destiny.gg chat" : `Connecting to destiny.gg chat (try ${status.retries + 1})`,
+        note: status.fallback
+          ? `Omnichat is down, so this is ${status.source} until it's back (try ${status.retries + 1}).`
+          : status.connected
+            ? `Connected to ${status.source}.`
+            : `Connecting to ${status.source} (try ${status.retries + 1}).`,
       });
     };
     s.onclose = () => {

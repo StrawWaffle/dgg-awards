@@ -110,3 +110,61 @@ describe("chat aggregator", () => {
     expect(ms).toBeLessThan(2000);
   });
 });
+
+// Frames as omnichat sends them (recorded from gum.vyneer.me, 2026-11-11).
+const omni = (platform: string, username: string, text: string, blocks: unknown[] | null = null, badges: string[] = []) =>
+  JSON.stringify({
+    platform,
+    type: "message",
+    user: { username, badges: badges.map((id) => ({ type: "text", id })), subscription: { tier: 1 } },
+    content: { originalText: text, blocks },
+  });
+const dggEmote = (id: string) => ({ type: "emote", platform: "dgg", id, originalId: id, url: `https://r2cdn.destiny.gg/emotes/${id}.png` });
+const kickEmote = (id: string, n: number) => ({
+  type: "emote",
+  platform: "kick",
+  id,
+  originalId: `[emote:${n}:${id}]`,
+  url: `https://files.kick.com/emotes/${n}/fullsize`,
+});
+
+describe("chat aggregator, omnichat", () => {
+  test("reads destiny.gg, Kick and YouTube messages, with their platform", () => {
+    const agg = new ChatAggregator(null);
+    agg.ingestOmni(omni("dgg", "a", "ShrimpleAs", [dggEmote("ShrimpleAs")], ["flair13", "subscriber"]));
+    agg.ingestOmni(omni("kick", "b", "[emote:5299391:gemzarsideeye]", [kickEmote("gemzarsideeye", 5299391)], ["subscriber"]));
+    agg.ingestOmni(omni("youtube", "c", "hello there"));
+    agg.ingestOmni(JSON.stringify({ platform: "system", type: "connected" }));
+    const s = agg.flush(1);
+    expect(s.messages).toBe(3);
+    expect(s.events).toEqual([
+      // destiny.gg flairs still colour the name; Kick's badges don't.
+      { nick: "a", emote: "ShrimpleAs", flair: "flair13" },
+      { nick: "b", emote: "kick:gemzarsideeye", flair: null, platform: "kick" },
+    ]);
+    expect(s.speakers).toContainEqual({ nick: "c", emote: null, flair: null, platform: "youtube" });
+    expect(s.pictures).toEqual({ "kick:gemzarsideeye": "https://files.kick.com/emotes/5299391/fullsize" });
+    expect(agg.flush(2).pictures).toBeUndefined();
+  });
+
+  test("counts combos across platforms, skips their bots, and keeps the same name on two platforms apart", () => {
+    const agg = new ChatAggregator(null);
+    agg.ingestOmni(omni("dgg", "a", "PEPE", [dggEmote("PEPE")]));
+    agg.ingestOmni(omni("kick", "a", "PEPE", [dggEmote("PEPE")]));
+    agg.ingestOmni(omni("kick", "BotRix", "follow the channel"));
+    const s = agg.flush(1);
+    expect(s.messages).toBe(2);
+    expect(s.combo).toEqual({ emote: "PEPE", count: 2 });
+    expect(s.speakers).toHaveLength(2);
+  });
+
+  test("a Kick moderator's words aren't shown as verified, and odd picture addresses are dropped", () => {
+    const agg = new ChatAggregator(null);
+    agg.ingestOmni(omni("kick", "m", "hi chat", null, ["moderator"]));
+    agg.ingestOmni(omni("kick", "x", "[emote:1:bad]", [{ ...kickEmote("bad", 1), url: 'https://x.test/a") body{' }]));
+    const s = agg.flush(1);
+    expect(s.said).toEqual([]);
+    expect(s.pictures).toBeUndefined();
+    expect(s.emoteOnly).toBe(0);
+  });
+});

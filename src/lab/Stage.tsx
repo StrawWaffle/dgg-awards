@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Emote, emoteElement, loopRepeating } from "@/lab/Emote";
+import { Emote, addEmotePictures, emoteElement, loopRepeating, paintEmote } from "@/lab/Emote";
 import { type Clip, ClipPlayer } from "@/lab/ClipPlayer";
 import { Sketch } from "@/lab/sketch";
 import { type FeedStatus, liveFeed, simulatedFeed } from "@/lab/chatFeed";
@@ -52,8 +52,8 @@ type Npc = {
 
 /** One line in the chat column: someone's emote, a verified message, or a combo. */
 type Line =
-  | { id: number; kind: "emote"; nick: string; flair: string | null; emote: string }
-  | { id: number; kind: "said"; nick: string; flair: string | null; text: string }
+  | { id: number; kind: "emote"; nick: string; flair: string | null; platform?: string; emote: string }
+  | { id: number; kind: "said"; nick: string; flair: string | null; platform?: string; text: string }
   | { id: number; kind: "combo"; emote: string; count: number };
 
 /** A character stays at least this long before it can be swapped out to make room. */
@@ -89,7 +89,7 @@ function setEmote(npc: Npc, emote: string) {
   if (npc.emote === emote) return;
   npc.emote = emote;
   npc.w = 0;
-  npc.emoteEl.className = `emote ${emote}`;
+  paintEmote(npc.emoteEl, emote);
   setTimeout(() => loopRepeating(npc.emoteEl), 50);
 }
 
@@ -149,6 +149,19 @@ async function simulatedResults(): Promise<Award[]> {
 
 const nickClass = (flair: string | null) => `nick${flair ? ` nick-${flair}` : ""}`;
 
+/** What the small mark beside a non-destiny.gg name says. */
+const PLATFORM_MARK: Record<string, string> = { kick: "K", youtube: "YT", twitch: "TW" };
+function PlatformMark({ platform }: { platform?: string }) {
+  if (!platform) return null;
+  return (
+    <span className={`platform-mark ${platform}`} title={`On ${platform[0]!.toUpperCase()}${platform.slice(1)}`}>
+      {PLATFORM_MARK[platform] ?? platform.slice(0, 2).toUpperCase()}
+    </span>
+  );
+}
+
+type Feed = "sim" | "omnichat" | "dgg" | "gum";
+
 /**
  * The presentation's big screen: chatters as their emotes, walking about,
  * hopping to the music, clapping when someone wins, beside a chat column.
@@ -174,7 +187,7 @@ export function Stage({
 }) {
   const floor = useRef<HTMLDivElement>(null);
   const npcs = useRef(new Map<string, Npc>());
-  const [feed, setFeed] = useState<"sim" | "live">("sim");
+  const [feed, setFeed] = useState<Feed>("sim");
   const [rate, setRate] = useState(300);
   const [emoteShare, setEmoteShare] = useState(0.5);
   // Who's on stage, remembered per browser (the gear's settings).
@@ -192,7 +205,7 @@ export function Stage({
     } catch {}
   }, [max, names, showSaid, who, stayMin, arrivalRate, whenFull]);
   /** Who spoke lately: nick → when, their last emote, flair. Oldest first. */
-  const roster = useRef(new Map<string, { at: number; emote: string | null; flair: string | null }>());
+  const roster = useRef(new Map<string, { at: number; emote: string | null; flair: string | null; platform?: string }>());
   /** What chat is spamming most: for someone who hasn't sent an emote. */
   const chatEmote = useRef("PEPE");
   const [status, setStatus] = useState<FeedStatus>({ connected: false, note: "" });
@@ -308,7 +321,7 @@ export function Stage({
   /** The chat line of the combo still running, to count it up in place. */
   const liveCombo = useRef<{ id: number; emote: string } | null>(null);
 
-  const spawn = useCallback((nick: string, emote: string, flair: string | null) => {
+  const spawn = useCallback((nick: string, emote: string, flair: string | null, platform?: string) => {
     const box = floor.current!;
     const el = document.createElement("div");
     el.className = "absolute left-0 top-0 flex flex-col items-center will-change-transform";
@@ -317,7 +330,13 @@ export function Stage({
     const label = document.createElement("span");
     label.className = `${nickClass(flair)} mb-0.5 whitespace-nowrap rounded-full px-1.5 text-[11px]`;
     label.style.background = "color-mix(in oklab, var(--panel) 75%, transparent)";
-    label.textContent = nick;
+    if (platform) {
+      const mark = document.createElement("span");
+      mark.className = `platform-mark ${platform}`;
+      mark.textContent = PLATFORM_MARK[platform] ?? platform.slice(0, 2).toUpperCase();
+      label.append(mark);
+    }
+    label.append(nick);
     const { wrap, emote: emoteEl } = emoteElement(emote);
     el.append(bubble, label, wrap);
     box.append(el);
@@ -371,6 +390,7 @@ export function Stage({
   const onSummary = useCallback(
     (summary: ChatSummary, feedStatus: FeedStatus) => {
       setStatus(feedStatus);
+      addEmotePictures(summary.pictures);
       const now = performance.now();
       const all = npcs.current;
       const set = settings.current;
@@ -383,13 +403,18 @@ export function Stage({
       // The roster, as dgg-radio keeps it: who spoke within the last few
       // minutes, most recent last, with the last emote they used. With
       // "everyone", any message counts; otherwise only emote-only ones.
-      const heard: { nick: string; emote: string | null; flair: string | null }[] =
+      const heard: { nick: string; emote: string | null; flair: string | null; platform?: string }[] =
         set.who === "everyone" ? (summary.speakers ?? []) : summary.events;
       const book = roster.current;
-      for (const p of [...heard, ...summary.said.map((x) => ({ nick: x.nick, emote: null, flair: x.flair }))]) {
+      for (const p of [...heard, ...summary.said.map((x) => ({ nick: x.nick, emote: null, flair: x.flair, platform: x.platform }))]) {
         const known = book.get(p.nick);
         book.delete(p.nick);
-        book.set(p.nick, { at: now, emote: p.emote ?? known?.emote ?? null, flair: p.flair ?? known?.flair ?? null });
+        book.set(p.nick, {
+          at: now,
+          emote: p.emote ?? known?.emote ?? null,
+          flair: p.flair ?? known?.flair ?? null,
+          platform: p.platform ?? known?.platform,
+        });
       }
       for (const [nick, r] of book) {
         if (now - r.at <= stayMs) break; // the rest are more recent
@@ -428,7 +453,7 @@ export function Stage({
             leave(quietest);
           }
           bucket.tokens -= 1;
-          const npc = spawn(nick, r.emote ?? chatEmote.current, r.flair);
+          const npc = spawn(nick, r.emote ?? chatEmote.current, r.flair, r.platform);
           npc.lastSeen = r.at;
           if (clapUntil.current > now) {
             npc.clapUntil = clapUntil.current;
@@ -445,7 +470,7 @@ export function Stage({
         if (!npc) {
           if (bucket.tokens < 1 || all.size >= set.max) continue;
           bucket.tokens -= 1;
-          npc = spawn(s.nick, "PepoG", s.flair);
+          npc = spawn(s.nick, "PepoG", s.flair, s.platform);
         }
         npc.bubble.textContent = s.text;
         npc.bubble.classList.remove("hidden");
@@ -457,8 +482,8 @@ export function Stage({
       const added: Line[] = [
         ...summary.events
           .slice(0, 2)
-          .map((e) => ({ id: lineId.current++, kind: "emote" as const, nick: e.nick, flair: e.flair, emote: e.emote })),
-        ...said.map((s) => ({ id: lineId.current++, kind: "said" as const, nick: s.nick, flair: s.flair, text: s.text })),
+          .map((e) => ({ id: lineId.current++, kind: "emote" as const, nick: e.nick, flair: e.flair, platform: e.platform, emote: e.emote })),
+        ...said.map((s) => ({ id: lineId.current++, kind: "said" as const, nick: s.nick, flair: s.flair, platform: s.platform, text: s.text })),
       ];
       // Combos as their own lines, as chat shows them: one that's still going
       // counts up in place; one that ended in between gets its final count.
@@ -506,7 +531,7 @@ export function Stage({
   );
 
   useEffect(() => {
-    if (feed === "live") return liveFeed(onSummary);
+    if (feed !== "sim") return liveFeed(onSummary, feed);
     if (emotes.length === 0) return;
     return simulatedFeed(emotes, () => settings.current.rate, () => settings.current.emoteShare, onSummary);
   }, [feed, emotes, onSummary]);
@@ -880,9 +905,11 @@ export function Stage({
           <div className="mt-3 grid gap-3">
             <label className="flex items-center justify-between gap-2">
               Chat from
-              <select value={feed} onChange={(e) => setFeed(e.currentTarget.value as "sim" | "live")} className="cozy-input py-1!">
+              <select value={feed} onChange={(e) => setFeed(e.currentTarget.value as Feed)} className="cozy-input py-1!">
                 <option value="sim">Simulator</option>
-                <option value="live">Live destiny.gg chat</option>
+                <option value="omnichat">Live: destiny.gg, Kick and YouTube (omnichat)</option>
+                <option value="dgg">Live: destiny.gg chat only</option>
+                <option value="gum">Test: gum.vyneer.me (Anything Else's chat)</option>
               </select>
             </label>
             <label className="flex items-center justify-between gap-2">
@@ -936,7 +963,7 @@ export function Stage({
             </label>
             <p className="text-xs font-semibold" style={{ color: "var(--muted)" }}>
               {stats.fps} fps · {stats.npcs} on stage · {stats.perSecond.toLocaleString()} messages/s ·{" "}
-              {feed === "live" ? (status.connected ? "live chat connected" : "live chat waiting") : "simulator"}. {status.note}{" "}
+              {feed !== "sim" ? (status.connected ? "live chat connected" : "live chat waiting") : "simulator"}. {status.note}{" "}
               {stats.chatting.toLocaleString()} chatting in the last {stayMin} min.
               {feed === "sim" && ` ${stats.emoteOnly.toLocaleString()} emote-only/s; the aggregator takes ${stats.ingestMs.toFixed(1)} ms each ¼ s.`}
             </p>
@@ -1106,6 +1133,7 @@ export function Stage({
                     className="rounded-lg px-1.5 py-0.5"
                     style={l.kind === "said" ? { background: "var(--highlight)", borderLeft: "3px solid var(--primary-shadow)" } : undefined}
                   >
+                    <PlatformMark platform={l.platform} />
                     <span className={nickClass(l.flair)}>{l.nick}</span>:{" "}
                     {l.kind === "emote" ? <Emote name={l.emote} size={0.85} /> : <span className="font-semibold">{l.text}</span>}
                   </div>

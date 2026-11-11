@@ -11,6 +11,28 @@ export function loopRepeating(el: Element) {
 }
 
 /**
+ * Emotes from other platforms (Kick, YouTube), named "<platform>:<name>",
+ * which destiny.gg's emotes.css can't draw: their pictures, as omnichat sent
+ * them (only plain https addresses get this far, see chat-aggregator.ts).
+ */
+const pictures = new Map<string, string>();
+export function addEmotePictures(found: Record<string, string> | undefined) {
+  if (found) for (const [name, url] of Object.entries(found)) pictures.set(name, url);
+}
+
+/** Make `el` show the emote `name`: a destiny.gg emote by its class, any other by its picture. */
+export function paintEmote(el: HTMLElement, name: string) {
+  const url = pictures.get(name);
+  if (url) {
+    el.className = "emote-picture";
+    el.style.backgroundImage = `url("${url}")`;
+  } else {
+    el.className = `emote ${name}`;
+    el.style.backgroundImage = "";
+  }
+}
+
+/**
  * An emote span for code that builds the page by hand (the big screen's cast):
  * inside a "text" span, as in a chat message, since some emotes are only drawn
  * right there. Returns the wrapper to append and the emote to restyle.
@@ -20,7 +42,7 @@ export function emoteElement(name: string) {
   wrap.className = "text";
   wrap.style.display = "contents";
   const emote = document.createElement("span");
-  emote.className = `emote ${name}`;
+  paintEmote(emote, name);
   wrap.append(emote);
   setTimeout(() => loopRepeating(emote), 50);
   return { wrap, emote };
@@ -61,6 +83,19 @@ export function Emote({
   useEffect(() => {
     for (const a of ref.current?.getAnimations({ subtree: true }) ?? []) a.playbackRate = rate;
   }, [rate]);
+  const url = pictures.get(name);
+  if (url) {
+    return (
+      <span
+        ref={ref}
+        role="img"
+        aria-label={title ?? name}
+        title={title ?? name.slice(name.indexOf(":") + 1)}
+        className={`emote-picture ${className}`}
+        style={{ zoom: size, backgroundImage: `url("${url}")`, ...style }}
+      />
+    );
+  }
   // Inside a "text" span, as in a chat message: some emotes are only drawn
   // right there (Chatting is a strip of all its frames anywhere else).
   return (

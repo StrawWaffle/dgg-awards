@@ -570,3 +570,35 @@ input[type="range"].cozy-range {
     animation: none;
   }
 }
+
+/* Emotes from Kick or YouTube (via omnichat), drawn from their picture at
+   about a destiny.gg emote's size. */
+.emote-picture {
+  display: inline-block;
+  width: 32px;
+  height: 32px;
+  vertical-align: middle;
+  background: no-repeat center bottom / contain;
+}
+
+/* A small mark beside the names of chatters on Kick or YouTube. */
+.platform-mark {
+  display: inline-block;
+  margin-right: 3px;
+  padding: 0 3px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 13px;
+  vertical-align: 1px;
+  color: #fff;
+}
+.platform-mark.kick {
+  background: #2f7d14;
+}
+.platform-mark.youtube {
+  background: #c4302b;
+}
+.platform-mark.twitch {
+  background: #6441a5;
+}
