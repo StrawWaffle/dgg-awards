@@ -1,0 +1,1 @@
+ALTER TABLE `categories` ADD `askDates` integer DEFAULT true NOT NULL;

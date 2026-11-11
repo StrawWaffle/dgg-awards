@@ -37,8 +37,8 @@ export type NomineeDetails =
   | "emote"
   | "listNumber";
 
-export type ImportableData = (Omit<Category, "votingStyle"> &
-  Partial<Pick<Category, "votingStyle">> & { hidden?: boolean } & {
+export type ImportableData = (Omit<Category, "votingStyle" | "askDates"> &
+  Partial<Pick<Category, "votingStyle" | "askDates">> & { hidden?: boolean } & {
   options: (Omit<Option, "categoryId" | NomineeDetails> &
     Partial<Pick<Option, NomineeDetails>>)[];
 })[];

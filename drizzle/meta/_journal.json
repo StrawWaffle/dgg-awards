@@ -85,6 +85,13 @@
       "when": 1794345619032,
       "tag": "0011_nominee_list_number",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1794358362362,
+      "tag": "0012_category_ask_dates",
+      "breakpoints": true
     }
   ]
 }

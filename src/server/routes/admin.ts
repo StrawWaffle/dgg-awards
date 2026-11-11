@@ -56,7 +56,7 @@ import {
   clipFrame,
   clearClip, clearThumbnail,
 } from "@/server/clips";
-import { DGG_NAME, fetchDggProfile } from "@/server/dgg-profile";
+import { DGG_NAME, cachedDggProfile } from "@/server/dgg-profile";
 import { categoriesWithMediaUrls } from "@/server/present";
 import { serveFile, storage } from "@/server/storage";
 import { libraryFile, listLibrary } from "@/server/library";
@@ -511,7 +511,7 @@ export const adminRoutes = new Hono<SessionEnv>()
   .get("/checks", async (c) => {
     const config = await getConfig();
     const year = config.awardYear ? Number(config.awardYear) : undefined;
-    return c.json(checkAwards(await getNominees(), year), 200);
+    return c.json(checkAwards(await getNominees({ admin: true }), year), 200);
   })
   // A chatter's destiny.gg membership card, for filling in a nominee.
   .get("/dgg-profile/:name", async (c) => {
@@ -520,7 +520,7 @@ export const adminRoutes = new Hono<SessionEnv>()
       return c.body(null, 400);
     }
     try {
-      const profile = await fetchDggProfile(name);
+      const profile = await cachedDggProfile(name);
       return profile ? c.json(profile, 200) : c.body(null, 404);
     } catch (error) {
       console.error(error);

@@ -58,6 +58,11 @@ export const categoriesTable = sqliteTable("categories", {
    * A category with votes can only be hidden, not deleted.
    */
   hidden: int({ mode: "boolean" }).notNull().default(false),
+  /**
+   * Whether the checks ask its nominees for a date. Off for awards about
+   * people, where a date means nothing. Admins only.
+   */
+  askDates: int({ mode: "boolean" }).notNull().default(true),
 });
 
 export const optionsTable = sqliteTable(

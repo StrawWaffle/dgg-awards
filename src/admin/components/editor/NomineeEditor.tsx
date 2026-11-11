@@ -23,10 +23,25 @@ import {
   saveNomineeOrder,
 } from "@/lib/queries";
 
+type Show = "all" | "errors" | "problems";
+
+/**
+ * Put a reordered part of a list back into the whole: the shown items take
+ * the shown items' places, in their new order; hidden ones stay put. So
+ * dragging works while a search or filter hides some rows.
+ */
+function mergeOrder(all: string[], shownInOrder: string[]) {
+  const shown = new Set(shownInOrder);
+  const next = shownInOrder[Symbol.iterator]();
+  return all.map((id) => (shown.has(id) ? next.next().value! : id));
+}
+
 /**
  * The nominee editor: categories on the left with their problem counts, the
  * selected category's settings and nominees on the right. Problems come from
  * the server's checks (src/lib/nominee-checks.ts). Both lists reorder by drag.
+ * Above the categories, a search (names, descriptions, ids, list numbers, in
+ * every award) and a filter for nominees with problems narrow both lists.
  */
 export function NomineeEditor() {
   const nominees = useQuery({
@@ -42,18 +57,40 @@ export function NomineeEditor() {
   });
   const checks = useQuery({ queryKey: ["checks"], queryFn: fetchChecks });
   const [selected, setSelected] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [show, setShow] = useState<Show>("all");
   const reorder = useReorder();
 
   const categories = nominees.data ?? [];
+  const issues = checks.data ?? [];
+  const issuesFor = (categoryId: string) => issues.filter((i) => i.categoryId === categoryId);
+
+  // What the search and filter leave: per category, the nominees shown.
+  const words = query.trim().toLowerCase();
+  const filtering = words !== "" || show !== "all";
+  const fits = (c: AdminCategory, n: AdminNominee) => {
+    if (show !== "all") {
+      const own = issues.filter((i) => i.categoryId === c.id && i.nomineeId === n.id);
+      if (show === "errors" ? !own.some((i) => i.severity === "error") : own.length === 0) return false;
+    }
+    if (!words) return true;
+    const text = [n.title, n.description, n.id, n.listNumber != null ? `#${n.listNumber}` : ""].join(" ").toLowerCase();
+    return text.includes(words);
+  };
+  const shownIn = new Map(categories.map((c) => [c.id, filtering ? c.options.filter((n) => fits(c, n)) : c.options]));
+  const listed = filtering ? categories.filter((c) => shownIn.get(c.id)!.length > 0) : categories;
+
+  // Keep a category selected, and one that the filter shows.
   useEffect(() => {
-    if (!selected && categories[0]) setSelected(categories[0].id);
-  }, [selected, categories]);
+    if (listed.length && !listed.some((c) => c.id === selected)) setSelected(listed[0]!.id);
+  }, [selected, listed]);
 
   if (nominees.isPending) return <p className="p-4 text-sm">Loading…</p>;
   if (nominees.isError) return <ErrorText>Couldn't load the nominees: {nominees.error.message}</ErrorText>;
 
-  const issuesFor = (categoryId: string) => (checks.data ?? []).filter((i) => i.categoryId === categoryId);
-  const category = categories.find((c) => c.id === selected);
+  const category = listed.find((c) => c.id === selected);
+  const errors = issues.filter((i) => i.severity === "error").length;
+  const shownCount = [...shownIn.values()].reduce((n, l) => n + l.length, 0);
 
   return (
     // On wide screens the editor is exactly the window's height (less the
@@ -65,25 +102,68 @@ export function NomineeEditor() {
         className="shrink-0 border-b border-neutral-200 md:w-64 md:overflow-y-auto md:overscroll-contain md:border-b-0"
         aria-label="Categories"
       >
-        <SortableList ids={categories.map((c) => c.id)} onReorder={(ids) => reorder.mutate({ ids })}>
+        <div className="space-y-2 border-b border-neutral-200 p-3">
+          <input
+            type="search"
+            className={inputClass}
+            value={query}
+            placeholder="Find a nominee"
+            aria-label="Find a nominee, in every category"
+            onChange={(e) => setQuery(e.currentTarget.value)}
+          />
+          <select
+            className={inputClass}
+            value={show}
+            aria-label="Which nominees to show"
+            onChange={(e) => setShow(e.currentTarget.value as Show)}
+          >
+            <option value="all">All nominees</option>
+            <option value="errors">Nominees with errors</option>
+            <option value="problems">Nominees with errors or warnings</option>
+          </select>
+          <p className="text-xs text-neutral-600">
+            {filtering
+              ? `${shownCount} nominee${shownCount === 1 ? "" : "s"} in ${listed.length} categor${listed.length === 1 ? "y" : "ies"}`
+              : checks.data && (
+                  <>
+                    In all: {errors > 0 && <span className="text-red-700">{errors} error{errors === 1 ? "" : "s"} · </span>}
+                    {issues.length - errors} warning{issues.length - errors === 1 ? "" : "s"}
+                  </>
+                )}
+          </p>
+        </div>
+        <SortableList
+          ids={listed.map((c) => c.id)}
+          onReorder={(ids) => reorder.mutate({ ids: mergeOrder(categories.map((c) => c.id), ids) })}
+        >
           <ul>
-            {categories.map((c) => (
+            {listed.map((c) => (
               <CategoryItem
                 key={c.id}
                 category={c}
                 issues={issuesFor(c.id)}
+                shown={filtering ? shownIn.get(c.id)!.length : undefined}
                 selected={c.id === selected}
                 onSelect={() => setSelected(c.id)}
               />
             ))}
           </ul>
         </SortableList>
+        {filtering && listed.length === 0 && <p className="p-3 text-sm text-neutral-600">No nominees match.</p>}
         <ErrorText>{reorder.error?.message}</ErrorText>
         <AddCategory taken={new Set(categories.map((c) => c.id))} onAdded={setSelected} />
       </nav>
       <div className="min-w-0 flex-1 p-4 md:overflow-y-auto md:overscroll-contain md:border-l md:border-neutral-200">
         {category ? (
-          <CategoryPanel key={category.id} category={category} issues={issuesFor(category.id)} />
+          <CategoryPanel
+            key={category.id}
+            category={category}
+            issues={issuesFor(category.id)}
+            shown={filtering ? shownIn.get(category.id)! : undefined}
+            openFirst={filtering && shownIn.get(category.id)!.length === 1}
+          />
+        ) : filtering ? (
+          <p className="text-sm text-neutral-600">No nominees match. Clear the search or show all nominees.</p>
         ) : (
           <p className="text-sm text-neutral-600">No categories yet. Add the first one under the list.</p>
         )}
@@ -120,11 +200,14 @@ function useReorder() {
 function CategoryItem({
   category: c,
   issues,
+  shown,
   selected,
   onSelect,
 }: {
   category: AdminCategory;
   issues: Issue[];
+  /** While searching or filtering: how many of its nominees are shown. */
+  shown?: number;
   selected: boolean;
   onSelect: () => void;
 }) {
@@ -160,6 +243,7 @@ function CategoryItem({
           {issues.length > errors && `${issues.length - errors} warning${issues.length - errors === 1 ? "" : "s"}`}
           {issues.length === 0 && "No problems"}
           {c.hidden && " · hidden"}
+          {shown !== undefined && <span className="text-neutral-700"> · {shown} shown</span>}
         </span>
       </button>
     </li>
@@ -258,16 +342,35 @@ function AddNominee({
   );
 }
 
-function CategoryPanel({ category, issues }: { category: AdminCategory; issues: Issue[] }) {
+function CategoryPanel({
+  category,
+  issues,
+  shown,
+  openFirst,
+}: {
+  category: AdminCategory;
+  issues: Issue[];
+  /** While searching or filtering: the nominees to show. */
+  shown?: AdminNominee[];
+  /** Open the one nominee the search found. */
+  openFirst?: boolean;
+}) {
   const refresh = useRefreshEditor();
   const reorder = useReorder();
   const [title, setTitle] = useState(category.title);
   const [description, setDescription] = useState(category.description);
   const [style, setStyle] = useState<VotingStyle | "">(category.usesDefaultStyle ? "" : category.votingStyle);
+  const [askDates, setAskDates] = useState(category.askDates);
   const [open, setOpen] = useState<string | null>(null);
+  const options = shown ?? category.options;
+  const only = openFirst ? options[0]?.id : undefined;
+  useEffect(() => {
+    if (only) setOpen(only);
+  }, [only]);
 
   const savedStyle = category.usesDefaultStyle ? "" : category.votingStyle;
-  const dirty = title !== category.title || description !== category.description || style !== savedStyle;
+  const dirty =
+    title !== category.title || description !== category.description || style !== savedStyle || askDates !== category.askDates;
 
   const save = useMutation({
     mutationFn: () =>
@@ -276,6 +379,7 @@ function CategoryPanel({ category, issues }: { category: AdminCategory; issues: 
         title: title.trim(),
         description: description.trim(),
         ...(style !== savedStyle ? { votingStyle: style || null } : {}),
+        ...(askDates !== category.askDates ? { askDates } : {}),
       }),
     onSuccess: refresh,
   });
@@ -309,7 +413,13 @@ function CategoryPanel({ category, issues }: { category: AdminCategory; issues: 
             </Field>
             <Field
               label="Voting style"
-              hint={category.usesDefaultStyle ? `Site default is currently ${category.votingStyle}.` : undefined}
+              hint={
+                (style || category.votingStyle) === "points"
+                  ? "Everyone ranks a top 10: 10 points for 1st down to 1 for 10th, shared by ties. Most points wins."
+                  : category.usesDefaultStyle
+                    ? `Site default is currently ${category.votingStyle}.`
+                    : undefined
+              }
             >
               <select
                 className={inputClass}
@@ -319,7 +429,7 @@ function CategoryPanel({ category, issues }: { category: AdminCategory; issues: 
                 <option value="">Site default</option>
                 <option value="single">Single pick</option>
                 <option value="ranked">Ranked (instant runoff)</option>
-                <option value="points">Top 10 (points: 10 for 1st down to 1 for 10th)</option>
+                <option value="points">Top 10 by points</option>
               </select>
             </Field>
           </div>
@@ -330,6 +440,21 @@ function CategoryPanel({ category, issues }: { category: AdminCategory; issues: 
               onChange={(e) => setDescription(e.currentTarget.value)}
             />
           </Field>
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={askDates}
+              onChange={(e) => setAskDates(e.currentTarget.checked)}
+            />
+            <span>
+              Ask for a date
+              <span className="block text-xs text-neutral-500">
+                Warns about nominees without one. Turn it off for awards about people, where a date means nothing.
+                Dates that are filled in are still checked against the award year.
+              </span>
+            </span>
+          </label>
           <div className="flex items-center gap-3">
             <Button type="submit" variant="primary" disabled={!dirty || save.isPending}>
               Save category
@@ -367,7 +492,9 @@ function CategoryPanel({ category, issues }: { category: AdminCategory; issues: 
       </Section>
 
       <section className="space-y-2 border-t border-neutral-200 pt-4">
-        <h3 className="text-sm font-bold">Nominees ({category.options.length})</h3>
+        <h3 className="text-sm font-bold">
+          Nominees ({shown ? `${shown.length} of ${category.options.length} shown` : category.options.length})
+        </h3>
         <AddNominee
           categoryId={category.id}
           taken={new Set(category.options.map((o) => o.id))}
@@ -375,11 +502,13 @@ function CategoryPanel({ category, issues }: { category: AdminCategory; issues: 
         />
         <ErrorText>{reorder.error?.message}</ErrorText>
         <SortableList
-          ids={category.options.map((o) => o.id)}
-          onReorder={(ids) => reorder.mutate({ categoryId: category.id, ids })}
+          ids={options.map((o) => o.id)}
+          onReorder={(ids) =>
+            reorder.mutate({ categoryId: category.id, ids: mergeOrder(category.options.map((o) => o.id), ids) })
+          }
         >
           <ul className="divide-y divide-neutral-200 rounded border border-neutral-200">
-            {category.options.map((n) => (
+            {options.map((n) => (
               <NomineeRow
                 key={n.id}
                 nominee={n}

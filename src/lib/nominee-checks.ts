@@ -34,6 +34,8 @@ export type NomineeInput = {
 export type CategoryInput = {
   id: string;
   title: string;
+  /** false: don't ask its nominees for a date (awards about people). */
+  askDates?: boolean;
   options: NomineeInput[];
 };
 
@@ -91,7 +93,7 @@ function similarity(a: Set<string>, b: Set<string>) {
 }
 
 export function checkNominee(
-  category: Pick<CategoryInput, "id">,
+  category: Pick<CategoryInput, "id" | "askDates">,
   n: NomineeInput,
   year: number | undefined,
 ): Issue[] {
@@ -125,7 +127,7 @@ export function checkNominee(
   }
 
   if (!n.date) {
-    add("missing-date", "warning", "No date. Add when it happened, so viewers know it's from this year.");
+    if (category.askDates !== false) add("missing-date", "warning", "No date. Add when it happened, so viewers know it's from this year.");
   } else {
     const m = n.date.match(isoDate);
     if (!m || Number.isNaN(Date.parse(n.date))) {

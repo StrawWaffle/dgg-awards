@@ -55,9 +55,6 @@ function replay({ order, steps }: Saved): TriageState {
   return s;
 }
 
-/** The award the wildcards are voted in (scripts/split-wildcards.ts). */
-export const WILDCARDS_ID = "dgger_wildcards";
-
 /** A nominee as a chatter to rank. */
 export const toChatter = (o: any, profile: (name: string) => string | null): Chatter => {
   const name = String(o.title).replace(/^\d+\.\s*/, "").trim();
@@ -71,8 +68,8 @@ export const toChatter = (o: any, profile: (name: string) => string | null): Cha
 };
 
 /**
- * The wildcards: the "DGGer wildcards" award, or before that existed, the
- * DGGer nominees whose description says "Wildcards".
+ * The wildcards: the award voted by points (whatever it's called), or before
+ * there was one, the DGGer nominees whose description says "Wildcards".
  */
 function useWildcards() {
   const [chatters, setChatters] = useState<Chatter[] | null | "missing">(null);
@@ -80,7 +77,8 @@ function useWildcards() {
     fetch("/api/admin/nominees")
       .then((r) => (r.ok ? r.json() : []))
       .then((data: any[]) => {
-        const own: any[] | undefined = data.find((c) => c.id === WILDCARDS_ID)?.options;
+        // The award voted by points (the wildcards since scripts/split-wildcards.ts).
+        const own: any[] | undefined = data.find((c) => c.votingStyle === "points")?.options;
         const options: any[] = own ?? (data.find((c) => c.id === "dgger")?.options ?? []).filter((o: any) => /wildcard/i.test(o.description ?? ""));
         const list = options.map((o) => toChatter(o, (name) => `/api/admin/dgg-profile/${encodeURIComponent(name)}`)).filter((c) => c.name);
         setChatters(list.length ? list : "missing");

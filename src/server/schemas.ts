@@ -114,6 +114,7 @@ export const categoryPatch = z.object({
   /** null: follow the site default. */
   votingStyle: z.enum(votingStyles).nullable().optional(),
   hidden: z.boolean().optional(),
+  askDates: z.boolean().optional(),
 });
 
 export const nomineePatch = z.object({
@@ -222,6 +223,7 @@ export const importedData = z.array(
     description: z.string(),
     votingStyle: z.enum(votingStyles).nullable().optional(),
     hidden: z.boolean().optional(),
+    askDates: z.boolean().optional(),
     options: z.array(
       z.object({
         id: required,

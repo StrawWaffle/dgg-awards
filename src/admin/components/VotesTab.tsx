@@ -2,7 +2,7 @@ import { type ReactNode, useState } from "react";
 import { Section } from "@/admin/components/Section";
 import { Button, ErrorText, inputClass } from "@/admin/components/editor/fields";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { type VoteFilter, fetchAllVotes, fetchConfig, fetchVoteStats } from "@/lib/queries";
+import { type VoteFilter, fetchAllVotes, fetchConfig, fetchVoteStats, getVoteResults } from "@/lib/queries";
 
 const number = new Intl.NumberFormat();
 const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: "short", timeStyle: "short" });
@@ -21,8 +21,29 @@ export function VotesTab() {
   );
 }
 
+type Results = Awaited<ReturnType<typeof getVoteResults>>;
+
+/**
+ * Who's ahead in one award, counted the way the results will be: the most
+ * points, the runoff's winner, or the most votes. Ties name everyone tied.
+ */
+function leading(award: Results[number] | undefined): string {
+  if (!award || award.totalVotes === 0) return "—";
+  const ahead = award.options.filter((o) => o.isWinner);
+  if (ahead.length === 0) return "—";
+  const names = ahead.map((o) => o.title).join(" and ");
+  const top = ahead[0]!;
+  if (award.votingStyle === "points" && "points" in top) return `${names} · ${number.format(top.points ?? 0)} points`;
+  const rounds = "runoff" in award && award.runoff ? award.runoff.rounds.length : 0;
+  if (rounds > 1) return `${names} · after ${rounds} rounds`;
+  return `${names} · ${number.format(top.count)} (${top.percentage}%)`;
+}
+
 function Stats({ onFilterIp, ipOn }: { onFilterIp: (ip: string) => void; ipOn: boolean }) {
   const stats = useQuery({ queryKey: ["vote-stats"], queryFn: fetchVoteStats, refetchInterval: 30000 });
+  // The same count as the results reveal (admins can see it in any mode).
+  const results = useQuery({ queryKey: ["vote-results"], queryFn: () => getVoteResults(true), refetchInterval: 60000 });
+  const byAward = new Map((results.data ?? []).map((r) => [r.categoryId, r]));
   if (stats.isPending) return <p className="text-sm">Loading…</p>;
   if (stats.isError) return <ErrorText>Couldn't load the totals: {stats.error.message}</ErrorText>;
   const s = stats.data;
@@ -35,15 +56,18 @@ function Stats({ onFilterIp, ipOn }: { onFilterIp: (ip: string) => void; ipOn: b
         <span className="text-neutral-600">{number.format(s.users)} people have signed in.</span>
       </p>
       <div className="grid items-start gap-6 lg:grid-cols-[3fr_2fr]">
-        <Table id="categories" title="Ballots per category" head={["Category", "Ballots"]}>
+        <Table id="categories" title="Ballots per category" head={["Category", "Ballots", "Leading"]}>
           {s.categories.map((c) => (
             <tr key={c.id}>
               <td className="px-3 py-1.5">{c.title}</td>
-              <td className="w-1/2 px-3 py-1.5">
+              <td className="w-1/4 px-3 py-1.5">
                 <div className="flex items-center gap-2">
                   <span className="w-12 shrink-0 text-right tabular-nums">{number.format(c.ballots)}</span>
                   <span className="h-2 bg-neutral-400" style={{ width: `${(c.ballots / most) * 100}%` }} />
                 </div>
+              </td>
+              <td className="px-3 py-1.5 text-right text-neutral-700">
+                {results.isError ? "Couldn't count" : results.data ? leading(byAward.get(c.id)) : "…"}
               </td>
             </tr>
           ))}

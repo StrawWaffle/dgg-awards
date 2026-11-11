@@ -648,12 +648,12 @@ export async function listUnfinishedClips() {
 /** Every category with its nominees, in display order. */
 /**
  * Every category with its nominees, in order. `admin` adds the admin-only
- * fields (`listNumber`); everything public leaves it out, so voters never
- * get them.
+ * fields (`listNumber`, and the award's `askDates`); everything public leaves
+ * them out, so voters never get them.
  */
 export async function getNominees({ includeHidden = false, admin = false } = {}) {
   return await db.query.categoriesTable.findMany({
-    columns: { position: false, hidden: false },
+    columns: admin ? { position: false, hidden: false } : { position: false, hidden: false, askDates: false },
     where: includeHidden ? undefined : (c, { eq }) => eq(c.hidden, false),
     orderBy: (c, { asc }) => [asc(c.position)],
     with: {
@@ -714,12 +714,13 @@ export async function updateCategory({
   title,
   votingStyle,
   hidden,
+  askDates,
 }: Partial<InferInsertModel<typeof schema.categoriesTable>> & {
   id: string;
 }) {
   return await db
     .update(schema.categoriesTable)
-    .set({ description, title, votingStyle, hidden })
+    .set({ description, title, votingStyle, hidden, askDates })
     .where(eq(schema.categoriesTable.id, id));
 }
 

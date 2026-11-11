@@ -552,6 +552,16 @@ StrawWaffle: the Lab tab shouldn't be in an admin's header outside a preview, an
   - typecheck and 92 unit tests; 49 API tests, with the preview addresses added
   - in the browser: both preview menus (hover, jump, close, current page marked, the admin one on a phone), every stage and page, a preview vote not saved, the old addresses rewritten, `/lab#sound` kept, non-admin and signed-out refusals, the big screen switched to simulated votes with the reveal running, and the music's first play starting at 6.02 s
 
+### Admin pass: finding problems, dates per award, who's leading (2026-11-11)
+
+StrawWaffle asked for all five of these after a look over the admin page.
+- **Search and a problems filter** above the category list (`NomineeEditor.tsx`). The search covers names, descriptions, ids and list numbers ("#41") in every award. The filter shows all nominees, those with errors, or those with any problem. Both lists shrink to what matches, a lone match opens, and a line says how many are shown (or, unfiltered, the errors and warnings in all). Dragging still works while filtered: the shown rows swap places among themselves (`mergeOrder`).
+- **"Ask for a date"** per award (migration 0012, `categories.askDates`, default on). Off, its nominees aren't warned about a missing date, but a date that's filled in is still checked against the award year. Admin-only: public nominee data leaves it out. Recorded and undoable like the other category settings. StrawWaffle or rinlux untick it on the awards about people; it isn't set for them.
+- **History** says what an import did ("Moved 67 nominees", "Set 14 pictures and changed 119 emotes") instead of "Imported 0 nominees".
+- **Votes tab:** a "Leading" column, counted as the results will be (`/api/vote/results?preview=1`, every minute): the most points, the runoff winner ("after 3 rounds"), or the most votes with the share. Ties name everyone tied.
+- The voting style option reads "Top 10 by points", with the rule in the hint under it.
+- Also: the lab's practice top ten takes the award voted by points, whatever its id (data, not a fixed id), and the admin profile route uses the 6-hour cache, since the top ten now loads every profile at once.
+
 ### The big screen for the stream, the wildcards in the vote, the year in chat (2026-11-10, deployed)
 
 Built on four branches at once (stage-camera, stage-polish, wildcard-vote, chat-story, then fullscreen and wildcard-numbers), merged in `combined`, deployed after a backup (`/data/backups/2026-11-10T22-34-57-371Z-before-deploy.db`). Migration 0011 adds `options.listNumber`.

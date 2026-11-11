@@ -65,6 +65,13 @@ describe("checkNominee", () => {
     expect(codes({ date: "June 2025" })).toEqual(["invalid-date"]);
   });
 
+  test("awards about people can stop asking for dates, but dates given are still checked", () => {
+    const people = (n: Partial<NomineeInput>) =>
+      checkNominee({ id: "c", askDates: false }, { ...good, ...n }, 2025).map((i) => i.code);
+    expect(people({ date: null })).toEqual([]);
+    expect(people({ date: "2024-03-01" })).toEqual(["wrong-year"]);
+  });
+
   test("29:53 / 56:25: no video or image", () => {
     expect(codes({ imageId: null })).toEqual(["missing-media"]);
   });
