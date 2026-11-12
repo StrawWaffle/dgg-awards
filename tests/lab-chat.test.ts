@@ -158,6 +158,22 @@ describe("chat aggregator, omnichat", () => {
     expect(s.speakers).toHaveLength(2);
   });
 
+  test("Kick and YouTube emotes typed with no space between them still count", () => {
+    const agg = new ChatAggregator(null);
+    const heart = { type: "emote", platform: "youtube", id: ":heart:", originalId: ":heart:", url: "https://yt3.ggpht.com/h=w48-h48" };
+    agg.ingestOmni(omni("kick", "a", "[emote:1:x][emote:1:x][emote:2:y]", [kickEmote("x", 1), kickEmote("x", 1), kickEmote("y", 2)]));
+    agg.ingestOmni(omni("youtube", "b", ":heart::heart:", [heart, heart]));
+    agg.ingestOmni(omni("youtube", "c", ":heart:chaaat!", [heart]));
+    const s = agg.flush(1);
+    expect(s.emoteOnly).toBe(2);
+    expect(s.events).toEqual([
+      { nick: "a", emote: "kick:y", flair: null, platform: "kick" },
+      { nick: "b", emote: "youtube::heart:", flair: null, platform: "youtube" },
+    ]);
+    expect(s.speakers).toContainEqual({ nick: "c", emote: "youtube::heart:", flair: null, platform: "youtube" });
+    expect(s.top).toEqual(expect.arrayContaining([["youtube::heart:", 3], ["kick:x", 2]]));
+  });
+
   test("a Kick moderator's words aren't shown as verified, and odd picture addresses are dropped", () => {
     const agg = new ChatAggregator(null);
     agg.ingestOmni(omni("kick", "m", "hi chat", null, ["moderator"]));

@@ -83,6 +83,19 @@ type OmniMessage = {
   content?: { originalText?: unknown; blocks?: { type?: unknown; platform?: unknown; id?: unknown; originalId?: unknown; url?: unknown }[] | null } | null;
 };
 
+/**
+ * Kick and YouTube emotes typed with nothing between them, or stuck to a
+ * word ("[emote:1:a][emote:2:b]", ":face-fuchsia-poop-shape:chaaat!"),
+ * spaced apart so each reads as its own word. destiny.gg's are left alone:
+ * its chat only counts an emote with spaces around it. Longest first, so a
+ * code that holds a shorter one is matched whole.
+ */
+function spaceEmotes(text: string, codes: string[]) {
+  if (codes.length === 0) return text;
+  const escaped = [...codes].sort((a, b) => b.length - a.length).map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  return text.replace(new RegExp(escaped.join("|"), "g"), (code) => ` ${code} `);
+}
+
 /** Only plain https addresses go to the stage as pictures. */
 const PICTURE_URL = /^https:\/\/[^\s"'()\\]+$/;
 
@@ -151,6 +164,7 @@ export class ChatAggregator {
     const platform = typeof msg.platform === "string" && msg.platform !== "dgg" ? msg.platform : null;
     if (platform && BOT_NAMES.has(nick.toLowerCase())) return;
     const emotes = new Map<string, string>();
+    const others: string[] = [];
     for (const b of msg.content?.blocks ?? []) {
       if (b.type !== "emote" || typeof b.id !== "string" || typeof b.originalId !== "string") continue;
       if (b.platform === "dgg" || b.platform === undefined) emotes.set(b.originalId, b.id);
@@ -158,12 +172,13 @@ export class ChatAggregator {
         const name = `${b.platform}:${b.id}`;
         emotes.set(b.originalId, name);
         this.pictures.set(name, b.url);
+        others.push(b.originalId);
       }
     }
     const tier = msg.user?.subscription?.tier;
     this.add({
       nick,
-      text,
+      text: spaceEmotes(text, others),
       // Flairs mean something only on destiny.gg (Kick has "moderator" and "subscriber" badges too).
       features: platform ? [] : (msg.user?.badges ?? []).map((b) => b.id).filter((id): id is string => typeof id === "string"),
       tier: typeof tier === "number" ? tier : 0,
