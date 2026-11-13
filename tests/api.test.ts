@@ -1050,7 +1050,7 @@ describe("admin", () => {
     await req("/api/admin/category", json("PATCH", { id: "pointscat", hidden: true }), admin);
   });
 
-  test("a nominee's list number is for admins only", async () => {
+  test("a nominee's list number, chat name and winner's line are for admins only", async () => {
     const json = (method: string, body: unknown) => ({
       method,
       headers: { "content-type": "application/json" },
@@ -1060,15 +1060,20 @@ describe("admin", () => {
     const id = ally.options[0].id;
     expect(ally.options[0].listNumber).toBeNull();
     expect((await req("/api/admin/nominee", json("PATCH", { id, categoryId: "ally", listNumber: 0 }), admin)).status).toBe(400);
-    expect((await req("/api/admin/nominee", json("PATCH", { id, categoryId: "ally", listNumber: 52 }), admin)).status).toBe(200);
+    expect((await req("/api/admin/nominee", json("PATCH", { id, categoryId: "ally", chatName: "not a name!" }), admin)).status).toBe(400);
+    const fields = { listNumber: 52, chatName: "Some_Chatter", winnerLine: "Thank you chat" };
+    expect((await req("/api/admin/nominee", json("PATCH", { id, categoryId: "ally", ...fields }), admin)).status).toBe(200);
     const adminView = (await (await req("/api/admin/nominees", {}, admin)).json()).find((c: any) => c.id === "ally");
-    expect(adminView.options.find((o: any) => o.id === id).listNumber).toBe(52);
-    // The history has it, and undoing clears it.
+    expect(adminView.options.find((o: any) => o.id === id)).toMatchObject(fields);
+    // The export keeps them, to import back.
+    const exported = (await (await req("/api/admin/export", {}, admin)).json()).find((c: any) => c.id === "ally");
+    expect(exported.options.find((o: any) => o.id === id)).toMatchObject(fields);
+    // The history has them, and undoing clears them.
     const [entry] = await (await req(`/api/admin/history?nomineeId=${id}`, {}, admin)).json();
-    expect(entry?.after).toMatchObject({ listNumber: 52 });
+    expect(entry?.after).toMatchObject(fields);
 
-    // Voters never get it: not in the nominees, the results or a ballot's answer.
-    const hasIt = (x: unknown) => JSON.stringify(x).includes("listNumber");
+    // Voters never get them: not in the nominees, the results or a ballot's answer.
+    const hasIt = (x: unknown) => /listNumber|chatName|winnerLine|Some_Chatter/.test(JSON.stringify(x));
     expect(hasIt(await (await req("/api/nominees")).json())).toBe(false);
     await setMode(admin, "reviewing");
     expect(hasIt(await (await req("/api/vote/results")).json())).toBe(false);
@@ -1077,7 +1082,7 @@ describe("admin", () => {
 
     expect((await req(`/api/admin/history/${entry.id}/undo`, json("POST", {}), admin)).status).toBe(200);
     const after = (await (await req("/api/admin/nominees", {}, admin)).json()).find((c: any) => c.id === "ally");
-    expect(after.options.find((o: any) => o.id === id).listNumber).toBeNull();
+    expect(after.options.find((o: any) => o.id === id)).toMatchObject({ listNumber: null, chatName: null, winnerLine: null });
   });
 
   // Needs the dgga-files container serving tests/fixtures (see tests/run.sh).

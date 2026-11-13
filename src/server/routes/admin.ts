@@ -191,7 +191,7 @@ export const adminRoutes = new Hono<SessionEnv>()
   })
   .get("/export", async (c) => {
     const flags = await getCategoryFlags();
-    const categories = await getNominees({ includeHidden: true });
+    const categories = await getNominees({ includeHidden: true, admin: true });
     const data = await Promise.all(
       categories.map(async (cat) => ({
         id: cat.id,
@@ -217,6 +217,8 @@ export const adminRoutes = new Hono<SessionEnv>()
           thumbnailKey: o.thumbnailKey,
           thumbnailAt: o.thumbnailAt,
           listNumber: o.listNumber,
+          chatName: o.chatName,
+          winnerLine: o.winnerLine,
         })),
       })),
     );

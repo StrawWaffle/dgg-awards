@@ -11,7 +11,7 @@
 //
 // If omnichat stays down, its relay borrows destiny.gg chat's summaries until
 // it's back, so the stage keeps its crowd (`status.fallback`).
-import { ChatAggregator, type ChatSummary } from "@/server/lab/chat-aggregator";
+import { ChatAggregator, type ChatSummary, type RecentLine } from "@/server/lab/chat-aggregator";
 import { emoteCatalogue } from "@/server/lab/emotes";
 
 export type ChatSourceId = "omnichat" | "gum" | "dgg";
@@ -76,6 +76,12 @@ class ChatRelay {
     if (this.source.kind === "dgg") emoteCatalogue().then((c) => this.aggregator.setCatalogue(c));
     this.connect();
     this.tick = setInterval(() => this.broadcast(), TICK_MS);
+  }
+
+  /** The latest messages of these chatters, from this relay (or the one standing in for it). */
+  recentFor(names: string[]): Record<string, RecentLine[]> {
+    if (this.borrowed) return relayFor("dgg").recentFor(names);
+    return this.aggregator.recentFor(names);
   }
 
   private stop() {

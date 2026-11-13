@@ -109,6 +109,13 @@ export const optionsTable = sqliteTable(
      * titles can be plain names. Never sent to voters (see getNominees).
      */
     listNumber: int(),
+    /**
+     * Admin-only: the nominee's destiny.gg username, when the nominee is a
+     * chatter, so the big screen can show what they said in chat when they win.
+     */
+    chatName: text(),
+    /** Admin-only: a line to show beside the nominee if they win, typed ahead of time. */
+    winnerLine: text(),
     /** Display order within the category. Lowest first. */
     position: int().notNull().default(0),
   },

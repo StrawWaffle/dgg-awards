@@ -64,6 +64,10 @@ const nomineeDetails = {
   clipEnd: seconds.nullable().optional(),
   /** Admin-only: the number on the organisers' list. */
   listNumber: z.number().int().min(1).max(99999).nullable().optional(),
+  /** Admin-only: the nominee's destiny.gg username, if a chatter. */
+  chatName: z.string().regex(/^[A-Za-z0-9_]{1,40}$/, "A destiny.gg username, as it shows in chat.").nullable().optional(),
+  /** Admin-only: a line shown beside the nominee if they win. */
+  winnerLine: z.string().max(300).nullable().optional(),
 };
 
 export const nomineeForm = z.object({

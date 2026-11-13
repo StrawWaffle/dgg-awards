@@ -22,6 +22,8 @@ const fieldNames: Record<string, string> = {
   thumbnailAt: "thumbnail frame",
   emote: "emote",
   listNumber: "number on the list",
+  chatName: "destiny.gg username",
+  winnerLine: "winner's line",
   votingStyle: "voting style",
   viewingMode: "mode",
   startTime: "voting opens",

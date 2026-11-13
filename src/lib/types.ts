@@ -35,7 +35,9 @@ export type NomineeDetails =
   | "thumbnailKey"
   | "thumbnailAt"
   | "emote"
-  | "listNumber";
+  | "listNumber"
+  | "chatName"
+  | "winnerLine";
 
 export type ImportableData = (Omit<Category, "votingStyle" | "askDates"> &
   Partial<Pick<Category, "votingStyle" | "askDates">> & { hidden?: boolean } & {
@@ -162,8 +164,8 @@ export type ResultsData = {
     isWinner: boolean;
     points?: number;
     placed?: number;
-    // Public: without the admin-only list number.
-    payload: Omit<Option, "listNumber">;
+    // Public: without the admin-only fields.
+    payload: Omit<Option, "listNumber" | "chatName" | "winnerLine">;
   }[];
 }[];
 

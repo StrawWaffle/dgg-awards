@@ -42,6 +42,15 @@ export const labRoutes = new Hono()
         onOpen(_event, ws) {
           unsubscribe = relayFor(source).subscribe((summary, status) => ws.send(JSON.stringify({ summary, status })));
         },
+        // The screen asks for a winner's latest messages: `{"recent": ["name", …]}`.
+        onMessage(event, ws) {
+          try {
+            const asked = JSON.parse(String(event.data)) as { recent?: unknown };
+            if (!Array.isArray(asked.recent)) return;
+            const names = asked.recent.filter((n): n is string => typeof n === "string" && /^[A-Za-z0-9_]{1,40}$/.test(n)).slice(0, 10);
+            ws.send(JSON.stringify({ recent: relayFor(source).recentFor(names) }));
+          } catch {}
+        },
         onClose() {
           unsubscribe?.();
         },

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { ChatAggregator } from "@/server/lab/chat-aggregator";
+import { FILTER_DEFAULTS, RepeatGuard, Removals, badWords, cleanMessage } from "@/lab/chatFilter";
 
 const catalogue = new Map([
   ["Klappa", 0],
@@ -182,5 +183,76 @@ describe("chat aggregator, omnichat", () => {
     expect(s.said).toEqual([]);
     expect(s.pictures).toBeUndefined();
     expect(s.emoteOnly).toBe(0);
+  });
+});
+
+describe("chat window: messages, moderation and the winner's words", () => {
+  test("people's words go to the chat window with their emotes marked; verified ones stay apart", () => {
+    const agg = new ChatAggregator(catalogue);
+    agg.ingest(msg("a", "hello YEE chat"));
+    agg.ingest(msg("b", "Klappa"));
+    agg.ingest(msg("v", "thanks chat", { features: ["flair20"] }));
+    const s = agg.flush(1);
+    expect(s.lines).toEqual([{ nick: "a", text: "hello YEE chat", flair: null, emotes: { YEE: "YEE" } }]);
+    expect(s.said.map((x) => x.nick)).toEqual(["v"]);
+  });
+
+  test("mutes, bans and deaths name who to take down; omnichat's deleted messages by id", () => {
+    const agg = new ChatAggregator(catalogue);
+    agg.ingest(`MUTE ${JSON.stringify({ nick: "mod", data: "loud" })}`);
+    agg.ingest(`BAN ${JSON.stringify({ nick: "mod", data: "rude" })}`);
+    agg.ingest(`DEATH ${JSON.stringify({ nick: "gone" })}`);
+    agg.ingestOmni(JSON.stringify({ platform: "youtube", type: "moderation-action", action: { type: "delete-message", uuid: "m1" } }));
+    expect(agg.flush(1).removed).toEqual({ nicks: [{ nick: "loud" }, { nick: "rude" }, { nick: "gone" }], ids: ["m1"] });
+    expect(agg.flush(2).removed).toBeUndefined();
+  });
+
+  test("omnichat's mutes and bans, as recorded live (destiny.gg's mutes come through it too)", () => {
+    const agg = new ChatAggregator(null);
+    const act = (platform: string, action: unknown) => JSON.stringify({ platform, type: "moderation-action", uuid: "x", action });
+    agg.ingestOmni(act("dgg", { type: "mute", moderator: { username: "Bot" }, target: { username: "loud", id: "1" }, duration: 600 }));
+    agg.ingestOmni(act("kick", { type: "ban", moderator: { username: "amod" }, target: { username: "rude", id: "rude" }, duration: 0 }));
+    expect(agg.flush(1).removed).toEqual({ nicks: [{ nick: "loud" }, { nick: "rude", platform: "kick" }], ids: [] });
+  });
+
+  test("keeps everyone's last messages for the winner, forgets a muted chatter's, and drops a deleted one", () => {
+    const agg = new ChatAggregator(catalogue);
+    for (const t of ["one", "two", "three", "four"]) agg.ingest(msg("Winner", t));
+    agg.ingestOmni(omni("kick", "winner", "five", null));
+    agg.ingestOmni(JSON.stringify({ ...JSON.parse(omni("youtube", "WINNER", "deleted soon")), uuid: "y1" }));
+    agg.ingestOmni(JSON.stringify({ platform: "youtube", type: "moderation-action", action: { type: "delete-message", uuid: "y1" } }));
+    expect(agg.recentFor(["winner"]).winner!.map((r) => r.text)).toEqual(["three", "four", "five"]);
+    agg.ingest(`MUTE ${JSON.stringify({ nick: "mod", data: "Winner" })}`);
+    expect(agg.recentFor(["winner"]).winner!.map((r) => r.text)).toEqual(["five"]);
+  });
+
+  test("the filters: bad words starred (emotes left alone), links out, long ones out", () => {
+    const bad = badWords("dang");
+    const f = FILTER_DEFAULTS;
+    expect(cleanMessage("holy shit that's dang good", undefined, f, bad)).toBe("holy **** that's **** good");
+    expect(cleanMessage("FUCKING POGGERS", { POGGERS: "POGGERS" }, f, bad)).toBe("****ING POGGERS");
+    expect(cleanMessage("look https://x.test/a and destiny.gg/bigscreen", undefined, f, bad)).toBe("look and");
+    expect(cleanMessage("https://x.test/a", undefined, f, bad)).toBeNull();
+    expect(cleanMessage("a".repeat(201), undefined, f, bad)).toBeNull();
+    expect(cleanMessage("shit https://x.test", undefined, { ...f, censor: false, links: false }, bad)).toBe("shit https://x.test");
+  });
+
+  test("repeats within half a minute, and who moderators took down", () => {
+    const g = new RepeatGuard();
+    const pasta = "This is a copy pasta, everyone!";
+    expect(g.isRepeat(pasta, 0, "a")).toBe(false);
+    expect(g.isRepeat("this is a COPY pasta everyone", 10_000, "b")).toBe(true);
+    expect(g.isRepeat(pasta, 35_000, "c")).toBe(true);
+    expect(g.isRepeat(pasta, 90_000, "d")).toBe(false);
+    // Short: only the same person again.
+    expect(g.isRepeat("W", 0, "a")).toBe(false);
+    expect(g.isRepeat("W", 1000, "b")).toBe(false);
+    expect(g.isRepeat("w!", 2000, "A")).toBe(true);
+    const r = new Removals();
+    r.add({ nicks: [{ nick: "Loud" }, { nick: "k", platform: "kick" }], ids: ["m1"] }, 0);
+    expect(r.has({ nick: "loud" })).toBe(true);
+    expect(r.has({ nick: "k" })).toBe(false);
+    expect(r.has({ nick: "k", platform: "kick" })).toBe(true);
+    expect(r.has({ nick: "x", msgId: "m1" })).toBe(true);
   });
 });

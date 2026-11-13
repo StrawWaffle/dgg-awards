@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { PlayIcon } from "@radix-ui/react-icons";
 import { type Clip, nomineeClip } from "@/lab/ClipPlayer";
-import { Emote } from "@/lab/Emote";
+import { ChatText, Emote } from "@/lab/Emote";
 import { type Award, amountLabel, decidedByRunoff, shareOf } from "@/lab/Results";
 
 export type Nominee = {
@@ -11,7 +11,12 @@ export type Nominee = {
   image: string | null;
   emote: string | null;
   clip: Clip | null;
+  /** Admin-only: their destiny.gg username, and a line typed for if they win. */
+  chatName: string | null;
+  winnerLine: string | null;
 };
+/** Beside the winner: what they said (in chat, or typed ahead in the admin page), with an emote. */
+export type WinnerWords = { name: string; emote: string | null; lines: { text: string; emotes?: Record<string, string> }[] };
 /** One award on the big screen: its results joined to its nominees' pictures and clips. */
 export type ShowAward = Award & { description: string; nominees: Nominee[] };
 
@@ -32,6 +37,8 @@ export async function loadShow(results: Award[]): Promise<ShowAward[]> {
       // In the emote award the nominee is the emote, named by its title.
       emote: o.emote ?? (isEmoteAward(award) ? o.title : null),
       clip: nomineeClip(o, `${o.title} · ${award.title}`),
+      chatName: o.chatName ?? null,
+      winnerLine: o.winnerLine ?? null,
     }));
     return { ...award, description: category?.description ?? "", nominees };
   });
@@ -257,9 +264,22 @@ function Tile({
 }
 
 /** Scene four: the winner, with their clip to play again. */
-export function WinnerCard({ award, onPlay, onCheer }: { award: ShowAward; onPlay: (clip: Clip) => void; onCheer: () => void }) {
+/** The award's winner (the first, on a tie; the most votes if none is marked), and its nominee. */
+export function winnerOf(award: ShowAward) {
   const result = award.results.find((r) => r.isWinner) ?? [...award.results].sort((a, b) => b.count - a.count)[0];
-  const nominee = award.nominees.find((x) => x.id === result?.id);
+  return { result, nominee: award.nominees.find((x) => x.id === result?.id) };
+}
+
+export function WinnerCard({
+  award,
+  onPlay,
+  onCheer,
+}: {
+  award: ShowAward;
+  onPlay: (clip: Clip) => void;
+  onCheer: () => void;
+}) {
+  const { result, nominee } = winnerOf(award);
   if (!result) return <div className="cozy-panel p-8">No votes in this award.</div>;
   return (
     <div className="cozy-panel space-y-4 p-6 text-center">
@@ -294,6 +314,30 @@ export function WinnerCard({ award, onPlay, onCheer }: { award: ShowAward; onPla
         <button type="button" className="cozy-btn" onClick={onCheer}>
           <Emote name="Klappa" size={0.6} title="" /> Cheer again
         </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * What the winner said, in a bubble with its tail towards the card, and an
+ * emote of theirs above it. Placed beside the winner card by the stage.
+ */
+export function WinnerBubble({ said }: { said: WinnerWords }) {
+  return (
+    <div className="flex w-72 flex-col items-start gap-2">
+      {said.emote && <Emote name={said.emote} size={1.4} title="" className="rank-bob" />}
+      <div className="cozy-panel relative space-y-1.5 px-4 py-3 text-left">
+        <span
+          aria-hidden
+          className="absolute top-6 -left-[9px] h-4 w-4 rotate-45 border-b-2 border-l-2"
+          style={{ background: "var(--panel)", borderColor: "var(--panel-border)" }}
+        />
+        {said.lines.map((l, i) => (
+          <p key={i} className="font-semibold">
+            <span className="font-black">{said.name}</span>: <ChatText text={l.text} emotes={l.emotes} />
+          </p>
+        ))}
       </div>
     </div>
   );

@@ -20,8 +20,24 @@ type From = { platform?: string };
 export type ChatEvent = { nick: string; emote: string; flair: string | null } & From;
 /** Someone who said anything, with the last emote in it (null if none). */
 export type ChatSpeaker = { nick: string; emote: string | null; flair: string | null } & From;
+/**
+ * The emotes in a message's text: each word that is one, and the emote's
+ * name. Only when there are any.
+ */
+type Emotes = { emotes?: Record<string, string> };
+/** Omnichat's id for the message, so a moderator deleting it can take it down here too. */
+type Id = { id?: string };
 /** Words from someone verified, which the stage may show at the right moment. */
-export type ChatSaid = { nick: string; text: string; flair: string | null } & From;
+export type ChatSaid = { nick: string; text: string; flair: string | null } & From & Emotes & Id;
+/** Anyone's words, for the chat column (filtered there, as the screen's settings say). */
+export type ChatLine = ChatSaid;
+/** One of someone's latest messages, kept for the winner's moment. */
+export type RecentLine = { text: string; at: number; platform?: string } & Emotes & Id;
+/**
+ * Chatters a moderator banned or muted (destiny.gg; `platform` elsewhere), and
+ * single messages they deleted (omnichat's ids).
+ */
+export type ChatRemoved = { nicks: ({ nick: string } & From)[]; ids: string[] };
 
 export type ChatSummary = {
   /** End of the window, ms. */
@@ -45,6 +61,10 @@ export type ChatSummary = {
   /** Combos of 2 or more that ended during the window (they'd be missed otherwise). */
   ended: { emote: string; count: number }[];
   said: ChatSaid[];
+  /** A random sample of the other messages with words in them (not emote-only, not verified). */
+  lines?: ChatLine[];
+  /** Taken down by moderators in the window. */
+  removed?: ChatRemoved;
   /** Pictures of the emotes from other platforms seen in the window, by name. */
   pictures?: Record<string, string>;
 };
@@ -64,6 +84,7 @@ const BOT_NAMES = new Set(["botrix", "kickbot", "nightbot", "streamelements", "f
 type Line = {
   nick: string;
   text: string;
+  id?: string;
   features: string[];
   tier: number;
   /** Null for destiny.gg. */
@@ -79,6 +100,13 @@ type Line = {
 type OmniMessage = {
   platform?: unknown;
   type?: unknown;
+  uuid?: unknown;
+  /**
+   * On a moderation-action: what was done. Seen: "delete-message" (with the
+   * message's uuid), and "mute" and "ban" (with `target.username`), destiny.gg's
+   * mutes included.
+   */
+  action?: Record<string, unknown> | null;
   user?: { username?: unknown; badges?: { id?: unknown }[] | null; subscription?: { tier?: unknown } | null } | null;
   content?: { originalText?: unknown; blocks?: { type?: unknown; platform?: unknown; id?: unknown; originalId?: unknown; url?: unknown }[] | null } | null;
 };
@@ -96,6 +124,22 @@ function spaceEmotes(text: string, codes: string[]) {
   return text.replace(new RegExp(escaped.join("|"), "g"), (code) => ` ${code} `);
 }
 
+/** How many of someone's messages are kept, and for how many people (the least recent forgotten first). */
+const RECENT_PER_NICK = 5;
+const RECENT_NICKS = 5000;
+const recentKey = (nick: string, platform: string | null | undefined) => `${platform ?? "dgg"}:${nick.toLowerCase()}`;
+/** Who a moderation action is about: `target` as seen, or wherever else omnichat may put it. */
+function actionNick(action: Record<string, unknown>): string | null {
+  for (const v of [action.user, action.target, action.targetUser]) {
+    if (v && typeof v === "object") {
+      const name = (v as { username?: unknown }).username;
+      if (typeof name === "string") return name;
+    }
+  }
+  for (const v of [action.username, action.targetUsername, action.nick]) if (typeof v === "string") return v;
+  return null;
+}
+
 /** Only plain https addresses go to the stage as pictures. */
 const PICTURE_URL = /^https:\/\/[^\s"'()\\]+$/;
 
@@ -110,11 +154,23 @@ export class ChatAggregator {
   private combo: { emote: string; count: number } | null = null;
   private ended: { emote: string; count: number }[] = [];
   private pictures = new Map<string, string>();
+  private lines: ChatLine[] = [];
+  private wordy = 0;
+  private removed: ChatRemoved = { nicks: [], ids: [] };
+  /** Everyone's last few messages, least recently heard from first. */
+  private recent = new Map<string, RecentLine[]>();
   private readonly verified: Set<string>;
 
   constructor(
     private catalogue: EmoteCatalogue | null,
-    private readonly options: { maxEvents?: number; maxSaid?: number; maxSpeakers?: number; verified?: string[]; random?: () => number } = {},
+    private readonly options: {
+      maxEvents?: number;
+      maxSaid?: number;
+      maxSpeakers?: number;
+      maxLines?: number;
+      verified?: string[];
+      random?: () => number;
+    } = {},
   ) {
     this.verified = new Set(options.verified ?? VERIFIED_FLAIRS);
   }
@@ -123,10 +179,25 @@ export class ChatAggregator {
     this.catalogue = catalogue;
   }
 
-  /** One raw frame off the chat socket (`EVENT {json}`). Anything but MSG is ignored. */
+  /**
+   * One raw frame off the chat socket (`EVENT {json}`): messages, and the
+   * mutes, bans and DEATHs that take someone's messages down (as chat-gui
+   * does). Anything else is ignored.
+   */
   ingest(raw: string) {
     // Cheap test first: in a flood nearly everything is MSG, but not all.
-    if (!raw.startsWith("MSG ")) return;
+    if (!raw.startsWith("MSG ")) {
+      const space = raw.indexOf(" ");
+      const event = raw.slice(0, space);
+      if (event !== "MUTE" && event !== "BAN" && event !== "DEATH") return;
+      try {
+        const d = JSON.parse(raw.slice(space + 1)) as { nick?: unknown; data?: unknown };
+        // MUTE and BAN: `nick` is the moderator and `data` who's muted; DEATH: `nick` is who.
+        const who = event === "DEATH" ? d.nick : d.data;
+        if (typeof who === "string" && who) this.removeNick(who, null);
+      } catch {}
+      return;
+    }
     let msg: Message;
     try {
       msg = JSON.parse(raw.slice(4));
@@ -151,11 +222,22 @@ export class ChatAggregator {
    * needed, and other platforms' emotes bring their picture.
    */
   ingestOmni(raw: string) {
-    if (!raw.includes('"type":"message"')) return;
+    const moderation = raw.includes('"type":"moderation-action"');
+    if (!moderation && !raw.includes('"type":"message"')) return;
     let msg: OmniMessage;
     try {
       msg = JSON.parse(raw);
     } catch {
+      return;
+    }
+    if (msg.type === "moderation-action") {
+      const action = msg.action ?? {};
+      const platform = typeof msg.platform === "string" && msg.platform !== "dgg" ? msg.platform : null;
+      if (action.type === "delete-message" && typeof action.uuid === "string") this.removeId(action.uuid);
+      else {
+        const nick = actionNick(action);
+        if (nick) this.removeNick(nick, platform);
+      }
       return;
     }
     const nick = msg.user?.username;
@@ -178,6 +260,7 @@ export class ChatAggregator {
     const tier = msg.user?.subscription?.tier;
     this.add({
       nick,
+      id: typeof msg.uuid === "string" ? msg.uuid : undefined,
       text: spaceEmotes(text, others),
       // Flairs mean something only on destiny.gg (Kick has "moderator" and "subscriber" badges too).
       features: platform ? [] : (msg.user?.badges ?? []).map((b) => b.id).filter((id): id is string => typeof id === "string"),
@@ -196,6 +279,7 @@ export class ChatAggregator {
     const words = line.text.split(/\s+/).filter(Boolean);
     let last: string | null = null;
     let allEmotes = words.length > 0;
+    let found: Record<string, string> | undefined;
     for (const word of words) {
       // Chat's own rule: an emote the author's tier doesn't allow is just a word.
       let emote: string | undefined;
@@ -210,8 +294,19 @@ export class ChatAggregator {
       }
       last = emote;
       this.counts.set(emote, (this.counts.get(emote) ?? 0) + 1);
+      (found ??= {})[word] = emote;
     }
     const flair = SHOWN_FLAIRS.find((f) => features.includes(f)) ?? null;
+    const extra = { ...from, ...(found ? { emotes: found } : {}), ...(line.id ? { id: line.id } : {}) };
+
+    // Their last few messages, for when they win.
+    const rk = recentKey(nick, line.platform);
+    const theirs = this.recent.get(rk) ?? [];
+    this.recent.delete(rk);
+    theirs.push({ text: line.text.slice(0, 300), at: Date.now(), ...extra });
+    if (theirs.length > RECENT_PER_NICK) theirs.shift();
+    this.recent.set(rk, theirs);
+    if (this.recent.size > RECENT_NICKS) this.recent.delete(this.recent.keys().next().value!);
 
     // Everyone who speaks, once per window with their latest. Past the cap,
     // each new name may replace one at random (reservoir sampling). The same
@@ -248,9 +343,56 @@ export class ChatAggregator {
       }
       return;
     }
-    if (features.some((f) => this.verified.has(f)) && this.said.length < (this.options.maxSaid ?? 3)) {
-      this.said.push({ nick, text: line.text.slice(0, 140), flair, ...from });
+    const verified = features.some((f) => this.verified.has(f));
+    if (verified && this.said.length < (this.options.maxSaid ?? 3)) {
+      this.said.push({ nick, text: line.text.slice(0, 140), flair, ...extra });
+      return;
     }
+    if (verified) return;
+    // Everyone else's words: a uniform sample, as for the emotes. Kept long
+    // enough that the screen can tell a long message from a short one.
+    this.wordy++;
+    const maxLines = this.options.maxLines ?? 6;
+    const said = { nick, text: line.text.slice(0, 500), flair, ...extra };
+    if (this.lines.length < maxLines) this.lines.push(said);
+    else {
+      const slot = Math.floor((this.options.random ?? Math.random)() * this.wordy);
+      if (slot < maxLines) this.lines[slot] = said;
+    }
+  }
+
+  /** A moderator muted or banned someone: their messages come down, here and on the screen. */
+  removeNick(nick: string, platform: string | null) {
+    if (this.removed.nicks.length < 50) this.removed.nicks.push(platform ? { nick, platform } : { nick });
+    this.recent.delete(recentKey(nick, platform));
+  }
+
+  /** A moderator deleted one message. */
+  removeId(id: string) {
+    if (this.removed.ids.length < 50) this.removed.ids.push(id);
+    for (const [k, theirs] of this.recent) {
+      const kept = theirs.filter((r) => r.id !== id);
+      if (kept.length !== theirs.length) {
+        if (kept.length) this.recent.set(k, kept);
+        else this.recent.delete(k);
+        break;
+      }
+    }
+  }
+
+  /**
+   * The latest messages of each of `names` (destiny.gg usernames, any case),
+   * from any platform they chat on under that name, oldest first.
+   */
+  recentFor(names: string[], max = 3): Record<string, RecentLine[]> {
+    const out: Record<string, RecentLine[]> = {};
+    for (const name of names) {
+      const lower = name.toLowerCase();
+      const all: RecentLine[] = [];
+      for (const [k, theirs] of this.recent) if (k.slice(k.indexOf(":") + 1) === lower) all.push(...theirs);
+      out[name] = all.sort((a, b) => a.at - b.at).slice(-max);
+    }
+    return out;
   }
 
   /** The window so far, and start a new one. The combo carries over. */
@@ -265,8 +407,13 @@ export class ChatAggregator {
       combo: this.combo && this.combo.count >= 2 ? this.combo : null,
       ended: this.ended,
       said: this.said,
+      lines: this.lines,
+      ...(this.removed.nicks.length || this.removed.ids.length ? { removed: this.removed } : {}),
       ...(this.pictures.size > 0 ? { pictures: Object.fromEntries(this.pictures) } : {}),
     };
+    this.lines = [];
+    this.wordy = 0;
+    this.removed = { nicks: [], ids: [] };
     this.pictures = new Map();
     this.ended = [];
     this.messages = 0;

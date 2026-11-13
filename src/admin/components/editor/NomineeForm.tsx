@@ -35,6 +35,8 @@ type Draft = {
   emote: string;
   renderType: "default" | "compact";
   listNumber: string;
+  chatName: string;
+  winnerLine: string;
 };
 
 const draftOf = (n: AdminNominee): Draft => ({
@@ -49,6 +51,8 @@ const draftOf = (n: AdminNominee): Draft => ({
   emote: n.emote ?? "",
   renderType: n.renderType ?? "default",
   listNumber: n.listNumber == null ? "" : String(n.listNumber),
+  chatName: n.chatName ?? "",
+  winnerLine: n.winnerLine ?? "",
 });
 
 /** Invalidate everything the editor shows, after any change. */
@@ -88,6 +92,8 @@ export function NomineeForm({ nominee, issues }: { nominee: AdminNominee; issues
         emote: draft.emote.trim() || null,
         renderType: draft.renderType,
         listNumber: draft.listNumber.trim() ? Number(draft.listNumber) : null,
+        chatName: draft.chatName.trim() || null,
+        winnerLine: draft.winnerLine.trim() || null,
       }),
     onSuccess: refresh,
   });
@@ -156,6 +162,25 @@ export function NomineeForm({ nominee, issues }: { nominee: AdminNominee; issues
               onChange={(e) => set("description", e.currentTarget.value)}
             />
           </Field>
+
+          <div className="grid gap-4 md:grid-cols-[1fr_2fr]">
+            <Field label="destiny.gg username" hint="Admins only. If this chatter wins, the big screen shows what they last said in chat.">
+              <input
+                className={inputClass}
+                value={draft.chatName}
+                placeholder="As it shows in chat"
+                onChange={(e) => set("chatName", e.currentTarget.value)}
+              />
+            </Field>
+            <Field label="Line to show if they win" hint="Admins only. Typed ahead of time; the big screen's settings pick this or their chat.">
+              <input
+                className={inputClass}
+                value={draft.winnerLine}
+                maxLength={300}
+                onChange={(e) => set("winnerLine", e.currentTarget.value)}
+              />
+            </Field>
+          </div>
 
           <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
             <Field

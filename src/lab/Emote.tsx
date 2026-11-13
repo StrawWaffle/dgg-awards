@@ -111,3 +111,19 @@ export function Emote({
     </span>
   );
 }
+
+/**
+ * A chat message's words, with the words that are emotes (`emotes`: word →
+ * emote name, from the relay) drawn as emotes.
+ */
+export function ChatText({ text, emotes, size = 0.85 }: { text: string; emotes?: Record<string, string>; size?: number }) {
+  if (!emotes) return <>{text}</>;
+  return (
+    <>
+      {text.split(/(\s+)/).map((part, i) => {
+        const emote = emotes[part];
+        return emote ? <Emote key={i} name={emote} size={size} /> : part;
+      })}
+    </>
+  );
+}

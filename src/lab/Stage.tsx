@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Emote, addEmotePictures, emoteElement, loopRepeating, paintEmote } from "@/lab/Emote";
+import { ChatText, Emote, addEmotePictures, emoteElement, loopRepeating, paintEmote } from "@/lab/Emote";
 import { type Clip, ClipPlayer } from "@/lab/ClipPlayer";
 import { Sketch } from "@/lab/sketch";
-import { type FeedStatus, liveFeed, simulatedFeed } from "@/lab/chatFeed";
+import { type FeedHandle, type FeedStatus, liveFeed, simulatedFeed } from "@/lab/chatFeed";
 import { type Levels, type Source, music, useFrame, useMusic } from "@/lab/music";
 import { toggleMusic } from "@/lab/MusicBar";
 import { useBursts } from "@/lab/Bursts";
 import { type Award, boardOf, decidedByRunoff, loadResults } from "@/lab/Results";
-import { DvdMenu, type ShowAward, TitleCard, WinnerCard, loadShow } from "@/lab/Scenes";
+import { DvdMenu, type ShowAward, TitleCard, WinnerBubble, WinnerCard, type WinnerWords, loadShow, winnerOf as winningNominee } from "@/lab/Scenes";
+import { type ChatFilters, LONG_AT, Removals, RepeatGuard, badWords, cleanMessage, loadFilters, saveFilters } from "@/lab/chatFilter";
 import { ResultsBoard } from "@/lab/StageRunoff";
 import { loadSimulated } from "@/lab/Summary";
 import { type Box, type Layout, Movable, defaultLayout, loadLayout, rectStyle, saveLayout } from "@/lab/StageLayout";
@@ -50,11 +51,28 @@ type Npc = {
   h: number;
 };
 
-/** One line in the chat column: someone's emote, a verified message, or a combo. */
+/**
+ * One line in the chat column: someone's emote, someone's words (highlighted
+ * if they're verified; "<censored>" once a moderator takes them down, if set
+ * so), or a combo. `msgId` is omnichat's, for a deleted message.
+ */
 type Line =
-  | { id: number; kind: "emote"; nick: string; flair: string | null; platform?: string; emote: string }
-  | { id: number; kind: "said"; nick: string; flair: string | null; platform?: string; text: string }
+  | { id: number; kind: "emote"; nick: string; flair: string | null; platform?: string; msgId?: string; emote: string }
+  | {
+      id: number;
+      kind: "said";
+      nick: string;
+      flair: string | null;
+      platform?: string;
+      msgId?: string;
+      text: string;
+      emotes?: Record<string, string>;
+      verified?: boolean;
+      censored?: boolean;
+    }
   | { id: number; kind: "combo"; emote: string; count: number };
+/** Words a quarter second, at most, so the column stays readable in a flood. */
+const WORD_LINES = 2;
 
 /** A character stays at least this long before it can be swapped out to make room. */
 const MIN_STAY_MS = 12_000;
@@ -200,6 +218,14 @@ export function Stage({
   const [stayMin, setStayMin] = useState(saved.stayMin);
   const [arrivalRate, setArrivalRate] = useState(saved.arrivals);
   const [whenFull, setWhenFull] = useState(saved.whenFull);
+  // What the chat window lets through (src/lab/chatFilter.ts), remembered per browser.
+  const [filters, setFilters] = useState(loadFilters);
+  const setFilter = <K extends keyof ChatFilters>(key: K, value: ChatFilters[K]) => setFilters((f) => ({ ...f, [key]: value }));
+  useEffect(() => saveFilters(filters), [filters]);
+  const bad = useMemo(() => badWords(filters.extraWords), [filters.extraWords]);
+  const repeats = useRef(new RepeatGuard());
+  const removals = useRef(new Removals());
+  const feedRef = useRef<FeedHandle | null>(null);
   useEffect(() => {
     try {
       localStorage.setItem(CAST_KEY, JSON.stringify({ max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull }));
@@ -312,8 +338,11 @@ export function Stage({
   const sceneNow = useRef(scene);
   sceneNow.current = scene;
   const [bursts, fire] = useBursts();
-  const settings = useRef({ rate, emoteShare, max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull });
-  settings.current = { rate, emoteShare, max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull };
+  const settings = useRef({ rate, emoteShare, max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull, filters, bad });
+  settings.current = { rate, emoteShare, max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull, filters, bad };
+  /** The nominees' destiny.gg usernames, for the simulator to chat as now and then. */
+  const nomineeNames = useRef<string[]>([]);
+  nomineeNames.current = (show ?? []).flatMap((a) => a.nominees.flatMap((n) => (n.chatName ? [n.chatName] : [])));
   const fps = useRef({ frames: 0, since: performance.now(), value: 0 });
   const clapUntil = useRef(0);
   const lineId = useRef(0);
@@ -400,6 +429,37 @@ export function Stage({
       bucket.tokens = Math.min(4, bucket.tokens + ((now - bucket.at) / 1000) * set.arrivals);
       bucket.at = now;
       if (summary.top[0]) chatEmote.current = summary.top[0][0];
+      const f = set.filters;
+      const takenDown = f.removed !== "nothing";
+
+      // Moderators muted, banned or deleted: their lines come down (or read
+      // <censored>), and so does a speech bubble of theirs.
+      if (summary.removed) {
+        removals.current.add(summary.removed, Date.now());
+        if (takenDown) {
+          const gone = (l: Line) => l.kind !== "combo" && !(l.kind === "said" && l.censored) && removals.current.has({ nick: l.nick, platform: l.platform, msgId: l.msgId });
+          setLines((ls) =>
+            f.removed === "remove"
+              ? ls.filter((l) => !gone(l))
+              : ls.map((l) => (gone(l) && l.kind !== "combo" ? { ...l, kind: "said" as const, text: "<censored>", emotes: undefined, censored: true } : l)),
+          );
+          for (const r of summary.removed.nicks) {
+            const npc = all.get(r.nick);
+            if (npc) {
+              npc.bubble.classList.add("hidden");
+              npc.bubbleUntil = 0;
+            }
+          }
+        }
+      }
+      const allowed = (l: { nick: string; platform?: string; id?: string }) =>
+        !takenDown || !removals.current.has({ nick: l.nick, platform: l.platform, msgId: l.id });
+      /** Someone's words through the filters, or null to leave them out. */
+      const words = (nick: string, text: string, emotes?: Record<string, string>) => {
+        const clean = cleanMessage(text, emotes, f, set.bad);
+        if (!clean || (f.repeats && repeats.current.isRepeat(clean, Date.now(), nick))) return null;
+        return clean;
+      };
 
       // The roster, as dgg-radio keeps it: who spoke within the last few
       // minutes, most recent last, with the last emote they used. With
@@ -463,7 +523,10 @@ export function Stage({
           }
         }
       }
-      const said = settings.current.showSaid ? summary.said : [];
+      const said = (settings.current.showSaid ? summary.said : []).filter(allowed).flatMap((s) => {
+        const text = words(s.nick, s.text, s.emotes);
+        return text ? [{ ...s, text }] : [];
+      });
       // No speech bubbles over a clip.
       if (!clipOn.current) for (const s of said) {
         // A verified message gets a character too, within the same limits.
@@ -478,13 +541,35 @@ export function Stage({
         npc.bubbleUntil = now + 5000;
         npc.lastSeen = now;
       }
-      // The chat column: a few of this window's characters, and what verified
-      // people said, newest at the bottom.
+      // The chat column: a few of this window's characters, a couple of
+      // people's messages (if set), and what verified people said, newest at
+      // the bottom.
+      const talk: Line[] = [];
+      if (f.words) {
+        for (const l of summary.lines ?? []) {
+          if (talk.length >= WORD_LINES) break;
+          if (!allowed(l)) continue;
+          const text = words(l.nick, l.text, l.emotes);
+          if (text) talk.push({ id: lineId.current++, kind: "said", nick: l.nick, flair: l.flair, platform: l.platform, msgId: l.id, text, emotes: l.emotes });
+        }
+      }
       const added: Line[] = [
         ...summary.events
+          .filter((e) => allowed(e))
           .slice(0, 2)
           .map((e) => ({ id: lineId.current++, kind: "emote" as const, nick: e.nick, flair: e.flair, platform: e.platform, emote: e.emote })),
-        ...said.map((s) => ({ id: lineId.current++, kind: "said" as const, nick: s.nick, flair: s.flair, platform: s.platform, text: s.text })),
+        ...talk,
+        ...said.map((s) => ({
+          id: lineId.current++,
+          kind: "said" as const,
+          nick: s.nick,
+          flair: s.flair,
+          platform: s.platform,
+          msgId: s.id,
+          text: s.text,
+          emotes: s.emotes,
+          verified: true,
+        })),
       ];
       // Combos as their own lines, as chat shows them: one that's still going
       // counts up in place; one that ended in between gets its final count.
@@ -532,10 +617,57 @@ export function Stage({
   );
 
   useEffect(() => {
-    if (feed !== "sim") return liveFeed(onSummary, feed);
-    if (emotes.length === 0) return;
-    return simulatedFeed(emotes, () => settings.current.rate, () => settings.current.emoteShare, onSummary);
+    let handle: FeedHandle | null = null;
+    if (feed !== "sim") handle = liveFeed(onSummary, feed);
+    else if (emotes.length > 0) {
+      handle = simulatedFeed(emotes, () => settings.current.rate, () => settings.current.emoteShare, onSummary, () => nomineeNames.current);
+    }
+    feedRef.current = handle;
+    return () => {
+      handle?.stop();
+      if (feedRef.current === handle) feedRef.current = null;
+    };
   }, [feed, emotes, onSummary]);
+
+  // Beside the winner: their last few messages in chat (asked for every few
+  // seconds while the scene is up, through the chat window's filters), or the
+  // line typed for them in the admin page, as set.
+  const [winnerSaid, setWinnerSaid] = useState<WinnerWords | null>(null);
+  useEffect(() => {
+    setWinnerSaid(null);
+    if (scene !== "winner" || !award || filters.winnerWords === "off") return;
+    const { nominee } = winningNominee(award);
+    if (!nominee) return;
+    if (filters.winnerWords === "line") {
+      if (nominee.winnerLine) setWinnerSaid({ name: nominee.chatName ?? nominee.title, emote: nominee.emote, lines: [{ text: nominee.winnerLine }] });
+      return;
+    }
+    const name = nominee.chatName;
+    if (!name) return;
+    let alive = true;
+    const ask = async () => {
+      const got = (await feedRef.current?.recent([name]))?.[name] ?? [];
+      if (!alive) return;
+      const { filters: f, bad: b } = settings.current;
+      const shown = got
+        .filter((r) => f.removed === "nothing" || !removals.current.has({ nick: name, platform: r.platform, msgId: r.id }))
+        .flatMap((r) => {
+          // Long ones are cut, not left out: it's their moment.
+          const text = cleanMessage(r.text, r.emotes, { ...f, long: false }, b);
+          return text ? [{ text: text.length > LONG_AT ? `${text.slice(0, LONG_AT)}…` : text, emotes: r.emotes }] : [];
+        })
+        // The same line twice in a row shows once.
+        .filter((l, i, all) => i === 0 || l.text !== all[i - 1]!.text);
+      const used = [...got].reverse().flatMap((r) => Object.values(r.emotes ?? {}));
+      setWinnerSaid(shown.length ? { name, emote: nominee.emote ?? used[0] ?? null, lines: shown } : null);
+    };
+    ask();
+    const timer = setInterval(ask, 4000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [scene, award, filters.winnerWords, feed]);
 
   // Everyone walks off and the chat clears when switching feeds.
   useEffect(() => {
@@ -962,6 +1094,51 @@ export function Stage({
             <label className="flex items-center gap-2" title="The Verified flair, Notable, Broadcaster and mods">
               <input type="checkbox" checked={showSaid} onChange={(e) => setShowSaid(e.currentTarget.checked)} /> Verified messages
             </label>
+            <p className="border-t-2 pt-2 font-black" style={{ borderColor: "var(--panel-border)" }}>
+              Chat window
+            </p>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={filters.words} onChange={(e) => setFilter("words", e.currentTarget.checked)} /> Everyone's messages, not only emotes
+            </label>
+            <label className="flex items-center justify-between gap-2" title="When a moderator mutes or bans someone, or deletes a message">
+              Muted or banned
+              <select value={filters.removed} onChange={(e) => setFilter("removed", e.currentTarget.value as ChatFilters["removed"])} className="cozy-input py-1!">
+                <option value="remove">Take their messages out</option>
+                <option value="censor">Show &lt;censored&gt;</option>
+                <option value="nothing">Leave them</option>
+              </select>
+            </label>
+            <label className="flex items-center gap-2" title="destiny.gg chat's own list, as its Censor bad words setting">
+              <input type="checkbox" checked={filters.censor} onChange={(e) => setFilter("censor", e.currentTarget.checked)} /> Star out bad words
+            </label>
+            {filters.censor && (
+              <label className="flex items-center gap-2">
+                <span className="w-36 shrink-0">More words</span>
+                <input
+                  value={filters.extraWords}
+                  placeholder="word, another"
+                  onChange={(e) => setFilter("extraWords", e.currentTarget.value)}
+                  className="cozy-input min-w-0 flex-1 py-1!"
+                />
+              </label>
+            )}
+            <label className="flex items-center gap-2" title="The same message again within half a minute: copypastas and spam">
+              <input type="checkbox" checked={filters.repeats} onChange={(e) => setFilter("repeats", e.currentTarget.checked)} /> Hide repeats
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={filters.long} onChange={(e) => setFilter("long", e.currentTarget.checked)} /> Hide messages over {LONG_AT} characters
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={filters.links} onChange={(e) => setFilter("links", e.currentTarget.checked)} /> Hide links
+            </label>
+            <label className="flex items-center justify-between gap-2" title="Set a nominee's destiny.gg username or line in the admin page">
+              Beside the winner
+              <select value={filters.winnerWords} onChange={(e) => setFilter("winnerWords", e.currentTarget.value as ChatFilters["winnerWords"])} className="cozy-input py-1!">
+                <option value="chat">Their last messages in chat</option>
+                <option value="line">The line typed in the admin page</option>
+                <option value="off">Nothing</option>
+              </select>
+            </label>
             <p className="text-xs font-semibold" style={{ color: "var(--muted)" }}>
               {stats.fps} fps · {stats.npcs} on stage · {stats.perSecond.toLocaleString()} messages/s ·{" "}
               {feed !== "sim" ? (status.connected ? "live chat connected" : "live chat waiting") : "simulator"}. {status.note}{" "}
@@ -1032,7 +1209,13 @@ export function Stage({
           </div>
         )}
         {award && (
-          <div className="flex h-full justify-center">
+          <div className="relative flex h-full justify-center">
+            {/* Beside the winner card, outside the scene's box (which scrolls, so would clip it). */}
+            {scene === "winner" && winnerSaid && !shownClip && (
+              <div className="lab-lower pointer-events-auto absolute top-1/4" style={{ left: `calc(50% + ${SCENE_WIDTH.winner} / 2 + 20px)` }}>
+                <WinnerBubble said={winnerSaid} />
+              </div>
+            )}
             <div
               key={`${scene}-${award.id}`}
               ref={sceneBox}
@@ -1059,7 +1242,9 @@ export function Stage({
                   />
                 </div>
               )}
-              {scene === "winner" && <WinnerCard award={award} onPlay={setPlaying} onCheer={() => winnerMoment(winnerOf(award))} />}
+              {scene === "winner" && (
+                <WinnerCard award={award} onPlay={setPlaying} onCheer={() => winnerMoment(winnerOf(award))} />
+              )}
             </div>
           </div>
         )}
@@ -1132,11 +1317,21 @@ export function Stage({
                   <div
                     key={l.id}
                     className="rounded-lg px-1.5 py-0.5"
-                    style={l.kind === "said" ? { background: "var(--highlight)", borderLeft: "3px solid var(--primary-shadow)" } : undefined}
+                    style={l.kind === "said" && l.verified ? { background: "var(--highlight)", borderLeft: "3px solid var(--primary-shadow)" } : undefined}
                   >
                     <PlatformMark platform={l.platform} />
                     <span className={nickClass(l.flair)}>{l.nick}</span>:{" "}
-                    {l.kind === "emote" ? <Emote name={l.emote} size={0.85} /> : <span className="font-semibold">{l.text}</span>}
+                    {l.kind === "emote" ? (
+                      <Emote name={l.emote} size={0.85} />
+                    ) : l.censored ? (
+                      <span className="font-semibold italic" style={{ color: "var(--muted)" }}>
+                        {l.text}
+                      </span>
+                    ) : (
+                      <span className="font-semibold">
+                        <ChatText text={l.text} emotes={l.emotes} />
+                      </span>
+                    )}
                   </div>
                 ),
               )}
