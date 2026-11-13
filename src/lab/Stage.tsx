@@ -98,6 +98,8 @@ type Cast = {
   max: number;
   names: boolean;
   showSaid: boolean;
+  /** Speech bubbles over characters: anyone's words (a few at a time), verified people's only, or none. */
+  bubbles: "anyone" | "verified" | "off";
   who: "everyone" | "emotes";
   stayMin: number;
   arrivals: number;
@@ -105,7 +107,7 @@ type Cast = {
   /** The share of newcomers who fly in the sky beside the scene. */
   fly: number;
 };
-const CAST_DEFAULTS: Cast = { max: 60, names: true, showSaid: true, who: "everyone", stayMin: 5, arrivals: 2, whenFull: "keep", fly: 0.2 };
+const CAST_DEFAULTS: Cast = { max: 60, names: true, showSaid: true, who: "everyone", stayMin: 5, arrivals: 2, whenFull: "keep", fly: 0.2, bubbles: "anyone" };
 function loadCast(): Cast {
   try {
     return { ...CAST_DEFAULTS, ...JSON.parse(localStorage.getItem(CAST_KEY) ?? "{}") };
@@ -231,6 +233,9 @@ export function Stage({
   const [max, setMax] = useState(saved.max);
   const [names, setNames] = useState(saved.names);
   const [showSaid, setShowSaid] = useState(saved.showSaid);
+  const [bubbles, setBubbles] = useState(saved.bubbles);
+  /** When the last bubble from someone unverified went up, to keep them to about one a second. */
+  const lastBubble = useRef(0);
   const [who, setWho] = useState(saved.who);
   const [stayMin, setStayMin] = useState(saved.stayMin);
   const [arrivalRate, setArrivalRate] = useState(saved.arrivals);
@@ -257,9 +262,9 @@ export function Stage({
   const feedRef = useRef<FeedHandle | null>(null);
   useEffect(() => {
     try {
-      localStorage.setItem(CAST_KEY, JSON.stringify({ max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull, fly: flyShare }));
+      localStorage.setItem(CAST_KEY, JSON.stringify({ max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull, fly: flyShare, bubbles }));
     } catch {}
-  }, [max, names, showSaid, who, stayMin, arrivalRate, whenFull, flyShare]);
+  }, [max, names, showSaid, who, stayMin, arrivalRate, whenFull, flyShare, bubbles]);
   /** Who spoke lately: nick → when, their last emote, flair. Oldest first. */
   const roster = useRef(new Map<string, { at: number; emote: string | null; flair: string | null; platform?: string }>());
   /** What chat is spamming most: for someone who hasn't sent an emote. */
@@ -367,8 +372,8 @@ export function Stage({
   const sceneNow = useRef(scene);
   sceneNow.current = scene;
   const [bursts, fire] = useBursts();
-  const settings = useRef({ rate, emoteShare, max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull, filters, bad, flyShare });
-  settings.current = { rate, emoteShare, max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull, filters, bad, flyShare };
+  const settings = useRef({ rate, emoteShare, max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull, filters, bad, flyShare, bubbles });
+  settings.current = { rate, emoteShare, max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull, filters, bad, flyShare, bubbles };
   /** The nominees' destiny.gg usernames, for the simulator to chat as now and then. */
   const nomineeNames = useRef<string[]>([]);
   nomineeNames.current = (show ?? []).flatMap((a) => a.nominees.flatMap((n) => (n.chatName ? [n.chatName] : [])));
@@ -385,7 +390,8 @@ export function Stage({
     const el = document.createElement("div");
     el.className = "absolute left-0 top-0 flex flex-col items-center will-change-transform";
     const bubble = document.createElement("div");
-    bubble.className = "cozy-panel mb-1 hidden max-w-52 px-3 py-1.5 text-xs font-bold";
+    // Floats above the character, so showing it doesn't move the emote.
+    bubble.className = "cozy-panel pointer-events-none absolute bottom-full left-1/2 mb-1 hidden w-max max-w-52 -translate-x-1/2 px-3 py-1.5 text-xs font-bold";
     const label = document.createElement("span");
     label.className = `${nickClass(flair)} mb-0.5 whitespace-nowrap rounded-full px-1.5 text-[11px]`;
     label.style.background = "color-mix(in oklab, var(--panel) 75%, transparent)";
@@ -570,12 +576,13 @@ export function Stage({
         }
       }
       // Verified people's words: filtered, but never held back as repeats.
-      const said = (settings.current.showSaid ? summary.said : []).filter(allowed).flatMap((s) => {
+      const verifiedSaid = summary.said.filter(allowed).flatMap((s) => {
         const text = cleanMessage(s.text, s.emotes, f, set.bad);
         return text ? [{ ...s, text }] : [];
       });
-      // No speech bubbles over a clip.
-      if (!clipOn.current) for (const s of said) {
+      const said = set.showSaid ? verifiedSaid : [];
+      // Speech bubbles for them (none over a clip).
+      if (!clipOn.current && set.bubbles !== "off") for (const s of verifiedSaid) {
         // A verified message gets a character too, within the same limits.
         let npc = all.get(s.nick);
         if (!npc) {
@@ -598,6 +605,21 @@ export function Stage({
           if (!allowed(l)) continue;
           const text = words(l.nick, l.text, l.emotes);
           if (text) talk.push({ id: lineId.current++, kind: "said", nick: l.nick, flair: l.flair, platform: l.platform, msgId: l.id, text, emotes: l.emotes });
+        }
+      }
+      // Anyone's words in a bubble, if set: about one a second, over someone
+      // already on stage without one, from what passed the chat window's filters.
+      if (set.bubbles === "anyone" && !clipOn.current && now - lastBubble.current > 1000) {
+        for (const l of summary.lines ?? []) {
+          const npc = all.get(l.nick);
+          if (!npc || npc.leaving || npc.bubbleUntil || !allowed(l)) continue;
+          const text = cleanMessage(l.text, l.emotes, f, set.bad);
+          if (!text) continue;
+          npc.bubble.textContent = text;
+          npc.bubble.classList.remove("hidden");
+          npc.bubbleUntil = now + 4000;
+          lastBubble.current = now;
+          break;
         }
       }
       const added: Line[] = [
@@ -1209,7 +1231,15 @@ export function Stage({
               <input type="checkbox" checked={names} onChange={(e) => setNames(e.currentTarget.checked)} /> Names over characters
             </label>
             <label className="flex items-center gap-2" title="The Verified flair, Notable, Broadcaster and mods">
-              <input type="checkbox" checked={showSaid} onChange={(e) => setShowSaid(e.currentTarget.checked)} /> Verified messages
+              <input type="checkbox" checked={showSaid} onChange={(e) => setShowSaid(e.currentTarget.checked)} /> Verified messages in the chat window
+            </label>
+            <label className="flex items-center justify-between gap-2" title="Over characters on stage, through the chat window's filters">
+              Speech bubbles
+              <select value={bubbles} onChange={(e) => setBubbles(e.currentTarget.value as Cast["bubbles"])} className="cozy-input py-1!">
+                <option value="anyone">Anyone, about one a second</option>
+                <option value="verified">Verified people only</option>
+                <option value="off">None</option>
+              </select>
             </label>
             <p className="border-t-2 pt-2 font-black" style={{ borderColor: "var(--panel-border)" }}>
               Chat window
