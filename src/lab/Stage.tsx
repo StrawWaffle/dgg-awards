@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChatText, Emote, addEmotePictures, emoteElement, loopRepeating, paintEmote } from "@/lab/Emote";
+import { ChatText, Emote, EmoteRow, addEmotePictures, emoteElement, paintEmotes } from "@/lab/Emote";
 import { type Clip, ClipPlayer } from "@/lab/ClipPlayer";
 import { Sketch } from "@/lab/sketch";
 import { type FeedHandle, type FeedStatus, liveFeed, simulatedFeed } from "@/lab/chatFeed";
@@ -18,8 +18,17 @@ import type { ChatSummary } from "@/server/lab/chat-aggregator";
 
 type Npc = {
   el: HTMLDivElement;
-  emoteEl: HTMLSpanElement;
+  /** The "text" span its emote (or group of emotes) is drawn in. */
+  wrap: HTMLSpanElement;
   bubble: HTMLDivElement;
+  /** Flying in the sky beside the scene, under a propeller hat, rather than walking the floor. */
+  fly: boolean;
+  hat: HTMLImageElement | null;
+  /** How high it flies (0 top, 1 just over the horizon), and where in its bob it is. */
+  alt: number;
+  phase: number;
+  /** Which side of the scene it flies on. */
+  side: "left" | "right";
   nick: string;
   emote: string;
   x: number;
@@ -57,7 +66,7 @@ type Npc = {
  * so), or a combo. `msgId` is omnichat's, for a deleted message.
  */
 type Line =
-  | { id: number; kind: "emote"; nick: string; flair: string | null; platform?: string; msgId?: string; emote: string }
+  | { id: number; kind: "emote"; nick: string; flair: string | null; platform?: string; msgId?: string; emote: string; seq?: string[] }
   | {
       id: number;
       kind: "said";
@@ -93,8 +102,10 @@ type Cast = {
   stayMin: number;
   arrivals: number;
   whenFull: "keep" | "swap";
+  /** The share of newcomers who fly in the sky beside the scene. */
+  fly: number;
 };
-const CAST_DEFAULTS: Cast = { max: 60, names: true, showSaid: true, who: "everyone", stayMin: 5, arrivals: 2, whenFull: "keep" };
+const CAST_DEFAULTS: Cast = { max: 60, names: true, showSaid: true, who: "everyone", stayMin: 5, arrivals: 2, whenFull: "keep", fly: 0.2 };
 function loadCast(): Cast {
   try {
     return { ...CAST_DEFAULTS, ...JSON.parse(localStorage.getItem(CAST_KEY) ?? "{}") };
@@ -103,13 +114,19 @@ function loadCast(): Cast {
   }
 }
 
+/** Emotes that come with their own propeller hat, so don't get another. */
+const HATTED = new Set(["Cucked"]);
+
 function setEmote(npc: Npc, emote: string) {
   if (npc.emote === emote) return;
   npc.emote = emote;
   npc.w = 0;
-  paintEmote(npc.emoteEl, emote);
-  setTimeout(() => loopRepeating(npc.emoteEl), 50);
+  paintEmotes(npc.wrap, emote);
+  if (npc.hat) npc.hat.style.visibility = emote.split(" ").some((e) => HATTED.has(e)) ? "hidden" : "";
 }
+
+/** Wide enough for a flyer: a strip of sky beside the scene narrower than this stays empty. */
+const MIN_STRIP = 70;
 
 /** How wide each scene's box is, within the layout's box for the scenes. */
 const SCENE_WIDTH: Record<Scene, string> = {
@@ -218,6 +235,18 @@ export function Stage({
   const [stayMin, setStayMin] = useState(saved.stayMin);
   const [arrivalRate, setArrivalRate] = useState(saved.arrivals);
   const [whenFull, setWhenFull] = useState(saved.whenFull);
+  const [flyShare, setFlyShare] = useState(saved.fly);
+  /** Emotes drawn together with the ones beside them (GIGACHAD BLADE), from destiny.gg's emotes.css. */
+  const combos = useRef(new Set<string>());
+  useEffect(() => {
+    fetch("/api/lab/emote-combos")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((names: string[]) => (combos.current = new Set(names)))
+      .catch(() => {});
+  }, []);
+  /** What someone's character shows: their whole message if it holds an emote that combines, else its last emote. */
+  const shownEmote = (p: { emote: string | null; seq?: string[] }) =>
+    p.seq && p.seq.some((e) => combos.current.has(e)) ? p.seq.join(" ") : p.emote;
   // What the chat window lets through (src/lab/chatFilter.ts), remembered per browser.
   const [filters, setFilters] = useState(loadFilters);
   const setFilter = <K extends keyof ChatFilters>(key: K, value: ChatFilters[K]) => setFilters((f) => ({ ...f, [key]: value }));
@@ -228,9 +257,9 @@ export function Stage({
   const feedRef = useRef<FeedHandle | null>(null);
   useEffect(() => {
     try {
-      localStorage.setItem(CAST_KEY, JSON.stringify({ max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull }));
+      localStorage.setItem(CAST_KEY, JSON.stringify({ max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull, fly: flyShare }));
     } catch {}
-  }, [max, names, showSaid, who, stayMin, arrivalRate, whenFull]);
+  }, [max, names, showSaid, who, stayMin, arrivalRate, whenFull, flyShare]);
   /** Who spoke lately: nick → when, their last emote, flair. Oldest first. */
   const roster = useRef(new Map<string, { at: number; emote: string | null; flair: string | null; platform?: string }>());
   /** What chat is spamming most: for someone who hasn't sent an emote. */
@@ -338,8 +367,8 @@ export function Stage({
   const sceneNow = useRef(scene);
   sceneNow.current = scene;
   const [bursts, fire] = useBursts();
-  const settings = useRef({ rate, emoteShare, max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull, filters, bad });
-  settings.current = { rate, emoteShare, max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull, filters, bad };
+  const settings = useRef({ rate, emoteShare, max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull, filters, bad, flyShare });
+  settings.current = { rate, emoteShare, max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull, filters, bad, flyShare };
   /** The nominees' destiny.gg usernames, for the simulator to chat as now and then. */
   const nomineeNames = useRef<string[]>([]);
   nomineeNames.current = (show ?? []).flatMap((a) => a.nominees.flatMap((n) => (n.chatName ? [n.chatName] : [])));
@@ -367,18 +396,34 @@ export function Stage({
       label.append(mark);
     }
     label.append(nick);
-    const { wrap, emote: emoteEl } = emoteElement(emote);
-    el.append(bubble, label, wrap);
+    const { wrap } = emoteElement(emote);
+    // Some fly, under a propeller hat on their head.
+    const fly = Math.random() < settings.current.flyShare;
+    let hat: HTMLImageElement | null = null;
+    if (fly) {
+      hat = document.createElement("img");
+      hat.src = "/Media/propeller-hat.gif";
+      hat.alt = "";
+      hat.className = "relative z-10 -mb-1.5 block h-[15px] w-[32px] max-w-none";
+      hat.style.imageRendering = "pixelated";
+      if (emote.split(" ").some((e) => HATTED.has(e))) hat.style.visibility = "hidden";
+      el.append(bubble, label, hat, wrap);
+    } else el.append(bubble, label, wrap);
     box.append(el);
     el.style.opacity = "0";
-    // In from the left or the right edge, walking onto the stage.
+    // In from the left or the right edge, walking (or flying) onto the stage.
     const fromLeft = Math.random() < 0.5;
     const width = box.clientWidth;
     const lane = Math.random();
     const npc: Npc = {
       el,
-      emoteEl,
+      wrap,
       bubble,
+      fly,
+      hat,
+      alt: Math.random(),
+      phase: Math.random() * Math.PI * 2,
+      side: fromLeft ? "left" : "right",
       nick,
       emote,
       x: fromLeft ? -50 : box.clientWidth + 10,
@@ -472,7 +517,7 @@ export function Stage({
         book.delete(p.nick);
         book.set(p.nick, {
           at: now,
-          emote: p.emote ?? known?.emote ?? null,
+          emote: shownEmote(p) ?? known?.emote ?? null,
           flair: p.flair ?? known?.flair ?? null,
           platform: p.platform ?? known?.platform,
         });
@@ -486,10 +531,11 @@ export function Stage({
       for (const p of heard) {
         const npc = all.get(p.nick);
         if (!npc) continue;
-        if (p.emote) {
+        const shown = shownEmote(p);
+        if (shown) {
           // During a winner moment everyone claps; they go back to this after.
-          setEmote(npc, npc.clapUntil > now ? "Klappa" : p.emote);
-          if (npc.clapUntil > now) npc.restore = p.emote;
+          setEmote(npc, npc.clapUntil > now ? "Klappa" : shown);
+          if (npc.clapUntil > now) npc.restore = shown;
           if (!npc.entering && !clipOn.current) npc.hop = Math.max(npc.hop, 0.6);
         }
         npc.lastSeen = now;
@@ -523,8 +569,9 @@ export function Stage({
           }
         }
       }
+      // Verified people's words: filtered, but never held back as repeats.
       const said = (settings.current.showSaid ? summary.said : []).filter(allowed).flatMap((s) => {
-        const text = words(s.nick, s.text, s.emotes);
+        const text = cleanMessage(s.text, s.emotes, f, set.bad);
         return text ? [{ ...s, text }] : [];
       });
       // No speech bubbles over a clip.
@@ -557,7 +604,7 @@ export function Stage({
         ...summary.events
           .filter((e) => allowed(e))
           .slice(0, 2)
-          .map((e) => ({ id: lineId.current++, kind: "emote" as const, nick: e.nick, flair: e.flair, platform: e.platform, emote: e.emote })),
+          .map((e) => ({ id: lineId.current++, kind: "emote" as const, nick: e.nick, flair: e.flair, platform: e.platform, emote: e.emote, seq: e.seq })),
         ...talk,
         ...said.map((s) => ({
           id: lineId.current++,
@@ -633,6 +680,7 @@ export function Stage({
   // seconds while the scene is up, through the chat window's filters), or the
   // line typed for them in the admin page, as set.
   const [winnerSaid, setWinnerSaid] = useState<WinnerWords | null>(null);
+  const winnerBubble = useRef<HTMLDivElement>(null);
   useEffect(() => {
     setWinnerSaid(null);
     if (scene !== "winner" || !award || filters.winnerWords === "off") return;
@@ -717,7 +765,69 @@ export function Stage({
     const panel = still ? (clipOn.current && clipBox.current ? boxOnFloor(clipBox.current, box) : null) : keep;
     const cut = panel ? Math.min(1, Math.max(0, (panel.bottom + 36 - top) / depthRange)) : 0;
     const stays = panel ? Math.max(0, width - (panel.right - panel.left) - 60) / Math.max(1, width) : 1;
+    // The sky: strips beside whatever's in the middle (the scene, its title, a
+    // clip, and the winner's bubble), from near the top down to the horizon.
+    const skyTop = 46;
+    const skyBottom = top - 30;
+    const middleBox = still ? panel : sceneBox.current ? boxOnFloor(sceneBox.current, box) : null;
+    let mid = middleBox ? { left: middleBox.left, right: middleBox.right } : null;
+    if (mid && winnerBubble.current) {
+      const b = boxOnFloor(winnerBubble.current, box);
+      mid = { left: Math.min(mid.left, b.left), right: Math.max(mid.right, b.right) };
+    }
+    const strips = {
+      left: mid ? { from: 4, to: mid.left - 24 } : { from: 4, to: width / 2 - 20 },
+      right: mid ? { from: mid.right + 24, to: width - 4 } : { from: width / 2 + 20, to: width - 4 },
+    };
+    const roomy = (side: "left" | "right") => strips[side].to - strips[side].from >= MIN_STRIP && skyBottom - skyTop > 60;
     for (const n of everyone) {
+      // A flyer whose side has no room crosses to the other; with none, it lands.
+      if (n.fly && !roomy(n.side) && roomy(n.side === "left" ? "right" : "left")) n.side = n.side === "left" ? "right" : "left";
+      const airborne = n.fly && roomy(n.side);
+      if (airborne) {
+        if (!n.w) {
+          n.w = n.el.offsetWidth;
+          n.h = n.el.offsetHeight;
+        }
+        const strip = strips[n.side];
+        const lo = strip.from;
+        const hi = Math.max(lo, strip.to - n.w * 0.8);
+        if (!n.entering && !n.leaving && !still && music.downbeat) n.hop = Math.max(n.hop, 0.5);
+        if (n.leaving) n.x += n.vx * dt;
+        else if (still) {
+          // A clip: hover in place, out of its way.
+          n.x += (Math.min(hi, Math.max(lo, n.x)) - n.x) * Math.min(1, dt * 3);
+        } else if (n.entering) {
+          n.targetX = Math.min(hi, Math.max(lo, n.targetX));
+          n.x += n.vx * dt;
+          if ((n.vx > 0 && n.x >= n.targetX) || (n.vx < 0 && n.x <= n.targetX)) {
+            n.entering = false;
+            n.vx = (Math.random() < 0.5 ? -1 : 1) * (10 + Math.random() * 20);
+          }
+        } else if (n.x < lo - 2 || n.x > hi + 2) {
+          // The scene moved or grew: drift back into the strip.
+          n.x += (Math.min(hi, Math.max(lo, n.x)) - n.x) * Math.min(1, dt * 2);
+        } else {
+          n.x += n.vx * dt;
+          if (n.x < lo || n.x > hi) {
+            n.vx = -n.vx;
+            n.x = Math.min(hi, Math.max(lo, n.x));
+          }
+        }
+        n.opacity = n.leaving ? n.opacity - dt * 1.2 : Math.min(1, n.opacity + dt * 2.5);
+        if (n.leaving && (n.opacity <= 0 || n.x < -80 || n.x > width + 40)) {
+          n.el.remove();
+          leavingNpcs.current.delete(n);
+          continue;
+        }
+        n.hop = Math.max(0, n.hop - dt * 2.4);
+        n.bob = 0;
+        // Hovering: a slow rise and fall, and a little lift on the one of each bar.
+        const y = skyTop + n.alt * (skyBottom - skyTop) + Math.sin(now / 700 + n.phase) * 6 - Math.sin(n.hop * Math.PI) * 14 * n.hop;
+        n.el.style.transform = `translate3d(${n.x}px, ${y}px, 0) scale(0.8)`;
+        n.el.style.opacity = String(Math.max(0, n.opacity));
+        n.el.style.zIndex = "0";
+      } else {
       const lane = panel && cut > 0 && cut < 0.9 && n.home < cut && n.roll > stays ? cut + (n.home / cut) * (1 - cut) : n.home;
       n.depth += (lane - n.depth) * Math.min(1, dt * 1.5);
       const ground = top + n.depth * depthRange;
@@ -792,6 +902,7 @@ export function Stage({
       n.el.style.transform = `translate3d(${n.x}px, ${y}px, 0) scale(${scale * (1 + n.bob * 0.04)}, ${scale * (1 - n.bob * 0.06)})`;
       n.el.style.opacity = String(Math.max(0, n.opacity));
       n.el.style.zIndex = String(Math.round(n.depth * 100));
+      }
       (n.el.children[1] as HTMLElement).style.display = showNames ? "" : "none";
       if (n.bubbleUntil && now > n.bubbleUntil) {
         n.bubble.classList.add("hidden");
@@ -1088,6 +1199,11 @@ export function Stage({
                 </label>
               </>
             )}
+            <label className="flex items-center gap-2" title="Newcomers who fly in the sky beside the scene, under a propeller hat">
+              <span className="w-36 shrink-0">Flying</span>
+              <input type="range" min={0} max={0.8} step={0.05} value={flyShare} onChange={(e) => setFlyShare(Number(e.currentTarget.value))} className="cozy-range min-w-0 flex-1" />
+              <span className="w-12 text-right tabular-nums">{Math.round(flyShare * 100)}%</span>
+            </label>
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={names} onChange={(e) => setNames(e.currentTarget.checked)} /> Names over characters
             </label>
@@ -1212,7 +1328,11 @@ export function Stage({
           <div className="relative flex h-full justify-center">
             {/* Beside the winner card, outside the scene's box (which scrolls, so would clip it). */}
             {scene === "winner" && winnerSaid && !shownClip && (
-              <div className="lab-lower pointer-events-auto absolute top-1/4" style={{ left: `calc(50% + ${SCENE_WIDTH.winner} / 2 + 20px)` }}>
+              <div
+                ref={winnerBubble}
+                className="lab-lower pointer-events-auto absolute top-1/4"
+                style={{ left: `calc(50% + ${SCENE_WIDTH.winner} / 2 + 20px)` }}
+              >
                 <WinnerBubble said={winnerSaid} />
               </div>
             )}
@@ -1322,7 +1442,7 @@ export function Stage({
                     <PlatformMark platform={l.platform} />
                     <span className={nickClass(l.flair)}>{l.nick}</span>:{" "}
                     {l.kind === "emote" ? (
-                      <Emote name={l.emote} size={0.85} />
+                      l.seq ? <EmoteRow names={l.seq} size={0.85} /> : <Emote name={l.emote} size={0.85} />
                     ) : l.censored ? (
                       <span className="font-semibold italic" style={{ color: "var(--muted)" }}>
                         {l.text}

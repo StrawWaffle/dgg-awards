@@ -7,7 +7,7 @@ import { getCookie } from "hono/cookie";
 import { join } from "node:path";
 import { verifyAdminSession } from "@/lib/auth";
 import { isChatSource, relayFor } from "@/server/lab/chat-relay";
-import { emoteCatalogue } from "@/server/lab/emotes";
+import { emoteCatalogue, emoteCombos } from "@/server/lab/emotes";
 import { SESSION_COOKIE } from "@/server/middleware";
 import { serveFile } from "@/server/storage";
 
@@ -26,6 +26,11 @@ export const labRoutes = new Hono()
   .get("/api/lab/emotes", async (c) => {
     if (!(await verifyAdminSession(getCookie(c, SESSION_COOKIE)))) return c.body(null, 401);
     return c.json([...((await emoteCatalogue())?.keys() ?? [])], 200);
+  })
+  // The emotes drawn differently beside others (GIGACHAD BLADE), from emotes.css.
+  .get("/api/lab/emote-combos", async (c) => {
+    if (!(await verifyAdminSession(getCookie(c, SESSION_COOKIE)))) return c.body(null, 401);
+    return c.json(await emoteCombos(), 200);
   })
   .get(
     "/api/lab/chat",

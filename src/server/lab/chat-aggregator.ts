@@ -16,10 +16,15 @@ import type { EmoteCatalogue } from "@/server/lab/emotes";
 
 /** Where a chatter typed, when not destiny.gg ("kick", "youtube", "twitch"). */
 type From = { platform?: string };
+/**
+ * Every emote of an emote-only message of two or more, in order (up to 8),
+ * as some are drawn together (GIGACHAD BLADE).
+ */
+type Seq = { seq?: string[] };
 /** Someone who sent only emotes: shown as a character doing that emote. */
-export type ChatEvent = { nick: string; emote: string; flair: string | null } & From;
+export type ChatEvent = { nick: string; emote: string; flair: string | null } & From & Seq;
 /** Someone who said anything, with the last emote in it (null if none). */
-export type ChatSpeaker = { nick: string; emote: string | null; flair: string | null } & From;
+export type ChatSpeaker = { nick: string; emote: string | null; flair: string | null } & From & Seq;
 /**
  * The emotes in a message's text: each word that is one, and the emote's
  * name. Only when there are any.
@@ -280,6 +285,7 @@ export class ChatAggregator {
     let last: string | null = null;
     let allEmotes = words.length > 0;
     let found: Record<string, string> | undefined;
+    const seq: string[] = [];
     for (const word of words) {
       // Chat's own rule: an emote the author's tier doesn't allow is just a word.
       let emote: string | undefined;
@@ -295,6 +301,7 @@ export class ChatAggregator {
       last = emote;
       this.counts.set(emote, (this.counts.get(emote) ?? 0) + 1);
       (found ??= {})[word] = emote;
+      if (seq.length < 8) seq.push(emote);
     }
     const flair = SHOWN_FLAIRS.find((f) => features.includes(f)) ?? null;
     const extra = { ...from, ...(found ? { emotes: found } : {}), ...(line.id ? { id: line.id } : {}) };
@@ -313,7 +320,8 @@ export class ChatAggregator {
     // name on two platforms is two people.
     const maxSpeakers = this.options.maxSpeakers ?? 150;
     const key = line.platform ? `${line.platform}:${nick}` : nick;
-    const speaker = { nick, emote: last, flair, ...from };
+    const group = allEmotes && seq.length > 1 ? { seq } : {};
+    const speaker = { nick, emote: last, flair, ...from, ...group };
     if (this.speakers.has(key) || this.speakers.size < maxSpeakers) this.speakers.set(key, speaker);
     else {
       this.speakerCount++;
@@ -335,7 +343,7 @@ export class ChatAggregator {
       this.emoteOnly++;
       // Reservoir sampling: every emote-only message equally likely to be kept.
       const max = this.options.maxEvents ?? 40;
-      const event = { nick, emote: last, flair, ...from };
+      const event = { nick, emote: last, flair, ...from, ...group };
       if (this.sample.length < max) this.sample.push(event);
       else {
         const slot = Math.floor((this.options.random ?? Math.random)() * this.emoteOnly);

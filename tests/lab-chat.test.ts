@@ -22,7 +22,8 @@ describe("chat aggregator", () => {
     expect(s.messages).toBe(3);
     expect(s.emoteOnly).toBe(2);
     expect(s.events).toEqual([
-      { nick: "a", emote: "Klappa", flair: null },
+      // A message of several emotes keeps them all, in order, as some are drawn together.
+      { nick: "a", emote: "Klappa", flair: null, seq: ["Klappa", "Klappa"] },
       { nick: "c", emote: "YEE", flair: null },
     ]);
     expect(s.top).toEqual([
@@ -104,9 +105,9 @@ describe("chat aggregator", () => {
     expect(s.messages).toBe(100_000);
     expect(s.events.length).toBe(40);
     expect(s.top.length).toBe(8);
-    // 40 events, 150 speakers, the top emotes: about 10 kB, four times a second.
+    // 40 events, 150 speakers (with a message's emotes when there are several), the top emotes: about 14 kB, four times a second.
     expect(s.speakers.length).toBe(150);
-    expect(JSON.stringify(s).length).toBeLessThan(14_000);
+    expect(JSON.stringify(s).length).toBeLessThan(16_000);
     // Generous: a busy awards chat is a few hundred messages a second.
     expect(ms).toBeLessThan(2000);
   });
@@ -168,8 +169,8 @@ describe("chat aggregator, omnichat", () => {
     const s = agg.flush(1);
     expect(s.emoteOnly).toBe(2);
     expect(s.events).toEqual([
-      { nick: "a", emote: "kick:y", flair: null, platform: "kick" },
-      { nick: "b", emote: "youtube::heart:", flair: null, platform: "youtube" },
+      { nick: "a", emote: "kick:y", flair: null, platform: "kick", seq: ["kick:x", "kick:x", "kick:y"] },
+      { nick: "b", emote: "youtube::heart:", flair: null, platform: "youtube", seq: ["youtube::heart:", "youtube::heart:"] },
     ]);
     expect(s.speakers).toContainEqual({ nick: "c", emote: "youtube::heart:", flair: null, platform: "youtube" });
     expect(s.top).toEqual(expect.arrayContaining([["youtube::heart:", 3], ["kick:x", 2]]));
@@ -254,5 +255,18 @@ describe("chat window: messages, moderation and the winner's words", () => {
     expect(r.has({ nick: "k" })).toBe(false);
     expect(r.has({ nick: "k", platform: "kick" })).toBe(true);
     expect(r.has({ nick: "x", msgId: "m1" })).toBe(true);
+  });
+});
+
+describe("emotes drawn together", () => {
+  test("the emotes whose look depends on their neighbours come from emotes.css", async () => {
+    const { combiningEmotes } = await import("@/server/lab/emotes");
+    const css = `
+      .emote.PEPE { width: 32px }
+      .emote.GIGACHAD + .emote.BLADE { transform: scaleX(-1) }
+      .emote.BoomerSippy:first-of-type, .emote.Plain:hover { left: 0 }
+      .text > .emote.Chatting:not(.emote + .emote.Chatting):has(+ .emote) { top: 0 }
+      /* .emote.Commented + .emote.Out */`;
+    expect(combiningEmotes(css)).toEqual(["BLADE", "BoomerSippy", "Chatting", "GIGACHAD"]);
   });
 });

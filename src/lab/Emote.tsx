@@ -33,19 +33,63 @@ export function paintEmote(el: HTMLElement, name: string) {
 }
 
 /**
+ * Make `wrap` (a "text" span) show `emotes`, separated by spaces: one, or a
+ * group drawn together as in a chat message (side by side, so destiny.gg's
+ * rules for emotes next to each other apply: GIGACHAD BLADE).
+ */
+export function paintEmotes(wrap: HTMLElement, emotes: string) {
+  const names = emotes.split(" ");
+  while (wrap.children.length > names.length) wrap.lastElementChild!.remove();
+  while (wrap.children.length < names.length) wrap.append(document.createElement("span"));
+  names.forEach((name, i) => paintEmote(wrap.children[i] as HTMLElement, name));
+  setTimeout(() => loopRepeating(wrap), 50);
+}
+
+/**
  * An emote span for code that builds the page by hand (the big screen's cast):
  * inside a "text" span, as in a chat message, since some emotes are only drawn
- * right there. Returns the wrapper to append and the emote to restyle.
+ * right there. `name` may be a group, separated by spaces (see paintEmotes).
+ * Returns the wrapper to append and repaint.
  */
 export function emoteElement(name: string) {
   const wrap = document.createElement("span");
   wrap.className = "text";
-  wrap.style.display = "contents";
-  const emote = document.createElement("span");
-  paintEmote(emote, name);
-  wrap.append(emote);
-  setTimeout(() => loopRepeating(emote), 50);
-  return { wrap, emote };
+  // A row, so a group stands side by side under one name, feet level.
+  wrap.style.display = "flex";
+  wrap.style.alignItems = "flex-end";
+  paintEmotes(wrap, name);
+  return { wrap };
+}
+
+/** One emote of a group or a message: a destiny.gg one by its class, any other by its picture. */
+function Drawn({ name, size }: { name: string; size: number }) {
+  const url = pictures.get(name);
+  if (url) {
+    const short = name.slice(name.indexOf(":") + 1);
+    return <span role="img" aria-label={short} title={short} className="emote-picture" style={{ zoom: size, backgroundImage: `url("${url}")` }} />;
+  }
+  return <span role="img" aria-label={name} title={name} className={`emote ${name}`} style={{ zoom: size }} />;
+}
+
+/** Emote animations meant to repeat, repeating, for whatever is drawn inside `ref`. */
+function useLooping(ref: React.RefObject<HTMLElement | null>, key: string) {
+  useEffect(() => {
+    const timer = setTimeout(() => ref.current && loopRepeating(ref.current), 50);
+    return () => clearTimeout(timer);
+  }, [key]);
+}
+
+/** Emotes side by side in one "text" span, as chat draws a message of several. */
+export function EmoteRow({ names, size = 1 }: { names: string[]; size?: number }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useLooping(ref, names.join(" "));
+  return (
+    <span ref={ref} className="text">
+      {names.map((name, i) => (
+        <Drawn key={i} name={name} size={size} />
+      ))}
+    </span>
+  );
 }
 
 /**
@@ -117,13 +161,17 @@ export function Emote({
  * emote name, from the relay) drawn as emotes.
  */
 export function ChatText({ text, emotes, size = 0.85 }: { text: string; emotes?: Record<string, string>; size?: number }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useLooping(ref, text);
   if (!emotes) return <>{text}</>;
+  // All in one "text" span, emotes as its own children, as chat has them, so
+  // emotes beside each other are drawn together.
   return (
-    <>
+    <span ref={ref} className="text">
       {text.split(/(\s+)/).map((part, i) => {
         const emote = emotes[part];
-        return emote ? <Emote key={i} name={emote} size={size} /> : part;
+        return emote ? <Drawn key={i} name={emote} size={size} /> : part;
       })}
-    </>
+    </span>
   );
 }

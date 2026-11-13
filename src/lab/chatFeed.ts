@@ -99,6 +99,15 @@ const SIM_WORDS = [
   "go to destiny.gg/bigscreen for the stream",
   "this is a very long message that goes on and on about the awards, the nominees, who should have won, who got robbed last year, what the voting system should be, why the runoff is fair or not, and it keeps going well past what the chat window shows",
 ];
+/** Emotes chat sends together, drawn as one (destiny.gg's emotes.css has rules for them side by side). */
+const SIM_GROUPS = [
+  ["GIGACHAD", "BLADE"],
+  ["BLADE", "BLADE"],
+  ["Clap", "ApeHands"],
+  ["BoomerSippy", "BoomerSippy"],
+  ["SoyPoint", "SOY", "SoyPoint"],
+  ["COGGERS", "COGGERS", "COGGERS"],
+];
 const SIM_ENDINGS = ["lol", "honestly", "chat", "for real", "imo", "again", "every year", "KEKW", "LULW", "I called it"];
 /** What the simulated winners say, if they win. */
 const WINNER_WORDS = ["no way", "I'm actually shaking", "thank you chat", "THIS IS RIGGED (thank you)"];
@@ -139,6 +148,7 @@ export function simulatedFeed(
 ): FeedHandle {
   const usable = SIM_EMOTES.filter((e) => emotes.includes(e));
   const pool = usable.length > 0 ? usable : emotes.slice(0, 20);
+  const groups = SIM_GROUPS.filter((g) => g.every((e) => emotes.includes(e)));
   const aggregator = new ChatAggregator(null);
   let combo: { blocks: SimBlock; platform: "dgg" | "kick" } | null = null;
   let comboLeft = 0;
@@ -186,7 +196,10 @@ export function simulatedFeed(
       const badges = platform === "dgg" ? SIM_FLAIRS[id % SIM_FLAIRS.length]! : [];
       if (Math.random() < emoteShare() && platform !== "youtube") {
         const n = 1 + Math.floor(Math.random() * 3);
-        const blocks = Array.from({ length: n }, () => (platform === "kick" && Math.random() < 0.6 ? kickBlock(pick(SIM_KICK_EMOTES)) : dggBlock(pick(pool))));
+        const group = platform === "dgg" && Math.random() < 0.12 ? pick(groups) : null;
+        const blocks = group
+          ? group.map(dggBlock)
+          : Array.from({ length: n }, () => (platform === "kick" && Math.random() < 0.6 ? kickBlock(pick(SIM_KICK_EMOTES)) : dggBlock(pick(pool))));
         aggregator.ingestOmni(frame(platform, nick, blocks, null, badges));
       } else if (platform === "dgg" && Math.random() < 0.004) {
         aggregator.ingestOmni(frame("dgg", nick, [], pick(VERIFIED_LINES), ["flair20"]));
