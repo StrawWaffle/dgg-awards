@@ -145,6 +145,9 @@ function actionNick(action: Record<string, unknown>): string | null {
   return null;
 }
 
+/** Destiny's own emotes on Kick: "destiny" and a destiny.gg emote's name. */
+const DESTINY_EMOTE = /^destiny[A-Za-z0-9_]+$/;
+
 /** Only plain https addresses go to the stage as pictures. */
 const PICTURE_URL = /^https:\/\/[^\s"'()\\]+$/;
 
@@ -165,6 +168,8 @@ export class ChatAggregator {
   /** Everyone's last few messages, least recently heard from first. */
   private recent = new Map<string, RecentLine[]>();
   private readonly verified: Set<string>;
+  /** destiny.gg's emote names by their lower case, for Destiny's own Kick emotes (destinySideEye is SideEye). */
+  private dggNames = new Map<string, string>();
 
   constructor(
     private catalogue: EmoteCatalogue | null,
@@ -178,10 +183,12 @@ export class ChatAggregator {
     } = {},
   ) {
     this.verified = new Set(options.verified ?? VERIFIED_FLAIRS);
+    this.setCatalogue(catalogue);
   }
 
   setCatalogue(catalogue: EmoteCatalogue | null) {
     this.catalogue = catalogue;
+    this.dggNames = new Map([...(catalogue?.keys() ?? [])].map((name) => [name.toLowerCase(), name]));
   }
 
   /**
@@ -255,7 +262,13 @@ export class ChatAggregator {
     for (const b of msg.content?.blocks ?? []) {
       if (b.type !== "emote" || typeof b.id !== "string" || typeof b.originalId !== "string") continue;
       if (b.platform === "dgg" || b.platform === undefined) emotes.set(b.originalId, b.id);
-      else if (typeof b.platform === "string" && typeof b.url === "string" && PICTURE_URL.test(b.url)) {
+      else if (DESTINY_EMOTE.test(b.id) && this.dggNames.has(b.id.slice(7).toLowerCase())) {
+        // Destiny's channel emotes on Kick copy destiny.gg's: drawn as destiny.gg's
+        // own, which animate and combine as in its chat (and some of Kick's
+        // copies have a black background, as destinySideEye).
+        emotes.set(b.originalId, this.dggNames.get(b.id.slice(7).toLowerCase())!);
+        others.push(b.originalId);
+      } else if (typeof b.platform === "string" && typeof b.url === "string" && PICTURE_URL.test(b.url)) {
         const name = `${b.platform}:${b.id}`;
         emotes.set(b.originalId, name);
         this.pictures.set(name, b.url);

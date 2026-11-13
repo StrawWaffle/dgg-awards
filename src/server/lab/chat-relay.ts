@@ -73,7 +73,9 @@ class ChatRelay {
 
   private start() {
     if (this.tick) return;
-    if (this.source.kind === "dgg") emoteCatalogue().then((c) => this.aggregator.setCatalogue(c));
+    // destiny.gg chat needs it to tell emotes from words; omnichat, to draw
+    // Destiny's Kick emotes as destiny.gg's own.
+    emoteCatalogue().then((c) => this.aggregator.setCatalogue(c));
     this.connect();
     this.tick = setInterval(() => this.broadcast(), TICK_MS);
   }

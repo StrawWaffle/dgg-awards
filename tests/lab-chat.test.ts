@@ -176,6 +176,15 @@ describe("chat aggregator, omnichat", () => {
     expect(s.top).toEqual(expect.arrayContaining([["youtube::heart:", 3], ["kick:x", 2]]));
   });
 
+  test("Destiny's Kick emotes are drawn as destiny.gg's own, where there is one", () => {
+    const agg = new ChatAggregator(new Map([["SideEye", 0], ["PEPE", 0]]));
+    agg.ingestOmni(omni("kick", "a", "[emote:5886923:destinySideEye]", [kickEmote("destinySideEye", 5886923)]));
+    agg.ingestOmni(omni("kick", "b", "[emote:1:destinyRustle]", [kickEmote("destinyRustle", 1)]));
+    const s = agg.flush(1);
+    expect(s.events.map((e) => e.emote)).toEqual(["SideEye", "kick:destinyRustle"]);
+    expect(s.pictures).toEqual({ "kick:destinyRustle": "https://files.kick.com/emotes/1/fullsize" });
+  });
+
   test("a Kick moderator's words aren't shown as verified, and odd picture addresses are dropped", () => {
     const agg = new ChatAggregator(null);
     agg.ingestOmni(omni("kick", "m", "hi chat", null, ["moderator"]));
