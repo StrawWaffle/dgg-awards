@@ -768,7 +768,8 @@ export function Stage({
     // The sky: strips beside whatever's in the middle (the scene, its title, a
     // clip, and the winner's bubble), from near the top down to the horizon.
     const skyTop = 46;
-    const skyBottom = top - 30;
+    // A little below the horizon, so they use the sky down to the hilltop.
+    const skyBottom = top + 40;
     const middleBox = still ? panel : sceneBox.current ? boxOnFloor(sceneBox.current, box) : null;
     let mid = middleBox ? { left: middleBox.left, right: middleBox.right } : null;
     if (mid && winnerBubble.current) {
