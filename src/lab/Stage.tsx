@@ -9,7 +9,7 @@ import { toggleMusic } from "@/lab/MusicBar";
 import { useBursts } from "@/lab/Bursts";
 import { type Award, boardOf, decidedByRunoff, loadResults } from "@/lab/Results";
 import { DvdMenu, type ShowAward, TitleCard, WinnerBubble, WinnerCard, type WinnerWords, loadShow, winnerOf as winningNominee } from "@/lab/Scenes";
-import { type ChatFilters, LONG_AT, Removals, RepeatGuard, badWords, cleanMessage, loadFilters, saveFilters } from "@/lab/chatFilter";
+import { type ChatFilters, LONG_AT, Removals, RepeatGuard, badWords, cleanMessage, loadFilters, saveFilters, withoutEmotes } from "@/lab/chatFilter";
 import { ResultsBoard } from "@/lab/StageRunoff";
 import { loadSimulated } from "@/lab/Summary";
 import { type Box, type Layout, Movable, defaultLayout, loadLayout, rectStyle, saveLayout } from "@/lab/StageLayout";
@@ -583,6 +583,9 @@ export function Stage({
       const said = set.showSaid ? verifiedSaid : [];
       // Speech bubbles for them (none over a clip).
       if (!clipOn.current && set.bubbles !== "off") for (const s of verifiedSaid) {
+        // Words only: the emote shows on the character below.
+        const bubbleText = withoutEmotes(s.text, s.emotes);
+        if (!bubbleText) continue;
         // A verified message gets a character too, within the same limits.
         let npc = all.get(s.nick);
         if (!npc) {
@@ -590,7 +593,7 @@ export function Stage({
           bucket.tokens -= 1;
           npc = spawn(s.nick, "PepoG", s.flair, s.platform);
         }
-        npc.bubble.textContent = s.text;
+        npc.bubble.textContent = bubbleText;
         npc.bubble.classList.remove("hidden");
         npc.bubbleUntil = now + 5000;
         npc.lastSeen = now;
@@ -613,7 +616,8 @@ export function Stage({
         for (const l of summary.lines ?? []) {
           const npc = all.get(l.nick);
           if (!npc || npc.leaving || npc.bubbleUntil || !allowed(l)) continue;
-          const text = cleanMessage(l.text, l.emotes, f, set.bad);
+          const clean = cleanMessage(l.text, l.emotes, f, set.bad);
+          const text = clean && withoutEmotes(clean, l.emotes);
           if (!text) continue;
           npc.bubble.textContent = text;
           npc.bubble.classList.remove("hidden");

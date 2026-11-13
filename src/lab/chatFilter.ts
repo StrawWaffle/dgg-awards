@@ -96,6 +96,16 @@ export function cleanMessage(text: string, emotes: Record<string, string> | unde
 /** Messages up to this long (letters and digits) are only repeats from the same person. */
 const SHORT = 15;
 
+/**
+ * A message without its emotes, for a speech bubble: the character under it
+ * shows the emote already. Null if nothing's left.
+ */
+export function withoutEmotes(text: string, emotes: Record<string, string> | undefined): string | null {
+  const words = emotes ? text.split(/\s+/).filter((w) => w && !emotes[w]) : [text];
+  const left = words.join(" ").trim();
+  return left || null;
+}
+
 /** Remembers messages for half a minute, to spot the same one sent again. */
 export class RepeatGuard {
   private seen = new Map<string, number>();

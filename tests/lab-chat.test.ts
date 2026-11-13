@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { ChatAggregator } from "@/server/lab/chat-aggregator";
-import { FILTER_DEFAULTS, RepeatGuard, Removals, badWords, cleanMessage } from "@/lab/chatFilter";
+import { FILTER_DEFAULTS, RepeatGuard, Removals, badWords, cleanMessage, withoutEmotes } from "@/lab/chatFilter";
 
 const catalogue = new Map([
   ["Klappa", 0],
@@ -245,6 +245,12 @@ describe("chat window: messages, moderation and the winner's words", () => {
     expect(cleanMessage("https://x.test/a", undefined, f, bad)).toBeNull();
     expect(cleanMessage("a".repeat(201), undefined, f, bad)).toBeNull();
     expect(cleanMessage("shit https://x.test", undefined, { ...f, censor: false, links: false }, bad)).toBe("shit https://x.test");
+  });
+
+  test("a speech bubble has the words without the emotes", () => {
+    expect(withoutEmotes("hello YEE chat kick:x", { YEE: "YEE", "kick:x": "kick:x" })).toBe("hello chat");
+    expect(withoutEmotes("YEE YEE", { YEE: "YEE" })).toBeNull();
+    expect(withoutEmotes("just words", undefined)).toBe("just words");
   });
 
   test("repeats within half a minute, and who moderators took down", () => {
