@@ -8,6 +8,7 @@ import { cssVar } from "@/lab/sketch";
 import { type Chatter, Final, TopTen } from "@/lab/RankChatters";
 import type { Places } from "@/lib/voting";
 import type { Me, SiteConfig } from "@/site/Site";
+import { PointsTutorial, RankedTutorial } from "@/site/VoteTutorial";
 
 type Nominee = { id: string; title: string; description: string; image: string | null; emote: string | null; clip: Clip | null };
 type Award = { id: string; title: string; description: string; ranked: boolean; points: boolean; nominees: Nominee[] };
@@ -138,6 +139,8 @@ function Ballot({
   const [casting, setCasting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [watching, setWatching] = useState<Clip | null>(null);
+  // The how-it-works steps passed this visit (VoteTutorial.tsx).
+  const [explained, setExplained] = useState<Set<"ranked" | "points">>(new Set());
   // Points ballots as cast (groups of equals), to show them back.
   const [places, setPlaces] = useState<Record<string, Places>>({});
   useEffect(() => {
@@ -153,6 +156,16 @@ function Ballot({
   const mine = award ? voted[award.id] : undefined;
   const chosen = award ? (mine ?? picks[award.id] ?? []) : [];
   const votedCount = awards.filter((a) => voted[a.id]).length;
+  // Before a ranked award or a top 10 not voted on yet, how it works, once a visit.
+  const kind = award && !mine ? (award.points ? "points" : award.ranked ? "ranked" : null) : null;
+  const explaining = kind !== null && !explained.has(kind) ? kind : null;
+  const explain = (k: "ranked" | "points", on: boolean) =>
+    setExplained((s) => {
+      const next = new Set(s);
+      if (on) next.delete(k);
+      else next.add(k);
+      return next;
+    });
 
   // A single pick gets a box drawn round it by hand.
   useEffect(() => {
@@ -312,7 +325,9 @@ function Ballot({
 
         <section ref={box} className="cozy-panel relative min-h-[28rem] scroll-mt-[calc(var(--lab-header,64px)+1rem)] overflow-hidden p-6">
           {layer}
-          {award && (
+          {explaining === "ranked" && <RankedTutorial onDone={() => explain("ranked", false)} />}
+          {explaining === "points" && <PointsTutorial onDone={() => explain("points", false)} />}
+          {award && !explaining && (
             <div className="space-y-5">
               <div className="flex flex-wrap gap-2">
                 <span className="cozy-chip coral">
@@ -333,14 +348,20 @@ function Ballot({
                   <p className="mt-1 text-sm font-semibold" style={{ color: "var(--muted)" }}>
                     {award.nominees.some((n) => n.clip)
                       ? "Click a clip to watch it. Rank them in order, your favourite first; press again to take one out."
-                      : "Click them in order: your favourite first. Click again to take one out."}
+                      : "Click them in order: your favourite first. Click again to take one out."}{" "}
+                    <button type="button" className="underline" onClick={() => explain("ranked", true)}>
+                      How does this work?
+                    </button>
                   </p>
                 )}
                 {award.points && !mine && (
                   <p className="mt-1 text-sm font-semibold" style={{ color: "var(--muted)" }}>
                     Swipe through everyone (yes, no or maybe), then pick between your yeses two at a time. Your top 10
                     gets points: 10 for first down to 1 for tenth, shared by any you rank equal. Everyone's points are
-                    added up. Your progress is kept in this browser until you cast it.
+                    added up. Your progress is kept in this browser until you cast it.{" "}
+                    <button type="button" className="underline" onClick={() => explain("points", true)}>
+                      How does this work?
+                    </button>
                   </p>
                 )}
               </div>
