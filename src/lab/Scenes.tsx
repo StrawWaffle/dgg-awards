@@ -17,8 +17,12 @@ export type Nominee = {
 };
 /** Beside the winner: what they said (in chat, or typed ahead in the admin page), with an emote. */
 export type WinnerWords = { name: string; emote: string | null; lines: { text: string; emotes?: Record<string, string> }[] };
-/** One award on the big screen: its results joined to its nominees' pictures and clips. */
-export type ShowAward = Award & { description: string; nominees: Nominee[] };
+/**
+ * One award on the big screen: its results joined to its nominees' pictures
+ * and clips, and its announcer video (played as the results come up, which
+ * then show all at once).
+ */
+export type ShowAward = Award & { description: string; nominees: Nominee[]; announcer: Clip | null };
 
 /**
  * The results joined to the nominees, in the awards' order. The nominees come
@@ -40,7 +44,10 @@ export async function loadShow(results: Award[]): Promise<ShowAward[]> {
       chatName: o.chatName ?? null,
       winnerLine: o.winnerLine ?? null,
     }));
-    return { ...award, description: category?.description ?? "", nominees };
+    const announcer = category
+      ? nomineeClip({ url: category.announcerUrl ?? null, clipUrl: category.announcerFileUrl ?? null }, `Announcing ${award.title}`)
+      : null;
+    return { ...award, description: category?.description ?? "", nominees, announcer };
   });
 }
 

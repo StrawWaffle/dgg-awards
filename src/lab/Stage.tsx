@@ -364,6 +364,8 @@ export function Stage({
   const [target, setTarget] = useState(0);
   const [run, setRun] = useState(0);
   const [revealed, setRevealed] = useState(false);
+  /** The board starts finished: the announcer video has shown who won. */
+  const [instant, setInstant] = useState(false);
   /** The runoff's round on show (null: the board), and whether the board before it is all in. */
   const [runoffRound, setRunoffRound] = useState<number | null>(null);
   const [boardDone, setBoardDone] = useState(false);
@@ -971,10 +973,20 @@ export function Stage({
   }, [playing]);
   const playingRef = useRef(playing);
   playingRef.current = playing;
+  /** The announcer video on show, and how many rows its award reveals once it's over. */
+  const announcing = useRef<{ clip: Clip; rows: number } | null>(null);
   // Read from a ref: the end-of-clip timer may fire after it was closed by hand.
   const closeClip = () => {
     const clip = playingRef.current;
     if (!clip) return;
+    // The announcement is over (or closed): the board shows finished at once,
+    // as it does coming back from the winner.
+    if (announcing.current?.clip === clip) {
+      setTarget(announcing.current.rows);
+      setInstant(true);
+      setRun((r) => r + 1);
+    }
+    announcing.current = null;
     playingRef.current = null;
     setRaising(clip);
     setPlaying(null);
@@ -1016,7 +1028,9 @@ export function Stage({
   const goTo = (index: number, next: Scene, backwards = false) => {
     if (!show?.length) return;
     const i = (index + show.length) % show.length;
+    announcing.current = null;
     closeClip();
+    setInstant(false);
     endCheer();
     setAwardIndex(i);
     setScene(next);
@@ -1027,11 +1041,22 @@ export function Stage({
       setBoardDone(backwards);
       setRunoffRound(null);
       setRun((r) => r + 1);
+      // An award with an announcer video: it plays first, once the board is lowered in.
+      if (!backwards && show[i]!.announcer) {
+        const t = setTimeout(() => announce(show[i]!), 900);
+        winnerTimers.current.push(t);
+      }
     }
     if (next === "winner") {
       const t = setTimeout(() => winnerMoment(winnerOf(show[i]!)), 700);
       winnerTimers.current.push(t);
     }
+  };
+  /** Plays the award's announcer video over its results. */
+  const announce = (a: ShowAward) => {
+    if (!a.announcer) return;
+    announcing.current = { clip: a.announcer, rows: boardOf(a).award.results.length };
+    setPlaying(a.announcer);
   };
   const step = (by: 1 | -1) => {
     const at = SCENES.findIndex((x) => x.id === scene) + by;
@@ -1055,6 +1080,8 @@ export function Stage({
     else if (c.t === "play") {
       const clip = award?.nominees[c.i]?.clip;
       if (clip) setPlaying(clip);
+    } else if (c.t === "announce") {
+      if (award && scene === "results") announce(award);
     } else if (c.t === "close") closeClip();
     else if (c.t === "music") toggleMusic();
     else if (c.t === "volume") music.setVolume(Math.min(1, Math.max(0, c.v)));
@@ -1076,6 +1103,7 @@ export function Stage({
     runoff: rounds && scene === "results" ? { rounds, round: runoffRound, ready: boardDone } : null,
     clips: (award?.nominees ?? []).flatMap((n, i) => (n.clip ? [{ i, title: n.title }] : [])),
     playing: !!playing,
+    announcer: !!award?.announcer,
     simulated: votes === "simulated",
     music: { playing: musicState.playing, muted: musicState.muted, volume: musicState.volume },
     chatOpen,
@@ -1390,6 +1418,7 @@ export function Stage({
                     key={`${award.id}-${run}`}
                     award={award}
                     target={target}
+                    instant={instant}
                     round={runoffRound}
                     onWinner={cheer}
                     onBoardDone={() => setBoardDone(true)}

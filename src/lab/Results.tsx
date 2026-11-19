@@ -158,11 +158,14 @@ type RowEls = {
 export function Board({
   award,
   target,
+  instant = false,
   onWinner,
   onFinished,
 }: {
   award: Award;
   target: number;
+  /** Start finished, every row drawn and in place (after an announcer video). */
+  instant?: boolean;
   onWinner: (el: HTMLElement) => void;
   /** Once every row is drawn and in place. */
   onFinished?: () => void;
@@ -174,13 +177,15 @@ export function Board({
   const [byRank] = useState(() => [...award.results].sort((a, b) => a.count - b.count));
   const [start] = useState(() => scrambled(award.results.map((r) => r.id), award.id));
   /** How many have finished (drawn, boxed and slid into place). */
-  const [done, setDone] = useState(0);
+  const [done, setDone] = useState(instant ? n : 0);
   const finishedRef = useRef(onFinished);
   finishedRef.current = onFinished;
   useEffect(() => {
     if (n > 0 && done === n) finishedRef.current?.();
   }, [done, n]);
-  const state = useRef(new Map(award.results.map((r) => [r.id, { v: 0, phase: "hidden" } as RowState])));
+  const state = useRef(
+    new Map(award.results.map((r) => [r.id, (instant ? { v: r.count, phase: "done" } : { v: 0, phase: "hidden" }) as RowState])),
+  );
   const els = useRef(new Map<string, RowEls>());
   const [barW, setBarW] = useState(0);
   const measure = useRef<HTMLDivElement>(null);
@@ -296,6 +301,25 @@ export function Board({
     }
     paint();
   }, [award, barW, paint, settled, crown]);
+
+  // Started finished: the winner is circled straight away.
+  useEffect(() => {
+    if (!instant || !crown || barW === 0) return;
+    const winner = award.results.find((r) => r.isWinner);
+    const name = winner && els.current.get(winner.id)?.name;
+    if (!name) return;
+    const a = annotate(name, { type: "circle", color: cssVar("--coral"), strokeWidth: 3, padding: 10, animationDuration: 800 });
+    const t = setTimeout(() => {
+      a.show();
+      onWinner(name);
+    }, 300);
+    return () => {
+      clearTimeout(t);
+      a.remove();
+    };
+    // Once, when the board can be measured.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [barW > 0]);
 
   // Work through the reveals one at a time until `target` are done; the last
   // two go together, as soon as either is asked for.

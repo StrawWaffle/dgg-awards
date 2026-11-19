@@ -19,6 +19,7 @@ const OUT_H = 26;
 export function ResultsBoard({
   award,
   target,
+  instant = false,
   round,
   onWinner,
   onBoardDone,
@@ -26,6 +27,8 @@ export function ResultsBoard({
 }: {
   award: Award;
   target: number;
+  /** Start the board finished (after an announcer video). */
+  instant?: boolean;
   round: number | null;
   onWinner: (el: HTMLElement) => void;
   onBoardDone: () => void;
@@ -39,6 +42,7 @@ export function ResultsBoard({
       <Board
         award={shown}
         target={target}
+        instant={instant}
         onWinner={onWinner}
         onFinished={() => {
           onBoardDone();

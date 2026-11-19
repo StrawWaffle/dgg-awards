@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import { Section } from "@/admin/components/Section";
+import { AnnouncerVideo } from "@/admin/components/editor/AnnouncerVideo";
 import { HistoryList } from "@/admin/components/history/HistoryList";
 import { DragHandle, SortableList, useSortableRow } from "@/admin/components/Sortable";
 import { Button, ErrorText, Field, inputClass } from "@/admin/components/editor/fields";
@@ -483,6 +484,16 @@ function CategoryPanel({
             </p>
           )}
         </form>
+      </Section>
+
+      <Section
+        id="category-announcer"
+        title="Announcer video"
+        aside={category.announcerFileUrl || category.announcerUrl ? "Set" : "None"}
+        defaultOpen={false}
+        boxed={false}
+      >
+        <AnnouncerVideo key={category.id} category={category} />
       </Section>
 
       <Section id="category-history" title="History of this category" defaultOpen={false} boxed={false}>

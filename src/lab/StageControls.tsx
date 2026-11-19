@@ -33,6 +33,8 @@ export type ShowState = {
   /** Nominees of this award with a clip to play: their index and name. */
   clips: { i: number; title: string }[];
   playing: boolean;
+  /** This award has an announcer video (it plays as the results come up). */
+  announcer: boolean;
   simulated: boolean;
   /** What the header used to give, for full screen: the music (it plays in the big screen's window), the chat, Settings. */
   music: MusicState;
@@ -51,6 +53,8 @@ export type ShowCommand =
   /** Show the runoff's round (0-based), or null for the board. */
   | { t: "runoff"; round: number | null }
   | { t: "play"; i: number }
+  /** Play the award's announcer video; when it ends, every result shows. */
+  | { t: "announce" }
   | { t: "close" }
   /** Play, or mute and unmute, the music; and its volume (0-1). */
   | { t: "music" }
@@ -209,6 +213,11 @@ export function ShowControls({
                 Reveal all
               </button>
               {state.runoff && <RunoffControls runoff={state.runoff} send={send} />}
+              {state.announcer && !state.playing && (
+                <button type="button" className="cozy-btn py-1!" onClick={() => send({ t: "announce" })}>
+                  Play the announcement
+                </button>
+              )}
             </>
           )}
           {state.playing ? (
