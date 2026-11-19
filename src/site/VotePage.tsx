@@ -331,7 +331,9 @@ function Ballot({
                 )}
                 {award.ranked && !mine && (
                   <p className="mt-1 text-sm font-semibold" style={{ color: "var(--muted)" }}>
-                    Click them in order: your favourite first. Click again to take one out.
+                    {award.nominees.some((n) => n.clip)
+                      ? "Click a clip to watch it. Rank them in order, your favourite first; press again to take one out."
+                      : "Click them in order: your favourite first. Click again to take one out."}
                   </p>
                 )}
                 {award.points && !mine && (
@@ -361,62 +363,16 @@ function Ballot({
                   const rank = chosen.indexOf(n.id);
                   const on = rank >= 0;
                   return (
-                    <div key={n.id} className="relative">
-                      <button
-                        data-nominee={n.id}
-                        type="button"
-                        onClick={(e) => choose(e, n.id)}
-                        disabled={!!mine}
-                        className={`${mine ? "" : "cozy-card"} group block h-full w-full rounded-[20px] border-2 p-2 text-left active:translate-y-[3px] disabled:cursor-default`}
-                        style={{
-                          background: "var(--cream)",
-                          borderColor: on ? "var(--primary-shadow)" : "var(--panel-border)",
-                          boxShadow: `0 5px 0 ${on ? "var(--primary-shadow)" : "var(--cream-shadow)"}`,
-                          opacity: mine && !on ? 0.55 : 1,
-                        }}
-                        aria-pressed={on}
-                      >
-                        <div className="relative aspect-[4/3] overflow-hidden rounded-[14px]" style={{ background: "var(--panel-border)" }}>
-                          {n.image ? (
-                            <img src={n.image} alt="" className="h-full w-full object-cover" loading="lazy" />
-                          ) : (
-                            n.emote && (
-                              <span className="flex h-full w-full items-center justify-center" style={{ background: "var(--cream)" }}>
-                                <Emote name={n.emote} size={2.4} />
-                              </span>
-                            )
-                          )}
-                          {award.ranked && on && (
-                            <span
-                              className="hand absolute top-2 left-2 flex h-9 w-9 items-center justify-center rounded-full text-2xl font-bold"
-                              style={{ background: "var(--primary)", color: "var(--primary-text)" }}
-                            >
-                              {rank + 1}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center justify-between gap-2 px-1 pt-2">
-                          <span className="font-extrabold leading-tight">{n.title}</span>
-                          {on && !award.ranked && <span className="cozy-chip green shrink-0">{mine ? "Your vote" : "Your pick"}</span>}
-                        </div>
-                        {n.description && (
-                          <p className="line-clamp-2 px-1 pt-1 text-xs font-semibold" style={{ color: "var(--muted)" }}>
-                            {n.description}
-                          </p>
-                        )}
-                      </button>
-                      {n.clip && (
-                        // Beside the card's button, over its picture (a button can't hold another).
-                        <button
-                          type="button"
-                          aria-label={`Watch the clip of ${n.title}`}
-                          className="cozy-chip coral absolute top-4 right-4 cursor-pointer"
-                          onClick={() => setWatching(n.clip)}
-                        >
-                          ▶ Clip
-                        </button>
-                      )}
-                    </div>
+                    <NomineeCard
+                      key={n.id}
+                      nominee={n}
+                      rank={award.ranked && on ? rank + 1 : null}
+                      on={on}
+                      mine={!!mine}
+                      single={!award.ranked}
+                      onChoose={(e) => choose(e, n.id)}
+                      onWatch={() => n.clip && setWatching(n.clip)}
+                    />
                   );
                 })}
               </div>
@@ -501,6 +457,118 @@ const topTenKey = (awardId: string, preview: boolean) => `${preview ? "preview" 
  * A points award's ballot: the top 10 maker (swipe, then compare), then the
  * finished list with Cast. Once cast, the list as cast.
  */
+/**
+ * One nominee on a pick or ranked award. Clicking it picks it, except when it
+ * has a clip: then clicking plays the clip and a button underneath picks it.
+ */
+function NomineeCard({
+  nominee: n,
+  rank,
+  on,
+  mine,
+  single,
+  onChoose,
+  onWatch,
+}: {
+  nominee: Nominee;
+  rank: number | null;
+  on: boolean;
+  mine: boolean;
+  single: boolean;
+  onChoose: (e: React.MouseEvent) => void;
+  onWatch: () => void;
+}) {
+  const clip = !!n.clip;
+  const frame = {
+    background: "var(--cream)",
+    borderColor: on ? "var(--primary-shadow)" : "var(--panel-border)",
+    boxShadow: `0 5px 0 ${on ? "var(--primary-shadow)" : "var(--cream-shadow)"}`,
+    opacity: mine && !on ? 0.55 : 1,
+  };
+  const body = (
+    <>
+      <div className="relative aspect-[4/3] overflow-hidden rounded-[14px]" style={{ background: "var(--panel-border)" }}>
+        {n.image ? (
+          <img src={n.image} alt="" className="h-full w-full object-cover" loading="lazy" />
+        ) : (
+          n.emote && (
+            <span className="flex h-full w-full items-center justify-center" style={{ background: "var(--cream)" }}>
+              <Emote name={n.emote} size={2.4} />
+            </span>
+          )
+        )}
+        {clip && (
+          <span className="absolute inset-0 flex items-center justify-center">
+            <span
+              className="flex h-12 w-12 items-center justify-center rounded-full pl-1 text-xl transition-transform group-hover:scale-110"
+              style={{ background: "var(--coral)", color: "var(--primary-text)" }}
+              aria-hidden
+            >
+              ▶
+            </span>
+          </span>
+        )}
+        {rank !== null && (
+          <span
+            className="hand absolute top-2 left-2 flex h-9 w-9 items-center justify-center rounded-full text-2xl font-bold"
+            style={{ background: "var(--primary)", color: "var(--primary-text)" }}
+          >
+            {rank}
+          </span>
+        )}
+      </div>
+      <div className="flex items-center justify-between gap-2 px-1 pt-2">
+        <span className="font-extrabold leading-tight">{n.title}</span>
+        {on && single && <span className="cozy-chip green shrink-0">{mine ? "Your vote" : "Your pick"}</span>}
+      </div>
+      {n.description && (
+        <p className="line-clamp-2 px-1 pt-1 text-xs font-semibold" style={{ color: "var(--muted)" }}>
+          {n.description}
+        </p>
+      )}
+    </>
+  );
+
+  if (!clip) {
+    return (
+      <button
+        data-nominee={n.id}
+        type="button"
+        onClick={onChoose}
+        disabled={mine}
+        className={`${mine ? "" : "cozy-card"} group block h-full w-full rounded-[20px] border-2 p-2 text-left active:translate-y-[3px] disabled:cursor-default`}
+        style={frame}
+        aria-pressed={on}
+      >
+        {body}
+      </button>
+    );
+  }
+
+  return (
+    <div data-nominee={n.id} className="flex h-full flex-col rounded-[20px] border-2 p-2" style={frame}>
+      <button
+        type="button"
+        onClick={onWatch}
+        className="group block flex-1 cursor-pointer text-left"
+        aria-label={`Watch the clip of ${n.title}`}
+      >
+        {body}
+      </button>
+      {!mine && (
+        <button
+          type="button"
+          className={`cozy-btn mt-2 justify-center ${on ? "primary" : ""}`}
+          onClick={onChoose}
+          aria-pressed={on}
+        >
+          {on ? (single ? "Picked" : `Ranked #${rank} · take out`) : single ? "Pick this" : "Rank this"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function PointsBallot({
   award,
   admin,
