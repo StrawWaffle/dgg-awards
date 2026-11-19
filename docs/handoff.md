@@ -67,8 +67,17 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 - **Locking the site before voting:** yes, so they can test, touch up and preview. Done with "locked" plus the countdown.
 - **The code is never to be public.**
 
+**rinlux's feedback (2026-11-19), with StrawWaffle's calls.** Nothing here is built yet.
+- **Timing:** rinlux says it all comes after New Year's. They can move the voting dates themselves (Settings → "Voting opens" / "Voting closes").
+- **DGGer in stages** (rinlux): first only the wildcards vote, then a group stage on one day with a page per group (A–E), where you rank your top N; each group's top 2 make the final ten for DGGer of the Year. StrawWaffle has asked rinlux: where the 5 wildcard winners go (into the groups or straight to the final), whether the rest of the site stays open during each round, N, points or runoff for the groups, and the dates.
+- **Voting tutorials as steps** (StrawWaffle): a step in the vote flow just before the first ranked award ("How ranked voting works", a practice round on made-up nominees, with Skip), and another before the wildcards' top 10. Everyone passes them; there's no "first time" to track.
+- **Announcer videos** (rinlux, StrawWaffle's design): an award may have a video, such as a community member announcing it. On the big screen it plays first, and when it ends the full results show at once. Without a video, the drawn reveal runs as now.
+- **Clip cards flipped** (rinlux, StrawWaffle agrees): clicking the card plays the clip, and a button votes. Today it's the other way round (`src/site/VotePage.tsx`).
+- **Framed quotes link to their context** on **rustlesearch** (StrawWaffle: the most official log), e.g. `https://rustlesearch.dev/surrounds?channel=Destinygg&date=2026-11-19T19%3A49%3A33.890Z&username=ilovemydogs`. The quotes need their exact send time and username: look them up with linkers.ooo's public API (`/api/messages`, see `Desktop/workshop/tools/linkers-logs/README.md`) in `scripts/build-chat-review.py`, and check the times match rustlesearch's to the millisecond.
+- **The year-in-chat page editable in place** (rinlux, StrawWaffle: "the more that is editable the better", and new things addable). Plan StrawWaffle agreed: load `chat-2026.json` into the database once; from then on admins edit that copy through an edit toggle on the page (any text; add, remove and reorder cards, quotes and sections), recorded in the history with undo. The build script only starts the page off, so a rebuild can't overwrite anyone's writing. The biggest of these.
+
 **Still open:**
-- How DGGer's groups and wildcards should vote.
+- How DGGer's groups and wildcards should vote (asked, see above).
 - ~~**Simulated results**~~: on the results preview and the big screen (see "Previews by stage").
 - ~~The new voting page~~: done, the site is one page now (see "One site").
 - ~~The public tally~~: done, on the results page.
