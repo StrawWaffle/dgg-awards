@@ -106,7 +106,7 @@ export function ReviewEditor({
               <button type="button" className="cozy-btn" onClick={() => setDraft(saved)}>
                 Edit page
               </button>
-              <span className="text-sm font-semibold" style={{ color: "var(--muted)" }}>
+              <span className="hidden text-sm font-semibold sm:inline" style={{ color: "var(--muted)" }}>
                 Admins only: change any text, and add, move or remove things.
               </span>
             </>
@@ -128,7 +128,8 @@ export function ReviewEditor({
                 {dirty ? "Discard changes" : "Done"}
               </button>
               <span className="text-sm font-semibold" style={{ color: "var(--muted)" }}>
-                {dirty ? "Unsaved changes." : "Saved. Click any text to change it."} Saves show in the admin History, with undo.
+                {dirty ? "Unsaved changes." : "Click any text to change it."}
+                <span className="hidden sm:inline"> Saves show in the admin History, with undo.</span>
               </span>
             </>
           )}
@@ -287,8 +288,15 @@ export function C({
   );
 }
 
-/** Move, remove: for item `i` of the list at `at`, while editing. Place it in a `relative` item. */
-export function ItemTools({ at, i }: { at: Path; i: number }) {
+/**
+ * Move, remove: for item `i` of the list at `at`, while editing. They show
+ * while the item is hovered or has focus (always on touch screens), so they
+ * don't sit over its words. `corner` (the default) floats them on the item's
+ * top edge, `above` just above it (small things like chips), and `inline`
+ * puts them in the flow (bars, beside the name). Corner and above need a
+ * `relative` item.
+ */
+export function ItemTools({ at, i, place = "corner" }: { at: Path; i: number; place?: "corner" | "above" | "inline" }) {
   const { editing, data, change } = useEdit();
   if (!editing) return null;
   const list = (getIn(data, at) as unknown[]) ?? [];
@@ -299,7 +307,10 @@ export function ItemTools({ at, i }: { at: Path; i: number }) {
       return setIn(d, at, next);
     });
   return (
-    <span className="absolute -top-3 right-2 z-10 flex gap-1" onClick={(e) => e.stopPropagation()}>
+    <span
+      className={`item-tools z-10 flex shrink-0 gap-1 ${place === "inline" ? "" : place === "above" ? "tools-above absolute bottom-full left-0 mb-1" : "absolute -top-3 right-2"}`}
+      onClick={(e) => e.stopPropagation()}
+    >
       <button type="button" className="cozy-chip" disabled={i === 0} onClick={() => move(i - 1)} aria-label="Move up" title="Move up">
         ↑
       </button>

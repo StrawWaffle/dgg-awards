@@ -614,3 +614,28 @@ input[type="range"].cozy-range {
   outline-color: var(--primary-shadow) !important;
   background: color-mix(in oklab, var(--cream), transparent 30%);
 }
+/* The move and remove buttons on the year in chat show on the item being pointed at, or typed in. */
+.item-tools {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+.edit-item:hover > .item-tools,
+.edit-item:focus-within > .item-tools,
+.edit-item:hover > * > * > .item-tools,
+.edit-item:focus-within > * > * > .item-tools {
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (hover: none) {
+  .item-tools {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  /* Always shown on touch, so in the chip rather than over its neighbours. */
+  .item-tools.tools-above {
+    position: static;
+    display: inline-flex;
+    margin: 0 0 0 0.35rem;
+  }
+}

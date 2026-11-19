@@ -155,7 +155,7 @@ function ChatReview({ data, preview, storyHref, onStory }: { data: ReviewDoc; pr
       <div>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {data.numbers.map((_, i) => (
-            <div key={i} className="cozy-panel relative p-4">
+            <div key={i} className="edit-item cozy-panel relative p-4">
               <ItemTools at={["numbers"]} i={i} />
               <T at={["numbers", i, "value"]} format={fmt} className="hand block text-[1.6rem] font-bold tabular-nums sm:text-5xl" />
               <T at={["numbers", i, "label"]} className="block font-black" />
@@ -182,7 +182,7 @@ function ChatReview({ data, preview, storyHref, onStory }: { data: ReviewDoc; pr
             {data.combos.top.map((c, i) => (
               <li
                 key={i}
-                className="relative grid grid-cols-[2rem_auto_1fr] items-center gap-3 rounded-2xl px-2 py-1.5"
+                className="edit-item relative grid grid-cols-[2rem_auto_1fr] items-center gap-3 rounded-2xl px-2 py-1.5"
                 style={{ background: i === 0 ? "var(--highlight)" : undefined }}
               >
                 <ItemTools at={["combos", "top"]} i={i} />
@@ -274,7 +274,7 @@ function ChatReview({ data, preview, storyHref, onStory }: { data: ReviewDoc; pr
           <C k="tags.duos" d="Chat's couples" as="h3" className="mb-2 block font-black" />
           <div className="grid gap-3 sm:grid-cols-2">
             {data.tags.duos.map((d, i) => (
-              <div key={i} className="relative rounded-2xl border-2 p-4" style={{ background: "var(--cream)", borderColor: "var(--panel-border)" }}>
+              <div key={i} className="edit-item relative rounded-2xl border-2 p-4" style={{ background: "var(--cream)", borderColor: "var(--panel-border)" }}>
                 <ItemTools at={["tags", "duos"]} i={i} />
                 <div className="flex items-center justify-between gap-2 font-black">
                   <T at={["tags", "duos", i, "a"]} />
@@ -304,7 +304,7 @@ function ChatReview({ data, preview, storyHref, onStory }: { data: ReviewDoc; pr
             <C k="tags.unrequited" d="Unrequited" as="h3" className="mb-2 block font-black" />
             <ul className="space-y-1.5">
               {data.tags.unrequited.map((_, i) => (
-                <li key={i} className="relative flex flex-wrap items-baseline gap-x-2 rounded-2xl px-3 py-2" style={{ background: "var(--cream)" }}>
+                <li key={i} className="edit-item relative flex flex-wrap items-baseline gap-x-2 rounded-2xl px-3 py-2" style={{ background: "var(--cream)" }}>
                   <ItemTools at={["tags", "unrequited"]} i={i} />
                   <b>
                     <T at={["tags", "unrequited", i, "a"]} />
@@ -331,7 +331,7 @@ function ChatReview({ data, preview, storyHref, onStory }: { data: ReviewDoc; pr
           <C k="greentext.quotes" d="Greentexts, framed" as="h3" className="mb-2 block font-black" />
           <div className="grid gap-3 md:grid-cols-2">
             {data.greentext.quotes.map((q, i) => (
-              <figure key={i} className="relative rounded-2xl border-2 p-4" style={{ background: "var(--cream)", borderColor: "var(--panel-border)" }}>
+              <figure key={i} className="edit-item relative rounded-2xl border-2 p-4" style={{ background: "var(--cream)", borderColor: "var(--panel-border)" }}>
                 <ItemTools at={["greentext", "quotes"]} i={i} />
                 <T at={["greentext", "quotes", i, "text"]} as="blockquote" className="chat-greentext block font-semibold break-words" />
                 <figcaption className="mt-2 text-sm font-bold">
@@ -367,7 +367,7 @@ function ChatReview({ data, preview, storyHref, onStory }: { data: ReviewDoc; pr
           <C k="links.top" d="Links chat reacted to most" as="h3" className="mb-2 block font-black" />
           <ul className="space-y-2">
             {data.links.top.map((l, i) => (
-              <li key={i} className="relative rounded-2xl border-2 p-4" style={{ background: "var(--cream)", borderColor: "var(--panel-border)" }}>
+              <li key={i} className="edit-item relative rounded-2xl border-2 p-4" style={{ background: "var(--cream)", borderColor: "var(--panel-border)" }}>
                 <ItemTools at={["links", "top"]} i={i} />
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="cozy-chip coral">
@@ -428,7 +428,7 @@ function ChatReview({ data, preview, storyHref, onStory }: { data: ReviewDoc; pr
       </Section>
 
       {extra.map((s, i) => (
-        <section key={s.id} id={s.id} className="cozy-panel relative scroll-mt-[calc(var(--lab-header,64px)+1rem)] space-y-6 p-6 sm:p-8">
+        <section key={s.id} id={s.id} className="edit-item cozy-panel relative scroll-mt-[calc(var(--lab-header,64px)+1rem)] space-y-6 p-6 sm:p-8">
           <ItemTools at={["extra"]} i={i} />
           <h2 className="flex flex-wrap items-center gap-3 text-3xl font-black">
             <button type="button" className="cozy-row rounded-xl p-1" onClick={burst(s.emote)} aria-label={`A burst of ${s.emote}`}>
@@ -502,7 +502,7 @@ export function Cards({ at, onEmote }: { at: Path; onEmote: (e: string) => (ev: 
         {cards.map((c, i) => (
           <div
             key={i}
-            className="relative rounded-2xl border-2 p-4"
+            className="edit-item relative rounded-2xl border-2 p-4"
             style={{ background: "var(--cream)", borderColor: "var(--panel-border)", boxShadow: "0 4px 0 var(--cream-shadow)" }}
           >
             <ItemTools at={at} i={i} />
@@ -541,12 +541,12 @@ export function Bars({ k, title, at }: { k: string; title: string; at: Path }) {
       <C k={`${k}.title`} d={title} as="h3" className="mb-2 block font-black" />
       <ol ref={list} className="space-y-2">
         {bars.map((b, i) => (
-          <li key={i} className="relative">
-            <ItemTools at={at} i={i} />
+          <li key={i} className="edit-item relative">
             <div className="flex items-baseline justify-between gap-3 text-sm">
               <span className="flex min-w-0 items-center gap-2 font-bold">
                 {b.emote && <Emote name={b.emote} size={0.45} title="" />}
                 <T at={[...at, i, "name"]} className="truncate" />
+                <ItemTools at={at} i={i} place="inline" />
               </span>
               <T at={[...at, i, "value"]} format={fmt} className="hand shrink-0 text-lg font-bold tabular-nums" />
             </div>
@@ -572,8 +572,8 @@ function Chips({ k, title, at, note }: { k: string; title: string; at: Path; not
       <C k={`${k}.title`} d={title} as="h3" className="mb-2 block font-black" />
       <ul className="flex flex-wrap gap-1.5">
         {chips.map((_, i) => (
-          <li key={i} className="cozy-chip relative">
-            <ItemTools at={at} i={i} />
+          <li key={i} className="edit-item cozy-chip relative">
+            <ItemTools at={at} i={i} place="above" />
             <T at={[...at, i, "label"]} />{" "}
             <span className="hand ml-1 text-base">
               ×<T at={[...at, i, "n"]} format={fmt} />
