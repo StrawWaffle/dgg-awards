@@ -67,7 +67,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 - **Locking the site before voting:** yes, so they can test, touch up and preview. Done with "locked" plus the countdown.
 - **The code is never to be public.**
 
-**rinlux's feedback (2026-11-19), with StrawWaffle's calls.** The last three are built on branch `feedback` (worktree `.claude/worktrees/feedback`, container `dgga-feedback` on 3700), not yet merged or deployed.
+**rinlux's feedback (2026-11-19), with StrawWaffle's calls.** The last three are built and deployed (2026-11-19, backup `/data/backups/2026-11-19T20-19-43Z-before-deploy.db`). Test container `dgga-feedback` (3700) runs that build; its browser check is `tests/visual/out/feedback/check.mjs` (gitignored).
 - **Timing:** rinlux says it all comes after New Year's. They can move the voting dates themselves (Settings → "Voting opens" / "Voting closes").
 - **DGGer in stages** (rinlux): first only the wildcards vote, then a group stage on one day with a page per group (A–E), where you rank your top N; each group's top 2 make the final ten for DGGer of the Year. StrawWaffle has asked rinlux: where the 5 wildcard winners go (into the groups or straight to the final), whether the rest of the site stays open during each round, N, points or runoff for the groups, and the dates.
 - **Voting tutorials as steps** (StrawWaffle): a step in the vote flow just before the first ranked award ("How ranked voting works", a practice round on made-up nominees, with Skip), and another before the wildcards' top 10. Everyone passes them; there's no "first time" to track.
@@ -80,7 +80,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
   - The page's own words (headings, notes, the story's start and end) are in `copy` by key once rewritten (`C` in ChatEdit), with the code's text as the default. Story slides point at the card, number or quote they show, so editing a slide edits it everywhere.
   - `PUT /api/admin/chat-review` checks the whole shape (`chatReview` in `src/server/schemas.ts`). History kind `page`: keeps the top-level parts that changed; the History tab lists every changed bit by path ("emotes.cards.1.title"), and undo puts the parts back. New "Pages" filter.
   - The cover line "what N of you did with M million messages" is worked out from the numbers until someone rewrites it.
-  - Tested: typecheck, 130 unit tests, 52 API tests, and a Playwright run (`tests/visual/out/feedback/check.mjs`, not in git): edit, add, remove, save, reload, the story, undo, a bad save refused (400) and a signed-out one (401), and the clip cards (play, pick). No API test covers the save yet.
+  - Tested: typecheck, 130 unit tests, 52 API tests, and a Playwright run (`tests/visual/out/feedback/check.mjs` in the main checkout, not in git): edit, add, remove, save, reload, the story, undo, a bad save refused (400) and a signed-out one (401), and the clip cards (play, pick). No API test covers the save yet.
 
 **Still open:**
 - How DGGer's groups and wildcards should vote (asked, see above).
