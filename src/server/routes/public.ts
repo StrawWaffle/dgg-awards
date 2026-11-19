@@ -1,4 +1,6 @@
 import { Hono } from "hono";
+import type chat2026 from "@/archive/chat-2026.json";
+import { getChatReview } from "@/server/chat-review";
 import { createMiddleware } from "hono/factory";
 import {
   getCategoryForVoting,
@@ -26,7 +28,6 @@ import {
   zValidator,
 } from "@/server/middleware";
 import { resultsQuery, voteSubmit } from "@/server/schemas";
-import chatReview from "@/archive/chat-2026.json";
 import { DGG_NAME, cachedDggProfile, chatterName } from "@/server/dgg-profile";
 
 /** 401 with no body unless voting is open right now. */
@@ -134,7 +135,7 @@ export const publicRoutes = new Hono<SessionEnv>()
     },
   )
 
-  // The year in DGG chat (src/archive/chat-2026.json): public with the
+  // The year in DGG chat (src/server/chat-review.ts): public with the
   // results, and for admins with ?preview=1. Served from here rather than
   // bundled into the page, so it stays out of sight until then.
   .get("/api/chat-review", zValidator("query", resultsQuery, rejectInvalid), async (c) => {
@@ -143,7 +144,9 @@ export const publicRoutes = new Hono<SessionEnv>()
       c.req.valid("query").preview === "1" &&
       (await verifyAdminSession(getCookie(c, SESSION_COOKIE))) !== null;
     if (config.viewingMode !== "reviewing" && !preview) return c.body(null, 401);
-    return c.json(chatReview, 200);
+    const review = await getChatReview("2026");
+    if (!review) return c.body(null, 404);
+    return c.json(review as typeof chat2026, 200);
   })
 
   // The tally (voters, ballots, per day): public with the results, and for

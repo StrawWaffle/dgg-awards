@@ -148,7 +148,7 @@ export const idQuery = z.object({ id: required });
 
 export const historyQuery = z.object({
   page: z.coerce.number().int().min(0).optional(),
-  kind: z.enum(["category", "nominee", "settings", "admin", "order", "import"]).optional(),
+  kind: z.enum(["category", "nominee", "settings", "admin", "order", "import", "page"]).optional(),
   categoryId: z.string().min(1).optional(),
   nomineeId: z.string().min(1).optional(),
   uid: z.coerce.number().int().optional(),
@@ -258,3 +258,76 @@ export const importForm = z.object({
     }
   }),
 });
+
+// The year in chat as edited on the page (src/archive/chat-<year>.json's
+// shape, plus `copy` and `extra`). Checked in full, so a save can't leave the
+// page unable to draw.
+const words = z.string().max(5000);
+const count = z.number().finite();
+const reviewCard = z.object({ emote: words, big: words, title: words, text: words });
+const reviewBar = z.object({ name: words, value: count, sub: words.optional(), emote: words.optional() });
+const reviewChip = z.object({ label: words, n: count });
+const reviewCrown = z.object({ nick: words, n: count }).nullable();
+export const chatReview = z.object({
+  year: words,
+  from: words,
+  through: words,
+  days: count,
+  numbers: z.array(z.object({ label: words, value: count, note: words })),
+  emotes: z.object({ cards: z.array(reviewCard), top: z.array(reviewBar), users: z.array(reviewBar) }),
+  combos: z.object({
+    cards: z.array(reviewCard),
+    top: z.array(
+      z.object({ emote: words, size: count, people: count, date: words, brokenBy: words, breaking: words.nullable() }),
+    ),
+    joiners: z.array(reviewBar),
+    breakers: z.array(reviewBar),
+  }),
+  names: z.object({
+    cards: z.array(reviewCard),
+    months: z.array(words),
+    crowns: z.array(z.object({ target: words, year: reviewCrown, months: z.array(reviewCrown) })),
+  }),
+  tags: z.object({
+    cards: z.array(reviewCard),
+    duos: z.array(z.object({ a: words, b: words, ab: count, ba: count, note: words.nullable() })),
+    unrequited: z.array(z.object({ a: words, b: words, ab: count, ba: count })),
+    tagged: z.array(reviewBar),
+  }),
+  greentext: z.object({
+    cards: z.array(reviewCard),
+    top: z.array(reviewBar),
+    quotes: z.array(z.object({ who: words, text: words, note: words, link: words.optional() })),
+  }),
+  links: z.object({
+    cards: z.array(reviewCard),
+    top: z.array(
+      z.object({
+        rank: count,
+        who: words,
+        reactions: count,
+        people: count,
+        date: words,
+        text: words,
+        link: z.object({ url: words, label: words }).nullable(),
+        note: words,
+      }),
+    ),
+  }),
+  law: z.object({
+    cards: z.array(reviewCard),
+    mods: z.array(reviewBar),
+    banReasons: z.array(reviewChip),
+    nuked: z.array(reviewChip),
+    linkRules: z.array(reviewChip),
+    flyers: z.array(reviewCard),
+  }),
+  notTags: z.array(words),
+  /** The page's own words (headings, notes), by key, where they've been rewritten. */
+  copy: z.record(z.string().max(100), words).optional(),
+  /** Sections added on the page, after the built ones. */
+  extra: z
+    .array(z.object({ id: z.string().max(100), title: words, emote: words, intro: words, cards: z.array(reviewCard) }))
+    .optional(),
+});
+export const chatReviewSave = z.object({ year: z.string().regex(/^\d{4}$/), data: chatReview });

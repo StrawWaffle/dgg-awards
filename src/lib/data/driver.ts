@@ -262,6 +262,19 @@ export async function pinVotedCategoryStyles(currentDefault: VotingStyle) {
     );
 }
 
+/** A page edited from the site (see `pagesTable`), or undefined if it has never been saved. */
+export async function getPage(key: string) {
+  return (await db.query.pagesTable.findFirst({ where: eq(schema.pagesTable.key, key) }))?.data;
+}
+
+export async function setPage(key: string, data: Record<string, unknown>) {
+  const updatedAt = new Date();
+  await db
+    .insert(schema.pagesTable)
+    .values({ key, data, updatedAt })
+    .onConflictDoUpdate({ target: schema.pagesTable.key, set: { data, updatedAt } });
+}
+
 /** Upsert one setting in the key/value configuration table. */
 export async function setSetting(key: string, val: string) {
   await db

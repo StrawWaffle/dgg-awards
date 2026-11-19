@@ -180,7 +180,20 @@ export const configurationTable = sqliteTable("configuration", {
   val: text().notNull(),
 });
 
-export type HistoryKind = "category" | "nominee" | "settings" | "admin" | "order" | "import";
+/**
+ * Pages edited from the site itself, as one JSON document each: "chat-2026"
+ * is the year in chat. Until a page is first saved, the server serves the
+ * file it was built into (src/archive/chat-2026.json).
+ */
+export const pagesTable = sqliteTable("pages", {
+  key: text().primaryKey(),
+  data: text({ mode: "json" }).$type<Record<string, unknown>>().notNull(),
+  updatedAt: int({ mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type HistoryKind = "category" | "nominee" | "settings" | "admin" | "order" | "import" | "page";
 export type HistoryAction = "create" | "update" | "delete";
 
 /**

@@ -10,6 +10,8 @@ import {
   getCategory,
   getCategoryNominees,
   getConfig,
+  getPage,
+  setPage,
   getHistoryEntry,
   getNominee,
   getNominees,
@@ -291,6 +293,21 @@ export async function undo(id: number, actor: Actor, force = false): Promise<num
       if (entry.categoryId) await reorderNominees(entry.categoryId, ids);
       else await reorderCategories(ids);
       return record(actor, { ...base, action: "update", before: { ids: current }, after: { ids } });
+    }
+
+    case "page": {
+      // Put the changed parts of the page back; a part the edit added goes away.
+      const key = entry.nomineeId!;
+      const current = await getPage(key);
+      if (!current) throw new UndoConflict("That page isn't saved any more.");
+      check(current);
+      const restored: Snapshot = { ...current };
+      for (const [k, value] of Object.entries(before)) {
+        if (value === null || value === undefined) delete restored[k];
+        else restored[k] = value;
+      }
+      await setPage(key, restored);
+      return record(actor, { ...base, action: "update", before: current, after: restored });
     }
 
     case "import": {

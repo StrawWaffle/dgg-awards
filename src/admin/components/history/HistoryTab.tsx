@@ -11,6 +11,7 @@ const kinds: { value: NonNullable<HistoryFilter["kind"]> | ""; label: string }[]
   { value: "settings", label: "Settings" },
   { value: "admin", label: "Admins" },
   { value: "import", label: "Imports" },
+  { value: "page", label: "Pages" },
 ];
 
 /** Every change made from the admin page, by anyone. */

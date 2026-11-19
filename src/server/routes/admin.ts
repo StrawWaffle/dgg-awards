@@ -58,6 +58,7 @@ import {
 } from "@/server/clips";
 import { DGG_NAME, cachedDggProfile } from "@/server/dgg-profile";
 import { categoriesWithMediaUrls } from "@/server/present";
+import { chatReviewKey, getChatReview, saveChatReview } from "@/server/chat-review";
 import { serveFile, storage } from "@/server/storage";
 import { libraryFile, listLibrary } from "@/server/library";
 import { RestoreError, restoreDatabase, snapshotDatabase } from "@/lib/data/driver";
@@ -67,6 +68,7 @@ import { type SessionEnv, rejectInvalid, requireAdmin, zValidator } from "@/serv
 import {
   categoryCreate,
   categoryForm,
+  chatReviewSave,
   categoryOrder,
   nomineeOrder,
   categoryPatch,
@@ -600,6 +602,27 @@ export const adminRoutes = new Hono<SessionEnv>()
       categoryId,
       before: { ids: before },
       after: { ids: await currentNomineeOrder(categoryId) },
+    });
+    return c.body(null, 200);
+  })
+
+  /**
+   * Save the year in chat as edited on its page. The whole document is sent;
+   * the history keeps the top-level parts that changed, for undo.
+   */
+  .put("/chat-review", zValidator("json", chatReviewSave, rejectInvalid), async (c) => {
+    const { year, data } = c.req.valid("json");
+    const before = await getChatReview(year);
+    if (!before) return c.text("There's no year in chat for that year.", 404);
+    await saveChatReview(year, data);
+    await record(await actor(c), {
+      kind: "page",
+      action: "update",
+      label: `The year in chat ${year}`,
+      // The page's key; pages have no category or nominee.
+      nomineeId: chatReviewKey(year),
+      before,
+      after: data,
     });
     return c.body(null, 200);
   })

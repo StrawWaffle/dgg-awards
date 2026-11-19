@@ -57,8 +57,26 @@ export function formatValue(key: string, value: unknown): string {
   return String(value);
 }
 
+/**
+ * Every bit of text in a page, by where it is: "emotes.cards.2.text". A page's
+ * history keeps whole parts of it, so its diff compares these.
+ */
+function leaves(value: unknown, at = "", out: Record<string, string> = {}) {
+  if (Array.isArray(value)) value.forEach((v, i) => leaves(v, `${at}.${i + 1}`, out));
+  else if (value && typeof value === "object") for (const [k, v] of Object.entries(value)) leaves(v, at ? `${at}.${k}` : k, out);
+  else if (value !== null && value !== undefined && value !== "") out[at] = String(value);
+  return out;
+}
+
 /** The rows of the diff: field, before, after. */
 export function diffRows(entry: HistoryEntry) {
+  if (entry.kind === "page") {
+    const before = leaves(entry.before ?? {});
+    const after = leaves(entry.after ?? {});
+    return [...new Set([...Object.keys(before), ...Object.keys(after)])]
+      .filter((k) => before[k] !== after[k])
+      .map((k) => ({ key: k, field: k, before: before[k] ?? "—", after: after[k] ?? "—" }));
+  }
   const before = (entry.before ?? {}) as Snapshot;
   const after = (entry.after ?? {}) as Snapshot;
   const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])].filter((k) => !hidden.has(k));
@@ -101,6 +119,10 @@ export function describe(entry: HistoryEntry): string {
       return "Reordered";
     case "import":
       return entry.action === "create" ? `${importSummary(after)}:` : "Removed the import of";
+    case "page": {
+      const n = diffRows(entry).length;
+      return `Edited ${n} ${n === 1 ? "bit" : "bits"} of`;
+    }
   }
 }
 

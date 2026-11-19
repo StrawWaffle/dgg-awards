@@ -307,3 +307,9 @@ export async function fetchYouTubeEmbedData(videoId?: string) {
     return null;
   }
 }
+
+/** Save the year in chat as edited on its page. */
+export type ChatReviewSave = Parameters<(typeof client.api.admin)["chat-review"]["$put"]>[0]["json"];
+export async function saveChatReview(body: ChatReviewSave) {
+  await ok(await client.api.admin["chat-review"].$put({ json: body }), "Couldn't save the page");
+}
