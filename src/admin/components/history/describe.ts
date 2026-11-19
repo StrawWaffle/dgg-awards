@@ -34,6 +34,8 @@ const fieldNames: Record<string, string> = {
   admin: "admin",
   hidden: "hidden",
   askDates: "asking for dates",
+  announcerKey: "announcer video",
+  announcerUrl: "announcer video link",
   ids: "order",
 };
 export const fieldName = (key: string) => fieldNames[key] ?? key;
@@ -50,7 +52,7 @@ export function formatValue(key: string, value: unknown): string {
   }
   if ((key === "clipStart" || key === "clipEnd") && typeof value === "number") return formatTimestamp(value);
   if (key === "thumbnailAt" && typeof value === "number") return `${value}s into the clip`;
-  if ((key === "clipKey" || key === "thumbnailKey") && typeof value === "string") return value.split("/").pop()!;
+  if ((key === "clipKey" || key === "thumbnailKey" || key === "announcerKey") && typeof value === "string") return value.split("/").pop()!;
   if (key === "admin" || key === "hidden" || key === "askDates") return value ? "yes" : "no";
   if (key === "ids" && Array.isArray(value)) return value.map((id, i) => `${i + 1}. ${id}`).join("\n");
   if (key === "votingStyle" && value === null) return "site default";

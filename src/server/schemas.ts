@@ -119,7 +119,14 @@ export const categoryPatch = z.object({
   votingStyle: z.enum(votingStyles).nullable().optional(),
   hidden: z.boolean().optional(),
   askDates: z.boolean().optional(),
+  /** The announcer video's link; null takes it away. */
+  announcerUrl: z.string().trim().url().nullable().optional(),
+  /** Only null: take the uploaded announcer video away (the file is kept, for undo). */
+  announcerKey: z.null().optional(),
 });
+
+/** An announcer video for an award, uploaded as a file. */
+export const announcerUpload = z.object({ categoryId: required, file: z.instanceof(File) });
 
 export const nomineePatch = z.object({
   id: required,

@@ -666,7 +666,9 @@ export async function listUnfinishedClips() {
  */
 export async function getNominees({ includeHidden = false, admin = false } = {}) {
   return await db.query.categoriesTable.findMany({
-    columns: admin ? { position: false, hidden: false } : { position: false, hidden: false, askDates: false },
+    columns: admin
+      ? { position: false, hidden: false }
+      : { position: false, hidden: false, askDates: false, announcerKey: false, announcerUrl: false },
     where: includeHidden ? undefined : (c, { eq }) => eq(c.hidden, false),
     orderBy: (c, { asc }) => [asc(c.position)],
     with: {
@@ -728,12 +730,14 @@ export async function updateCategory({
   votingStyle,
   hidden,
   askDates,
+  announcerKey,
+  announcerUrl,
 }: Partial<InferInsertModel<typeof schema.categoriesTable>> & {
   id: string;
 }) {
   return await db
     .update(schema.categoriesTable)
-    .set({ description, title, votingStyle, hidden, askDates })
+    .set({ description, title, votingStyle, hidden, askDates, announcerKey, announcerUrl })
     .where(eq(schema.categoriesTable.id, id));
 }
 

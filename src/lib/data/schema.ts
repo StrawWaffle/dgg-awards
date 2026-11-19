@@ -63,6 +63,15 @@ export const categoriesTable = sqliteTable("categories", {
    * people, where a date means nothing. Admins only.
    */
   askDates: int({ mode: "boolean" }).notNull().default(true),
+  /**
+   * The announcer video: someone from the community revealing the winner,
+   * played on the big screen before the results, which then show all at once.
+   * An uploaded file (`announcerKey`, a storage key) or a link (YouTube,
+   * Twitch, Streamable or a video file); the file wins if both are set.
+   * Admins only, so it can't spoil the show.
+   */
+  announcerKey: text(),
+  announcerUrl: text(),
 });
 
 export const optionsTable = sqliteTable(

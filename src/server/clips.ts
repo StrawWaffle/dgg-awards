@@ -37,7 +37,7 @@ const MAX_VIDEO_KBPS = 4000;
  * clips that need trimming are usually 10–40 MB.
  */
 export const MAX_VIDEO_UPLOAD_BYTES = 95 * 1024 * 1024;
-const VIDEO_EXTENSIONS = ["mp4", "m4v", "mov", "mkv", "webm"];
+export const VIDEO_EXTENSIONS = ["mp4", "m4v", "mov", "mkv", "webm"];
 
 /**
  * Uploaded videos wait here, next to the database (so on its volume), until

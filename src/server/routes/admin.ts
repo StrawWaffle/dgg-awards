@@ -55,6 +55,8 @@ import {
   thumbnailFromUpload,
   clipFrame,
   clearClip, clearThumbnail,
+  MAX_VIDEO_UPLOAD_BYTES,
+  VIDEO_EXTENSIONS,
 } from "@/server/clips";
 import { DGG_NAME, cachedDggProfile } from "@/server/dgg-profile";
 import { categoriesWithMediaUrls } from "@/server/present";
@@ -66,6 +68,7 @@ import { decryptBackup, isEncryptedBackup, isSqlite } from "@/lib/backup-crypto"
 import { backupDatabaseOffsite, backupMediaOffsite, offsiteEnabled, offsiteStatus } from "@/server/backups";
 import { type SessionEnv, rejectInvalid, requireAdmin, zValidator } from "@/server/middleware";
 import {
+  announcerUpload,
   categoryCreate,
   categoryForm,
   chatReviewSave,
@@ -495,6 +498,30 @@ export const adminRoutes = new Hono<SessionEnv>()
     return c.body(null, 200);
   })
 
+  /**
+   * An announcer video for an award, as a file. Stored as it is (browsers play
+   * mp4 and webm; other formats may not play) and recorded like any category
+   * change. Old files are kept, so undo can bring them back.
+   */
+  .post("/announcer", zValidator("form", announcerUpload, rejectInvalid), async (c) => {
+    const { categoryId, file } = c.req.valid("form");
+    const before = await getCategory(categoryId);
+    if (!before) return c.body(null, 404);
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+    if (!VIDEO_EXTENSIONS.includes(ext) && !file.type.startsWith("video/")) {
+      return c.text("That isn't a video file. Use mp4 or webm.", 400);
+    }
+    if (file.size > MAX_VIDEO_UPLOAD_BYTES) {
+      return c.text(`Videos can be at most ${Math.floor(MAX_VIDEO_UPLOAD_BYTES / 1024 / 1024)} MB. Export it smaller.`, 400);
+    }
+    const key = `announcers/${categoryId}-${Date.now()}.${VIDEO_EXTENSIONS.includes(ext) ? ext : "mp4"}`;
+    await storage.put(key, file, file.type || "video/mp4");
+    await updateCategory({ id: categoryId, announcerKey: key });
+    const after = await getCategory(categoryId);
+    await record(await actor(c), { kind: "category", action: "update", label: before.title, categoryId, before, after });
+    return c.json({ announcerFileUrl: storage.url(key) }, 200);
+  })
+
   .get("/nominees", async (c) => {
     const config = await getConfig();
     const flags = await getCategoryFlags();
@@ -506,6 +533,7 @@ export const adminRoutes = new Hono<SessionEnv>()
         ...cat,
         hidden: flags.get(cat.id)?.hidden ?? false,
         hasVotes: flags.get(cat.id)?.hasVotes ?? false,
+        announcerFileUrl: cat.announcerKey ? storage.url(cat.announcerKey) : null,
       })),
       200,
     );
