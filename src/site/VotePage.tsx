@@ -519,7 +519,7 @@ function NomineeCard({
       </div>
       <div className="flex items-center justify-between gap-2 px-1 pt-2">
         <span className="font-extrabold leading-tight">{n.title}</span>
-        {on && single && <span className="cozy-chip green shrink-0">{mine ? "Your vote" : "Your pick"}</span>}
+        {on && single && (!clip || mine) && <span className="cozy-chip green shrink-0">{mine ? "Your vote" : "Your pick"}</span>}
       </div>
       {n.description && (
         <p className="line-clamp-2 px-1 pt-1 text-xs font-semibold" style={{ color: "var(--muted)" }}>
@@ -550,7 +550,7 @@ function NomineeCard({
       <button
         type="button"
         onClick={onWatch}
-        className="group block flex-1 cursor-pointer text-left"
+        className="group flex flex-1 cursor-pointer flex-col justify-start text-left"
         aria-label={`Watch the clip of ${n.title}`}
       >
         {body}

@@ -1,20 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { originOf, useBursts } from "@/lab/Bursts";
 import { Emote } from "@/lab/Emote";
+import { C, EmoteName, type Path, ReviewEditor, T, WordList, getIn, useReviewAt } from "@/site/ChatEdit";
 import { type Review, ReviewNotice, day, fmt, useReview } from "@/site/ChatReviewPage";
 import type { Me, SiteConfig } from "@/site/Site";
 
-type Slide = {
-  key: string;
-  section: string;
-  emote: string;
-  big?: string;
-  greentext?: string;
-  /** Where the quote sits in chat, on rustlesearch. */
-  link?: string;
-  title: string;
-  text?: string;
-};
+/**
+ * One screen of the story. Each points at what it shows in the data (`at`),
+ * so editing a slide edits that card, number or quote everywhere.
+ */
+type Slide = { key: string; section: string; kind: "number" | "card" | "quote" | "duo"; at: Path };
 
 const SECTION_BG: Record<string, string> = {
   "The year": "var(--panel)",
@@ -30,29 +25,35 @@ const SECTION_BG: Record<string, string> = {
 /** The year as a run of slides: the numbers, then each section's highlights, a few quotes, and the way out. */
 function slidesOf(d: Review): Slide[] {
   const s: Slide[] = [];
-  const num = (label: string, emote: string) => {
-    const n = d.numbers.find((x) => x.label === label)!;
-    s.push({ key: `n-${label}`, section: "The year", emote, big: fmt(n.value), title: label, text: n.note });
+  const num = (label: string) => {
+    const i = d.numbers.findIndex((x) => x.label === label);
+    if (i >= 0) s.push({ key: `n-${i}`, section: "The year", kind: "number", at: ["numbers", i] });
   };
-  num("messages", "OMEGALUL");
-  num("chatters", "Klappa");
-  num("emotes", "PepoG");
-  num("punishments", "GIGACHAD");
-  const cards = (section: string, list: { emote: string; big: string; title: string; text: string }[]) =>
-    list.forEach((c) => s.push({ key: `${section}-${c.title}`, section, ...c }));
-  cards("Emotes", d.emotes.cards.slice(0, 4));
-  cards("Combos", [d.combos.cards[2]!, d.combos.cards[0]!, d.combos.cards[1]!, d.combos.cards[3]!, d.combos.cards[4]!]);
-  cards("Their names", d.names.cards);
-  cards("Who tagged whom", d.tags.cards);
-  const duo = d.tags.duos.find((x) => x.a === "aus_bits") ?? d.tags.duos[0]!;
-  s.push({ key: "duo", section: "Who tagged whom", emote: "peepoHug", big: `${fmt(duo.ab)} ⇄ ${fmt(duo.ba)}`, title: `${duo.a} and ${duo.b}`, text: duo.note ?? "" });
-  cards("Greentext", d.greentext.cards);
+  num("messages");
+  num("chatters");
+  num("emotes");
+  num("punishments");
+  const cards = (section: string, list: Path, picks: number[]) => {
+    const all = (getIn(d, list) as unknown[] | undefined) ?? [];
+    for (const i of picks) if (i < all.length) s.push({ key: `${list.join(".")}-${i}`, section, kind: "card", at: [...list, i] });
+  };
+  const range = (n: number) => Array.from({ length: n }, (_, i) => i);
+  cards("Emotes", ["emotes", "cards"], range(4));
+  cards("Combos", ["combos", "cards"], [2, 0, 1, 3, 4]);
+  cards("Their names", ["names", "cards"], range(d.names.cards.length));
+  cards("Who tagged whom", ["tags", "cards"], range(d.tags.cards.length));
+  const duo = Math.max(0, d.tags.duos.findIndex((x) => x.a === "aus_bits"));
+  if (d.tags.duos[duo]) s.push({ key: "duo", section: "Who tagged whom", kind: "duo", at: ["tags", "duos", duo] });
+  cards("Greentext", ["greentext", "cards"], range(d.greentext.cards.length));
   for (const who of ["yusuf", "Clanker", "Torrniquet"]) {
-    const q = d.greentext.quotes.find((x) => x.who === who);
-    if (q) s.push({ key: `q-${who}`, section: "Greentext", emote: "PepoG", greentext: q.text, title: q.who, text: q.note, link: q.link });
+    const i = d.greentext.quotes.findIndex((x) => x.who === who);
+    if (i >= 0) s.push({ key: `q-${i}`, section: "Greentext", kind: "quote", at: ["greentext", "quotes", i] });
   }
-  cards("Links", d.links.cards.slice(0, 2));
-  cards("Law and order", [...d.law.cards.slice(0, 3), d.law.flyers[0]!]);
+  cards("Links", ["links", "cards"], range(2));
+  cards("Law and order", ["law", "cards"], range(3));
+  cards("Law and order", ["law", "flyers"], [0]);
+  // Sections added on the page: every card.
+  (d.extra ?? []).forEach((x, e) => cards(x.title, ["extra", e, "cards"], range(x.cards.length)));
   return s;
 }
 
@@ -80,7 +81,11 @@ export function ChatStoryPage({
       </main>
     );
   }
-  return <ChatStory data={data} preview={preview} {...links} />;
+  return (
+    <ReviewEditor data={data} admin={!!me?.admin} year={data.year} floating>
+      {(d) => <ChatStory data={d} preview={preview} {...links} />}
+    </ReviewEditor>
+  );
 }
 
 function ChatStory({ data, preview, allHref, onAll }: { data: Review; preview: boolean } & Links) {
@@ -120,41 +125,17 @@ function ChatStory({ data, preview, allHref, onAll }: { data: Review; preview: b
       >
         <Screen i={0} at={at} bg="var(--panel)">
           <Emote name="DANKMEMES" size={2.5} title="" />
-          <h1 className="mt-6 text-5xl font-black sm:text-7xl">{data.year} in DGG chat</h1>
-          <p className="mt-4 text-xl font-semibold" style={{ color: "var(--muted)" }}>
-            {day(data.from)} to {day(data.through, true)}
-          </p>
-          <p className="mt-16 text-sm font-bold" style={{ color: "var(--muted)" }}>
-            Scroll, or use the arrow keys ↓
-          </p>
+          <C k="story.title" d={`${data.year} in DGG chat`} as="h1" className="mt-6 block text-5xl font-black sm:text-7xl" />
+          <C k="story.dates" d={`${day(data.from)} to ${day(data.through, true)}`} as="p" className="mt-4 block text-xl font-semibold" style={{ color: "var(--muted)" }} />
+          <C k="story.intro" optional as="p" className="mt-6 block max-w-2xl text-xl font-semibold" />
+          <C k="story.scroll" d="Scroll, or use the arrow keys ↓" as="p" className="mt-16 block text-sm font-bold" style={{ color: "var(--muted)" }} />
           <a className="mt-3 text-sm font-bold underline" style={{ color: "var(--muted)" }} href={allHref} onClick={onAll}>
-            or see every number at once
+            <C k="story.all" d="or see every number at once" />
           </a>
         </Screen>
         {slides.map((s, i) => (
           <Screen key={s.key} i={i + 1} at={at} bg={SECTION_BG[s.section] ?? "var(--panel)"}>
-            <span className="cozy-chip">{s.section}</span>
-            <button
-              type="button"
-              className="cozy-row mt-6 rounded-2xl p-2"
-              onClick={(e) => fire(s.emote, ...originOf(e, outer.current), 8)}
-              aria-label={`A burst of ${s.emote}`}
-            >
-              <Emote name={s.emote} size={2.5} title="" />
-            </button>
-            {s.big && <div className="hand mt-4 text-7xl font-bold tabular-nums sm:text-9xl">{s.big}</div>}
-            {s.greentext && <blockquote className="chat-greentext mt-4 max-w-2xl text-xl font-semibold sm:text-2xl">{s.greentext}</blockquote>}
-            <h2 className="mt-4 text-3xl font-black sm:text-4xl">{s.title}</h2>
-            {s.text && (
-              <p className="mt-3 max-w-xl text-lg font-semibold sm:text-xl" style={{ color: "var(--muted)" }}>
-                {s.text}
-              </p>
-            )}
-            {s.link && (
-              <a className="mt-3 text-sm font-bold underline" style={{ color: "var(--muted)" }} href={s.link} target="_blank" rel="noopener noreferrer">
-                See it in chat on rustlesearch ↗
-              </a>
-            )}
+            <SlideBody slide={s} onEmote={(e, emote) => fire(emote, ...originOf(e, outer.current), 8)} />
           </Screen>
         ))}
         <Screen i={slides.length + 1} at={at} bg="var(--panel)">
@@ -162,20 +143,18 @@ function ChatStory({ data, preview, allHref, onAll }: { data: Review; preview: b
             <Emote name="Klappa" size={2} title="" />
             <Emote name="CHEERSTINY" size={2} title="" />
           </div>
-          <h2 className="mt-6 text-4xl font-black">That was the year.</h2>
-          <p className="mt-3 max-w-xl text-lg font-semibold" style={{ color: "var(--muted)" }}>
-            Every number, chart and table is on one page as well.
-          </p>
+          <C k="story.end" d="That was the year." as="h2" className="mt-6 block text-4xl font-black" />
+          <C k="story.endNote" d="Every number, chart and table is on one page as well." as="p" className="mt-3 block max-w-xl text-lg font-semibold" style={{ color: "var(--muted)" }} />
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <a className="cozy-btn primary" href={allHref} onClick={onAll}>
-              See all the numbers
+              <C k="story.allButton" d="See all the numbers" />
             </a>
             <button type="button" className="cozy-btn" onClick={() => go(0)}>
               Back to the start
             </button>
           </div>
           <p className="mx-auto mt-10 max-w-2xl text-xs font-semibold" style={{ color: "var(--muted)" }}>
-            Names that are also everyday words weren't counted as tags: {data.notTags.join(", ")}.
+            <C k="story.notTags" d="Names that are also everyday words weren't counted as tags:" /> <WordList at={["notTags"]} />.
           </p>
         </Screen>
       </div>
@@ -207,5 +186,49 @@ function Screen({ i, at, bg, children }: { i: number; at: number; bg: string; ch
     >
       <div className={`flex flex-col items-center transition-opacity duration-500 ${at === i ? "opacity-100" : "opacity-0"}`}>{children}</div>
     </section>
+  );
+}
+
+const NUMBER_EMOTE: Record<string, string> = { messages: "OMEGALUL", chatters: "Klappa", emotes: "PepoG", punishments: "GIGACHAD" };
+
+/** What a slide shows, every bit of it editable. */
+function SlideBody({ slide: s, onEmote }: { slide: Slide; onEmote: (e: React.MouseEvent, emote: string) => void }) {
+  const item = useReviewAt(s.at) as Record<string, unknown> | undefined;
+  if (!item) return null;
+  const emote =
+    s.kind === "card" ? String(item.emote) : s.kind === "number" ? (NUMBER_EMOTE[String(item.label)] ?? "PepoG") : s.kind === "duo" ? "peepoHug" : "PepoG";
+  const muted = { color: "var(--muted)" };
+  return (
+    <>
+      <C k={`story.section.${s.section}`} d={s.section} className="cozy-chip" />
+      <button type="button" className="cozy-row mt-6 rounded-2xl p-2" onClick={(e) => onEmote(e, emote)} aria-label={`A burst of ${emote}`}>
+        <Emote name={emote} size={2.5} title="" />
+      </button>
+      {s.kind === "card" && <EmoteName at={[...s.at, "emote"]} />}
+      {(s.kind === "card" || s.kind === "number") && (
+        <T at={[...s.at, s.kind === "card" ? "big" : "value"]} format={s.kind === "number" ? fmt : undefined} className="hand mt-4 block text-7xl font-bold tabular-nums sm:text-9xl" />
+      )}
+      {s.kind === "duo" && (
+        <div className="hand mt-4 text-7xl font-bold tabular-nums sm:text-9xl">
+          <T at={[...s.at, "ab"]} format={fmt} /> ⇄ <T at={[...s.at, "ba"]} format={fmt} />
+        </div>
+      )}
+      {s.kind === "quote" && <T at={[...s.at, "text"]} as="blockquote" className="chat-greentext mt-4 block max-w-2xl text-xl font-semibold sm:text-2xl" />}
+      <h2 className="mt-4 text-3xl font-black sm:text-4xl">
+        {s.kind === "duo" ? (
+          <>
+            <T at={[...s.at, "a"]} /> and <T at={[...s.at, "b"]} />
+          </>
+        ) : (
+          <T at={[...s.at, s.kind === "card" ? "title" : s.kind === "number" ? "label" : "who"]} />
+        )}
+      </h2>
+      <T at={[...s.at, s.kind === "card" ? "text" : "note"]} optional as="p" className="mt-3 block max-w-xl text-lg font-semibold sm:text-xl" style={muted} />
+      {s.kind === "quote" && typeof item.link === "string" && item.link && (
+        <a className="mt-3 text-sm font-bold underline" style={muted} href={item.link} target="_blank" rel="noopener noreferrer">
+          <C k="story.quoteLink" d="See it in chat on rustlesearch ↗" />
+        </a>
+      )}
+    </>
   );
 }

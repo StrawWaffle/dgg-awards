@@ -602,3 +602,15 @@ input[type="range"].cozy-range {
 .platform-mark.twitch {
   background: #6441a5;
 }
+
+/* Text being edited on the year in chat (src/site/ChatEdit.tsx): a hint while it's empty. */
+.edit-text:empty::before {
+  content: attr(data-placeholder);
+  color: var(--muted);
+  font-style: italic;
+  opacity: 0.8;
+}
+.edit-text:focus {
+  outline-color: var(--primary-shadow) !important;
+  background: color-mix(in oklab, var(--cream), transparent 30%);
+}
