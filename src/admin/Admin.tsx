@@ -18,6 +18,7 @@ import {
   ExternalLinkIcon,
   GearIcon,
   HomeIcon,
+  ChatBubbleIcon,
   MoonIcon,
   PersonIcon,
   StackIcon,
@@ -150,6 +151,10 @@ function AdminPage() {
 
         <div className="flex flex-wrap items-center gap-1 border-t border-neutral-200 pt-2 md:mt-auto md:flex-col md:items-stretch">
           <PreviewMenu collapsed={collapsed} />
+          {/* Edited on the page itself (rinlux's ask), so this opens it with editing on. */}
+          <SideLink href="/preview/results/chat-all#edit" icon={<ChatBubbleIcon />} collapsed={collapsed}>
+            Year in chat
+          </SideLink>
           <SideLink href="/" icon={<HomeIcon />} collapsed={collapsed}>
             Open the site
           </SideLink>

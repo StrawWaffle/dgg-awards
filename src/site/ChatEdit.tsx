@@ -57,7 +57,11 @@ export function ReviewEditor({
   children: (data: ReviewDoc) => ReactNode;
 }) {
   const [saved, setSaved] = useState(data);
-  const [draft, setDraft] = useState<ReviewDoc | null>(null);
+  // `#edit` (the admin sidebar's "Year in chat" link) opens it with editing on.
+  const [draft, setDraft] = useState<ReviewDoc | null>(() => (admin && location.hash === "#edit" ? data : null));
+  useEffect(() => {
+    if (location.hash === "#edit") history.replaceState(null, "", location.pathname + location.search);
+  }, []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => setSaved(data), [data]);
