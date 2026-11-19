@@ -281,6 +281,14 @@ function ChatReview({ data, preview, storyHref, onStory }: { data: Review; previ
                 <blockquote className="chat-greentext font-semibold break-words">{q.text}</blockquote>
                 <figcaption className="mt-2 text-sm font-bold">
                   {q.who} <span style={{ color: "var(--muted)" }}>· {q.note}</span>
+                  {q.link && (
+                    <>
+                      {" "}
+                      <a className="underline" style={{ color: "var(--muted)" }} href={q.link} target="_blank" rel="noopener noreferrer">
+                        See it in chat ↗
+                      </a>
+                    </>
+                  )}
                 </figcaption>
               </figure>
             ))}

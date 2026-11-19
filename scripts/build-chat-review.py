@@ -15,7 +15,7 @@ import json
 import sys
 from collections import Counter, defaultdict
 from datetime import date, datetime
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 
 src, out = sys.argv[1], sys.argv[2]
 d = json.load(open(src, encoding="utf-8"))
@@ -152,21 +152,30 @@ tag_cards = [
 
 # ---- Greentext
 gt = d["greentext"]
+# Who, why, and when they said it: the time is rustlesearch's, to the millisecond, so the quote
+# links to the chat around it. Found with https://api-v2.rustlesearch.dev/anon/search (username,
+# start_date, end_date, text); the report has no times. yusuf posted his three times; this is the first.
 QUOTES = {
-    "yusuf": "A formal statement on dan's verbal malfunctions.",
-    "Clanker": "A history lesson, in uwu.",
-    "Torrniquet": "A business plan.",
-    "Vandriel": "Unsolicited Star Wars rewrite, part one of many.",
-    "Doomah": "The longest Doomah got, out of 101,017 messages.",
-    "dannysartproject": "Said three times, for emphasis.",
+    "yusuf": ("A formal statement on dan's verbal malfunctions.", "2026-03-20T19:13:00.094Z"),
+    "Clanker": ("A history lesson, in uwu.", "2026-06-06T05:28:40.533Z"),
+    "Torrniquet": ("A business plan.", "2026-07-09T06:00:23.256Z"),
+    "Vandriel": ("Unsolicited Star Wars rewrite, part one of many.", "2026-01-09T08:55:19.698Z"),
+    "Doomah": ("The longest Doomah got, out of 101,017 messages.", "2026-07-31T03:18:39.097Z"),
+    "dannysartproject": ("Said three times, for emphasis.", "2026-05-21T20:04:11.246Z"),
 }
+
+
+def surrounds(nick, ts):
+    return "https://rustlesearch.dev/surrounds?" + urlencode({"channel": "Destinygg", "date": ts, "username": nick})
+
+
 quotes = []
-for nick, note in QUOTES.items():
+for nick, (note, ts) in QUOTES.items():
     g = by(gt, "nick", nick)
     text = g["longest"].strip()
     if nick == "dannysartproject":
         text = text.split(" >HOW")[0]  # the same line three times; once is enough
-    quotes.append({"who": nick, "text": text, "note": note})
+    quotes.append({"who": nick, "text": text, "note": note, "link": surrounds(nick, ts)})
 greentext_bars = [{"name": g["nick"], "value": g["greentexts"], "sub": f"{g['pct']}% of their messages"} for g in gt[:10]]
 aph = gt[0]
 greentext_cards = [

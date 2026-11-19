@@ -10,6 +10,8 @@ type Slide = {
   emote: string;
   big?: string;
   greentext?: string;
+  /** Where the quote sits in chat, on rustlesearch. */
+  link?: string;
   title: string;
   text?: string;
 };
@@ -47,7 +49,7 @@ function slidesOf(d: Review): Slide[] {
   cards("Greentext", d.greentext.cards);
   for (const who of ["yusuf", "Clanker", "Torrniquet"]) {
     const q = d.greentext.quotes.find((x) => x.who === who);
-    if (q) s.push({ key: `q-${who}`, section: "Greentext", emote: "PepoG", greentext: q.text, title: q.who, text: q.note });
+    if (q) s.push({ key: `q-${who}`, section: "Greentext", emote: "PepoG", greentext: q.text, title: q.who, text: q.note, link: q.link });
   }
   cards("Links", d.links.cards.slice(0, 2));
   cards("Law and order", [...d.law.cards.slice(0, 3), d.law.flyers[0]!]);
@@ -147,6 +149,11 @@ function ChatStory({ data, preview, allHref, onAll }: { data: Review; preview: b
               <p className="mt-3 max-w-xl text-lg font-semibold sm:text-xl" style={{ color: "var(--muted)" }}>
                 {s.text}
               </p>
+            )}
+            {s.link && (
+              <a className="mt-3 text-sm font-bold underline" style={{ color: "var(--muted)" }} href={s.link} target="_blank" rel="noopener noreferrer">
+                See it in chat on rustlesearch ↗
+              </a>
             )}
           </Screen>
         ))}
