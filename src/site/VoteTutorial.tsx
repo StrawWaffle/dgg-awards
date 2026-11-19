@@ -34,7 +34,7 @@ function rounds(ranking: string[]): Round[] {
       counts: { [x]: 38, [second]: 30, [y]: 20, [first]: 12 },
       out: first,
       winner: null,
-      note: `Everyone's first choices are counted. Yours goes to ${n(first)}. Nobody has more than half (51 of 100), so the one with the fewest, ${n(first)}, goes out.`,
+      note: `Everyone's first choices are counted. Yours goes to ${n(first)}. Nobody has more than half (51 of 100), so the one with the fewest goes out. In this made-up count that's ${n(first)}, to show what happens when your favourite can't win.`,
     },
     {
       counts: { [second]: 42, [x]: 38, [y]: 20 },
