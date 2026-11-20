@@ -362,6 +362,8 @@ function CategoryPanel({
   const [description, setDescription] = useState(category.description);
   const [style, setStyle] = useState<VotingStyle | "">(category.usesDefaultStyle ? "" : category.votingStyle);
   const [askDates, setAskDates] = useState(category.askDates);
+  const [round, setRound] = useState(category.round ?? "");
+  const [rankLimit, setRankLimit] = useState(category.rankLimit ? String(category.rankLimit) : "");
   const [open, setOpen] = useState<string | null>(null);
   const options = shown ?? category.options;
   const only = openFirst ? options[0]?.id : undefined;
@@ -371,7 +373,12 @@ function CategoryPanel({
 
   const savedStyle = category.usesDefaultStyle ? "" : category.votingStyle;
   const dirty =
-    title !== category.title || description !== category.description || style !== savedStyle || askDates !== category.askDates;
+    title !== category.title ||
+    description !== category.description ||
+    style !== savedStyle ||
+    askDates !== category.askDates ||
+    round.trim() !== (category.round ?? "") ||
+    rankLimit !== (category.rankLimit ? String(category.rankLimit) : "");
 
   const save = useMutation({
     mutationFn: () =>
@@ -381,6 +388,8 @@ function CategoryPanel({
         description: description.trim(),
         ...(style !== savedStyle ? { votingStyle: style || null } : {}),
         ...(askDates !== category.askDates ? { askDates } : {}),
+        ...(round.trim() !== (category.round ?? "") ? { round: round.trim() || null } : {}),
+        ...(rankLimit !== (category.rankLimit ? String(category.rankLimit) : "") ? { rankLimit: rankLimit ? Number(rankLimit) : null } : {}),
       }),
     onSuccess: refresh,
   });
@@ -441,6 +450,23 @@ function CategoryPanel({
               onChange={(e) => setDescription(e.currentTarget.value)}
             />
           </Field>
+          <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
+            <Field label="Round" hint="Awards in a round vote on its own dates, on a page of their own (set the dates under Rounds). Empty: the main vote.">
+              <input className={inputClass} value={round} placeholder="None" maxLength={60} onChange={(e) => setRound(e.currentTarget.value)} />
+            </Field>
+            {(style || category.votingStyle) === "ranked" && (
+              <Field label="Rank up to" hint="How many a voter may rank. Empty: any number.">
+                <input
+                  className={inputClass}
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={rankLimit}
+                  onChange={(e) => setRankLimit(e.currentTarget.value)}
+                />
+              </Field>
+            )}
+          </div>
           <label className="flex items-start gap-2 text-sm">
             <input
               type="checkbox"

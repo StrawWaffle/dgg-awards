@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useBursts } from "@/lab/Bursts";
 import { Emote } from "@/lab/Emote";
 import { Sketch } from "@/lab/sketch";
+import { nextOpening, roundNow } from "@/lib/rounds";
 import type { SiteConfig } from "@/site/Site";
 
 type Phase = "unknown" | "before" | "open" | "closed" | "results";
@@ -48,19 +49,31 @@ export function Countdown({
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
-  const start = timeOf(config?.startTime);
-  const end = timeOf(config?.endTime);
+  const mainStart = timeOf(config?.startTime);
+  const mainEnd = timeOf(config?.endTime);
   const year = config?.awardYear;
+  // Rounds (the DGGer wildcards and group stage) open before the main vote,
+  // each with its own dates: the countdown goes to whichever opens next.
+  const rounds = config?.rounds ?? [];
+  const round = config?.viewingMode === "voting" ? roundNow(rounds, now / 1000) : undefined;
+  const next = config ? nextOpening(config, rounds, now / 1000) : null;
+  const mainOpen = !!mainStart && now >= mainStart && !(mainEnd && now >= mainEnd);
+  const start = next ? next.at * 1000 : mainStart;
+  const end = round ? round.closesAt * 1000 : mainEnd;
   const phase: Phase =
     config?.viewingMode === "reviewing"
       ? "results"
       : !config || !start
         ? "unknown"
-        : now < start
-          ? "before"
-          : end && now >= end
-            ? "closed"
-            : "open";
+        : round || (mainOpen && config.viewingMode === "voting")
+          ? "open"
+          : next
+            ? "before"
+            : mainEnd && now >= mainEnd
+              ? "closed"
+              : "open";
+  /** What opens next, or what's open: a round's name, or the main vote. */
+  const opening = next?.name ?? null;
 
   // A cheer when the countdown runs out with the page open.
   const last = useRef<Phase | null>(null);
@@ -89,7 +102,7 @@ export function Countdown({
 
         {phase === "before" && start && (
           <div className="space-y-4">
-            <p className="text-xl font-bold">Voting opens in</p>
+            <p className="text-xl font-bold">{opening ? `${opening} voting opens in` : "Voting opens in"}</p>
             <Clock ms={start - now} />
             <p className="font-semibold" style={{ color: "var(--muted)" }}>
               {when(start)}
@@ -100,7 +113,7 @@ export function Countdown({
         {phase === "open" && (
           <div className="space-y-4">
             <p className="flex items-center justify-center gap-3 text-2xl font-black">
-              <Emote name="CHEERSTINY" size={1.1} title="" /> Voting is open!
+              <Emote name="CHEERSTINY" size={1.1} title="" /> {round ? `${round.name}: voting is open!` : "Voting is open!"}
             </p>
             <a className="cozy-btn primary text-lg" href="/vote" onClick={onVote}>
               Vote now

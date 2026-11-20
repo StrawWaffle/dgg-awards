@@ -1,4 +1,5 @@
 import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type Round, firstOpening } from "@/lib/rounds";
 import { ChatBubbleIcon } from "@radix-ui/react-icons";
 import archive2025 from "@/archive/2025.json";
 import { EmoteBackdrop } from "@/lab/EmoteBackdrop";
@@ -20,6 +21,8 @@ export type SiteConfig = {
   endTime?: string;
   viewingMode?: "idle" | "locked" | "voting" | "reviewing";
   awardYear?: string;
+  /** Rounds with their own dates (the DGGer wildcards and group stage), before the main vote. */
+  rounds?: Round[];
 };
 export type Me = { uid: number; name: string; admin: boolean } | null;
 
@@ -65,7 +68,8 @@ const pathOf = (page: Page, stage: Stage | null) => (page === "lab" || stage ? p
 /** The stage the site is in now, by its settings. */
 function stageNow(config: SiteConfig): Stage {
   const now = Date.now() / 1000;
-  const start = Number(config.startTime) || 0;
+  // Voting starts with the first round, if one opens before the main vote.
+  const start = firstOpening(config, config.rounds ?? []) ?? 0;
   const end = Number(config.endTime) || 0;
   if (config.viewingMode === "reviewing") return "results";
   if (end && now >= end) return "closed";

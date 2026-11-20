@@ -68,7 +68,7 @@ export function RankedTutorial({ onDone }: { onDone: () => void }) {
         <h2 className="text-3xl font-black">How ranked voting works</h2>
         <p className="mt-1 max-w-3xl font-semibold" style={muted}>
           Some awards are ranked. Instead of one pick, you put nominees in the order you'd want them to win: your favourite
-          first, then your next, as many as you like. If your favourite can't win, your vote moves to your next choice
+          first, then your next, as many as the award lets you. If your favourite can't win, your vote moves to your next choice
           instead of going to waste.
         </p>
       </div>

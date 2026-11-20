@@ -313,3 +313,21 @@ export type ChatReviewSave = Parameters<(typeof client.api.admin)["chat-review"]
 export async function saveChatReview(body: ChatReviewSave) {
   await ok(await client.api.admin["chat-review"].$put({ json: body }), "Couldn't save the page");
 }
+
+/** A round's dates, on every award in it. */
+export async function saveRoundDates(body: { name: string; opensAt: number; closesAt: number }) {
+  await ok(await client.api.admin.round.$patch({ json: body }), "Couldn't save the dates");
+}
+
+/** DGGer's next round: who goes through. */
+export async function fetchAdvancePlan(step: "groups" | "final") {
+  const res = await client.api.admin.advance.$get({ query: { step } });
+  if (!res.ok) throw new Error((await res.text()) || `Couldn't count (${res.status})`);
+  return res.json();
+}
+export type AdvancePlan = Awaited<ReturnType<typeof fetchAdvancePlan>>;
+
+/** Advance DGGer with the confirmed picks. */
+export async function advanceDgger(body: { step: "groups" | "final"; picks: { from: string; id: string; to: string }[] }) {
+  await ok(await client.api.admin.advance.$post({ json: body }), "Couldn't advance");
+}

@@ -6,12 +6,25 @@ import { type Clip, ClipPlayer, nomineeClip } from "@/lab/ClipPlayer";
 import { Emote } from "@/lab/Emote";
 import { cssVar } from "@/lab/sketch";
 import { type Chatter, Final, TopTen } from "@/lab/RankChatters";
+import { nextOpening, votableNow, windowOf } from "@/lib/rounds";
 import type { Places } from "@/lib/voting";
 import type { Me, SiteConfig } from "@/site/Site";
 import { PointsTutorial, RankedTutorial } from "@/site/VoteTutorial";
 
 type Nominee = { id: string; title: string; description: string; image: string | null; emote: string | null; clip: Clip | null };
-type Award = { id: string; title: string; description: string; ranked: boolean; points: boolean; nominees: Nominee[] };
+type Award = {
+  id: string;
+  title: string;
+  description: string;
+  ranked: boolean;
+  points: boolean;
+  nominees: Nominee[];
+  /** Rounds (src/lib/rounds.ts): its round, own dates, and how many a voter may rank. */
+  round: string | null;
+  opensAt: number | null;
+  closesAt: number | null;
+  rankLimit: number | null;
+};
 
 const toAwards = (data: any[]): Award[] =>
   data
@@ -23,6 +36,10 @@ const toAwards = (data: any[]): Award[] =>
       ranked: c.votingStyle === "ranked",
       // A top 10 with points: made by swiping, then comparing (TopTen).
       points: c.votingStyle === "points",
+      round: c.round ?? null,
+      opensAt: c.opensAt ?? null,
+      closesAt: c.closesAt ?? null,
+      rankLimit: c.rankLimit ?? null,
       nominees: c.options.map((o: any) => ({
         id: o.id,
         title: o.title,
@@ -65,9 +82,7 @@ export function VotePage({
   const admin = !!me?.admin;
   const now = Date.now();
   const start = seconds(config?.startTime);
-  const end = seconds(config?.endTime);
-  // As the server decides it: voting mode, and between both dates.
-  const open = config?.viewingMode === "voting" && !!start && !!end && now >= start && now <= end;
+  const rounds = config?.rounds ?? [];
 
   const [awards, setAwards] = useState<Award[] | null | "locked">(null);
   const [voted, setVoted] = useState<Record<string, string[]>>({});
@@ -88,6 +103,20 @@ export function VotePage({
 
   if (me === undefined || !config || awards === null) return <div className="cozy-panel p-8">Loading…</div>;
 
+  // What can be voted on now, as the server decides it (src/lib/rounds.ts):
+  // during a round, only its awards, on a page of their own.
+  const list = awards === "locked" ? [] : awards;
+  const votable = votableNow(
+    list.map((a) => ({ ...a, nominees: a.nominees.length })),
+    config,
+    now / 1000,
+  ).map((t) => list.find((a) => a.id === t.id)!);
+  const open = votable.length > 0;
+  const round = votable.find((a) => a.round)?.round ?? null;
+  const roundEnd = round ? Math.max(...votable.map((a) => windowOf({ ...a, nominees: a.nominees.length }, config).closesAt ?? 0)) * 1000 : null;
+  const end = roundEnd ?? seconds(config?.endTime);
+  const next = nextOpening(config, rounds, now / 1000);
+
   // Visitors outside voting: say when, instead of the ballot.
   if (!preview && !open) {
     const reviewing = config.viewingMode === "reviewing";
@@ -97,11 +126,13 @@ export function VotePage({
         <p className="text-2xl font-black">
           {reviewing
             ? "Voting is over: the results are out."
-            : end && now >= end
-              ? "Voting has closed."
-              : start && now < start
-                ? `Voting opens ${when(start)}.`
-                : "Voting isn't open yet."}
+            : next
+              ? `${next.name ? `${next.name} voting` : "Voting"} opens ${when(next.at * 1000)}.`
+              : end && now >= end
+                ? "Voting has closed."
+                : start && now < start
+                  ? `Voting opens ${when(start)}.`
+                  : "Voting isn't open yet."}
         </p>
         <a className="cozy-btn primary" href={reviewing ? "/results" : "/"} onClick={reviewing ? onResults : onHome}>
           {reviewing ? "See the results" : "Back to the front page"}
@@ -112,7 +143,21 @@ export function VotePage({
   if (awards === "locked" || awards.length === 0) {
     return <div className="cozy-panel p-8">No awards to vote on yet.</div>;
   }
-  return <Ballot awards={awards} me={me} preview={preview} voted={voted} setVoted={setVoted} end={end} />;
+  // A preview goes through every award; visitors get what's open now.
+  const shown = preview ? list : votable;
+  return (
+    <>
+      {!preview && round && (
+        <div className="cozy-panel mb-4 flex flex-wrap items-center gap-3 px-5 py-3" style={{ background: "var(--highlight)" }}>
+          <span className="cozy-chip coral">{round}</span>
+          <span className="font-semibold">
+            This round has its own vote{roundEnd ? `, open until ${when(roundEnd)}` : ""}. The other awards open later.
+          </span>
+        </div>
+      )}
+      <Ballot awards={shown} me={me} preview={preview} voted={voted} setVoted={setVoted} end={end} />
+    </>
+  );
 }
 
 function Ballot({
@@ -197,6 +242,10 @@ function Ballot({
     if (!award || mine) return;
     setError(null);
     const current = picks[award.id] ?? [];
+    if (award.ranked && award.rankLimit && !current.includes(id) && current.length >= award.rankLimit) {
+      setError(`You can rank up to ${award.rankLimit}. Take one out to change your picks.`);
+      return;
+    }
     const next = award.ranked ? (current.includes(id) ? current.filter((x) => x !== id) : [...current, id]) : [id];
     setPicks({ ...picks, [award.id]: next });
     if (!current.includes(id)) fire("Klappa", ...originOf(e, box.current), award.ranked ? 3 : 6);
@@ -333,7 +382,7 @@ function Ballot({
                 <span className="cozy-chip coral">
                   Award {step + 1} of {awards.length}
                 </span>
-                <span className="cozy-chip">{award.points ? "Your top 10" : award.ranked ? "Rank as many as you like" : "Pick one"}</span>
+                <span className="cozy-chip">{award.points ? "Your top 10" : award.ranked ? (award.rankLimit ? `Rank your top ${award.rankLimit}` : "Rank as many as you like") : "Pick one"}</span>
                 <span className="cozy-chip green">{award.nominees.length} nominees</span>
                 {mine && <span className="cozy-chip green">Voted</span>}
               </div>

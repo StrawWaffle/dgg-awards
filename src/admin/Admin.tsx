@@ -5,6 +5,7 @@ import { HistoryTab } from "@/admin/components/history/HistoryTab";
 import { NomineeEditor } from "@/admin/components/editor/NomineeEditor";
 import { PreviewMenu } from "@/admin/components/PreviewMenu";
 import { SettingsTab } from "@/admin/components/SettingsTab";
+import { RoundsTab } from "@/admin/components/RoundsTab";
 import { SideLabel, TabTrigger, sideItemClass } from "@/admin/components/TabTrigger";
 import { VotesTab } from "@/admin/components/VotesTab";
 import { type Theme, useTheme } from "@/admin/theme";
@@ -23,6 +24,7 @@ import {
   PersonIcon,
   StackIcon,
   SunIcon,
+  LayersIcon,
 } from "@radix-ui/react-icons";
 import { Tabs } from "radix-ui";
 import clsx from "clsx";
@@ -36,7 +38,7 @@ const queryClient: QueryClient = new QueryClient({
   }),
 });
 
-const tabs = ["nominees", "settings", "admins", "votes", "history"] as const;
+const tabs = ["nominees", "rounds", "settings", "admins", "votes", "history"] as const;
 type Tab = (typeof tabs)[number];
 const tabFromHash = (): Tab => {
   const hash = location.hash.slice(1);
@@ -135,6 +137,9 @@ function AdminPage() {
           <TabTrigger value="nominees" icon={<StackIcon />} collapsed={collapsed}>
             Nominees
           </TabTrigger>
+          <TabTrigger value="rounds" icon={<LayersIcon />} collapsed={collapsed}>
+            Rounds
+          </TabTrigger>
           <TabTrigger value="settings" icon={<GearIcon />} collapsed={collapsed}>
             Settings
           </TabTrigger>
@@ -171,6 +176,9 @@ function AdminPage() {
       <main className="min-w-0 flex-1 p-4 md:p-6">
         <Tabs.Content value="nominees" className="outline-none">
           <NomineeEditor />
+        </Tabs.Content>
+        <Tabs.Content value="rounds" className="outline-none">
+          <RoundsTab />
         </Tabs.Content>
         <Tabs.Content value="settings" className="outline-none">
           <SettingsTab />
