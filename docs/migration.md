@@ -3,7 +3,7 @@
 Everything the site needs to come back, on another machine or with another maintainer, is in the Google Drive folder **DGG Awards backups**:
 
 - `database/`: the database, one plain SQLite file an hour (`dgg-awards-2026-11-09T19-42Z.db`). Every copy is kept for 2 days, then one a day for 60 days. They show who voted for what, so share the folder only with the organisers.
-- `media/`: clips and thumbnails, copied once a day. New files are added; nothing there is deleted.
+- `media/`: clips, thumbnails and announcer videos (the whole bucket), copied once a day. New files are added; nothing there is deleted.
 - `archive/`: things to keep. `dgga25-original-source.zip` is the 2025 site's code as recovered, which this repository started from (code only: no database or secrets).
 
 Until 2026-11-09 the database backups were encrypted (`.db.enc`) with a password, which StrawWaffle has. Those are deleted by the keeping rule within 60 days. Until then, they need that password to open (see Restoring).
@@ -14,6 +14,8 @@ What isn't in the folder, and where it is instead:
 - **Secrets** (destiny.gg app, tunnel token, R2 keys, `AUTH_SECRET`): each maintainer makes their own. See "Settings for a new install" below.
 - **The video library** (`/data/library`): a copy of the collaborators' own Drive folder, used only to cut clips in the editor. Re-import it with `scripts/import-drive.py` (see the handoff). The site runs without it.
 - **Sign-in sessions**: never backed up. Everyone signs in again on a new install.
+
+Everything else set on the site is in the database, so the backups have it: awards, nominees and votes, the rounds and their dates, announcer video settings, the edit history, and the year in chat as edited on its page (the `pages` table; once edited, rebuilding `src/archive/chat-<year>.json` no longer changes it).
 
 ## Backups while the site runs
 
@@ -73,7 +75,7 @@ Steps:
    ```
 
    (Or start the site empty, sign in as an admin, and use Settings → Backups → Restore, which needs the same version of the code as the backup.)
-4. **Media:** the stored names (`clips/…`, `thumbs/…`) are the same in every kind of storage, so copy the files as they are, to the root:
+4. **Media:** the stored names (`clips/…`, `thumbs/…`, `announcers/…`) are the same in every kind of storage, so copy the files as they are, to the root:
    - **On the server itself** (simplest; fine for testing): leave the `R2_*` settings empty and copy `media/` into the volume's `media/` folder:
 
      ```sh

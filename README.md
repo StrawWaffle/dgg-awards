@@ -15,7 +15,7 @@
 >
 > **Import:**
 > 1. Put the database in the data volume as `sqlite.db` before the first start. Newer database updates apply on start.
-> 2. Copy the clips to the root of your bucket as they are (`clips/…`, `thumbs/…`).
+> 2. Copy the clips to the root of your bucket as they are (`clips/…`, `thumbs/…`, and the announcer videos in `announcers/…`).
 > 3. Fill in `.env`, then run `docker compose up -d --build app`.
 >
 > The backup shows who voted for what, so keep it private. Everyone signs in again on the new site.
