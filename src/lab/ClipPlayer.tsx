@@ -73,6 +73,13 @@ export function ClipPlayer(props: { clip: Clip; autoPlay?: boolean; fill?: boole
   return props.clip.clipUrl ? <VideoPlayer key={props.clip.clipUrl} {...props} /> : <EmbedPlayer key={props.clip.embedUrl} {...props} />;
 }
 
+/** `url` with `params` added. */
+function withParams(url: string, params: Record<string, string>) {
+  const u = new URL(url);
+  for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
+  return u.toString();
+}
+
 /** The title and the link to the full source, under the player. */
 function Caption({ clip, fill }: { clip: Clip; fill: boolean }) {
   const type = clip.linkType ?? (clip.url ? classifyLink(clip.url)?.type : null) ?? null;
@@ -90,20 +97,48 @@ function Caption({ clip, fill }: { clip: Clip; fill: boolean }) {
 
 /**
  * The source's own player, for a clip we haven't built. Its controls are the
- * platform's, and we can't tell when it ends, so the music stays faded out
- * while it's open.
+ * platform's, so the music stays faded out while it's open. Only YouTube says
+ * when it ends (through its player API's messages); Twitch and Streamable
+ * embeds stay until they're closed.
  */
-function EmbedPlayer({ clip, fill = false }: { clip: Clip; fill?: boolean }) {
+function EmbedPlayer({ clip, fill = false, onEnded }: { clip: Clip; fill?: boolean; onEnded?: () => void }) {
   useEffect(() => {
     music.setDucked(true);
     return () => music.setDucked(false);
   }, []);
+  const frame = useRef<HTMLIFrameElement>(null);
+  const youtube = /youtube(-nocookie)?\.com\/embed\//.test(clip.embedUrl ?? "");
+  const src = youtube ? withParams(clip.embedUrl!, { enablejsapi: "1", origin: location.origin }) : clip.embedUrl!;
+  const ended = useRef(onEnded);
+  ended.current = onEnded;
+  useEffect(() => {
+    if (!youtube) return;
+    let done = false;
+    const onMessage = (e: MessageEvent) => {
+      if (e.source !== frame.current?.contentWindow || typeof e.data !== "string") return;
+      try {
+        const d = JSON.parse(e.data) as { event?: string; info?: number | { playerState?: number } };
+        // 0 is "ended", sent as a state change or in the player's regular updates.
+        const state = d.event === "onStateChange" ? d.info : d.event === "infoDelivery" && typeof d.info === "object" ? d.info?.playerState : undefined;
+        if (state === 0 && !done) {
+          done = true;
+          ended.current?.();
+        }
+      } catch {}
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [youtube]);
+  // YouTube sends its events once asked to (the player API's "listening").
+  const listen = () => frame.current?.contentWindow?.postMessage(JSON.stringify({ event: "listening", id: 1, channel: "widget" }), "*");
   return (
     <div className={fill ? "flex h-full flex-col gap-2" : "space-y-2"}>
       <Sketch pad={5} radius={18} strokeWidth={3} boil drawOn className={fill ? "min-h-0 flex-1" : ""}>
         <div className={`overflow-hidden rounded-[16px] bg-black ${fill ? "h-full" : "aspect-video"}`}>
           <iframe
-            src={clip.embedUrl!}
+            ref={frame}
+            src={src}
+            onLoad={listen}
             title={clip.title}
             className="block h-full w-full"
             allow="autoplay; fullscreen; encrypted-media; picture-in-picture"

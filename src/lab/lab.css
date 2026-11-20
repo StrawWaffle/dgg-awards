@@ -647,3 +647,10 @@ input[type="range"].cozy-range {
     margin: 0 0 0 0.35rem;
   }
 }
+
+/* The big screen while a clip plays: destiny.gg's emotes hold still (rinlux: moving emotes distract). */
+.clip-on .emote,
+.clip-on .emote::before,
+.clip-on .emote::after {
+  animation-play-state: paused !important;
+}

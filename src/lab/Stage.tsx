@@ -53,6 +53,8 @@ type Npc = {
   clapUntil: number;
   /** The emote to go back to after clapping. */
   restore: string;
+  /** While a clip plays everyone is the MMMM fish (rinlux: moving emotes distract); their own emote, for after. */
+  beforeClip?: string;
   /** While a clip plays: the spot beside it to walk to and sit at. */
   parkX?: number;
   /** Its unscaled size, measured when needed (0: measure again). */
@@ -366,6 +368,24 @@ export function Stage({
   const [revealed, setRevealed] = useState(false);
   /** The board starts finished: the announcer video has shown who won. */
   const [instant, setInstant] = useState(false);
+  /** Simple controls (StageControls): the reveal and the runoff play by themselves. Remembered per browser; on at first. */
+  const [simple, setSimpleState] = useState(() => {
+    try {
+      return localStorage.getItem("lab.stage.simple") !== "off";
+    } catch {
+      return true;
+    }
+  });
+  const setSimple = (on: boolean) => {
+    setSimpleState(on);
+    try {
+      localStorage.setItem("lab.stage.simple", on ? "on" : "off");
+    } catch {}
+  };
+  const simpleNow = useRef(simple);
+  simpleNow.current = simple;
+  /** Simple controls: the runoff stepped by hand instead. */
+  const [breakdown, setBreakdown] = useState(false);
   /** The runoff's round on show (null: the board), and whether the board before it is all in. */
   const [runoffRound, setRunoffRound] = useState<number | null>(null);
   const [boardDone, setBoardDone] = useState(false);
@@ -540,7 +560,10 @@ export function Stage({
         const npc = all.get(p.nick);
         if (!npc) continue;
         const shown = shownEmote(p);
-        if (shown) {
+        if (shown && clipOn.current) {
+          // A clip is on: still the fish, with this for after.
+          npc.beforeClip = shown;
+        } else if (shown) {
           // During a winner moment everyone claps; they go back to this after.
           setEmote(npc, npc.clapUntil > now ? "Klappa" : shown);
           if (npc.clapUntil > now) npc.restore = shown;
@@ -949,6 +972,16 @@ export function Stage({
   // still there until it's gone. (Scenes are kept clear in the frame loop.)
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
+      // Everyone is the MMMM fish while a clip plays, and themselves again after.
+      for (const n of npcs.current.values()) {
+        if (playing && n.beforeClip === undefined) {
+          n.beforeClip = n.emote;
+          setEmote(n, "MMMM");
+        } else if (!playing && n.beforeClip !== undefined) {
+          setEmote(n, n.beforeClip);
+          n.beforeClip = undefined;
+        }
+      }
       const box = floor.current;
       const middle = playing ? clipBox.current : null;
       if (!box || !middle) {
@@ -1032,6 +1065,7 @@ export function Stage({
     closeClip();
     // Coming back from the winner, the board is shown finished, all at once.
     setInstant(backwards);
+    setBreakdown(false);
     endCheer();
     setAwardIndex(i);
     setScene(next);
@@ -1044,6 +1078,11 @@ export function Stage({
       // An award with an announcer video: it plays first, once the board is lowered in.
       if (!backwards && show[i]!.announcer) {
         const t = setTimeout(() => announce(show[i]!), 900);
+        winnerTimers.current.push(t);
+      } else if (!backwards && simpleNow.current) {
+        // Simple controls: the reveal runs by itself, last place up.
+        const rows = boardOf(show[i]!).award.results.length;
+        const t = setTimeout(() => setTarget(rows), 900);
         winnerTimers.current.push(t);
       }
     }
@@ -1080,7 +1119,9 @@ export function Stage({
     else if (c.t === "play") {
       const clip = award?.nominees[c.i]?.clip;
       if (clip) setPlaying(clip);
-    } else if (c.t === "announce") {
+    } else if (c.t === "simple") setSimple(c.on);
+    else if (c.t === "breakdown") setBreakdown(c.on);
+    else if (c.t === "announce") {
       if (award && scene === "results") announce(award);
     } else if (c.t === "close") closeClip();
     else if (c.t === "music") toggleMusic();
@@ -1093,6 +1134,14 @@ export function Stage({
     else if (c.t === "settings") setSettingsOpen(c.open);
     else if (c.t === "resetLayout") resetLayout();
   };
+  // Simple controls: once the first choices are in, the runoff plays round
+  // by round by itself (rinlux), unless the breakdown is being stepped by hand.
+  useEffect(() => {
+    if (!simple || breakdown || scene !== "results" || !boardDone || !rounds || playing) return;
+    if (runoffRound !== null && runoffRound >= rounds - 1) return;
+    const t = setTimeout(() => setRunoffRound((r) => (r === null ? 0 : r + 1)), runoffRound === null ? 2000 : 3000);
+    return () => clearTimeout(t);
+  }, [simple, breakdown, scene, boardDone, rounds, runoffRound, playing]);
   const showState: ShowState = {
     awards: show?.map((a) => a.title) ?? [],
     awardIndex,
@@ -1104,6 +1153,8 @@ export function Stage({
     clips: (award?.nominees ?? []).flatMap((n, i) => (n.clip ? [{ i, title: n.title }] : [])),
     playing: !!playing,
     announcer: !!award?.announcer,
+    simple,
+    breakdown,
     simulated: votes === "simulated",
     music: { playing: musicState.playing, muted: musicState.muted, volume: musicState.volume },
     chatOpen,
@@ -1333,7 +1384,8 @@ export function Stage({
     <div
       ref={screen}
       // Its own stacking context, so the header's Settings menu opens over it.
-      className="relative isolate overflow-hidden"
+      // While a clip plays, destiny.gg's emotes hold still (lab.css).
+      className={`relative isolate overflow-hidden ${playing ? "clip-on" : ""}`}
       style={{
         height: full ? "100dvh" : "calc(100dvh - var(--lab-header, 64px))",
         background: "linear-gradient(to bottom, var(--sky-top), var(--sky-bottom))",

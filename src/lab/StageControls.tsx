@@ -35,6 +35,13 @@ export type ShowState = {
   playing: boolean;
   /** This award has an announcer video (it plays as the results come up). */
   announcer: boolean;
+  /**
+   * Simple controls (rinlux: for Destiny, just Next): the results reveal and
+   * the runoff play by themselves. Off gives every control, for setting up.
+   */
+  simple: boolean;
+  /** Simple controls: the runoff stepped by hand, round by round. */
+  breakdown: boolean;
   simulated: boolean;
   /** What the header used to give, for full screen: the music (it plays in the big screen's window), the chat, Settings. */
   music: MusicState;
@@ -55,6 +62,8 @@ export type ShowCommand =
   | { t: "play"; i: number }
   /** Play the award's announcer video; when it ends, every result shows. */
   | { t: "announce" }
+  | { t: "simple"; on: boolean }
+  | { t: "breakdown"; on: boolean }
   | { t: "close" }
   /** Play, or mute and unmute, the music; and its volume (0-1). */
   | { t: "music" }
@@ -145,6 +154,78 @@ export function ShowControls({
   const at = SCENES.findIndex((x) => x.id === state.scene);
   const done = state.target >= state.rows;
   const gearOn = settingsShown ?? state.settingsOpen;
+  const icons = (
+    <span className="flex shrink-0 items-center gap-1.5">
+      {remote ? (
+        <MusicBar small state={state.music} onToggle={() => send({ t: "music" })} onVolume={(v) => send({ t: "volume", v })} />
+      ) : (
+        <MusicBar small />
+      )}
+      <IconButton
+        on={state.chatOpen}
+        label={state.chatOpen ? "Hide the website chat" : "Show the website chat"}
+        onClick={() => send({ t: "chat", on: !state.chatOpen })}
+      >
+        <ChatBubbleIcon />
+      </IconButton>
+      <IconButton on={gearOn} label="Settings" onClick={onSettings ?? (() => send({ t: "settings", open: !state.settingsOpen }))}>
+        <GearIcon />
+      </IconButton>
+      <IconButton on={state.full} label={state.full ? "Leave full screen (Esc)" : "Full screen"} onClick={() => send({ t: "full", on: !state.full })}>
+        {state.full ? <ExitFullScreenIcon /> : <EnterFullScreenIcon />}
+      </IconButton>
+    </span>
+  );
+
+  // Simple: where you are, Next, and only what the moment needs.
+  if (state.simple) {
+    const sceneLabel = SCENES[at]?.label ?? "";
+    return (
+      <div className="space-y-2 text-sm">
+        <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="truncate font-extrabold">{state.awards[state.awardIndex] ?? "No awards"}</div>
+            <div className="font-semibold" style={{ color: "var(--muted)" }}>
+              Award {state.awardIndex + 1} of {state.awards.length} · {sceneLabel}
+            </div>
+          </div>
+          {icons}
+        </div>
+        {(state.playing || (state.scene === "results" && (state.runoff || (state.announcer && !state.playing)))) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {state.playing && (
+              <button type="button" className="cozy-btn py-1!" onClick={() => send({ t: "close" })}>
+                Close the clip
+              </button>
+            )}
+            {!state.playing && state.scene === "results" && state.runoff && (
+              <button type="button" className={`cozy-btn py-1! ${state.breakdown ? "primary" : ""}`} onClick={() => send({ t: "breakdown", on: !state.breakdown })}>
+                {state.breakdown ? "Back to automatic" : "Full breakdown"}
+              </button>
+            )}
+            {!state.playing && state.scene === "results" && state.runoff && state.breakdown && <RunoffControls runoff={state.runoff} send={send} />}
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <button type="button" className="cozy-btn py-1!" onClick={() => send({ t: "step", by: -1 })} disabled={!state.awards.length}>
+            ←
+          </button>
+          <button
+            type="button"
+            className="cozy-btn primary flex-1 justify-center py-2! text-base"
+            onClick={() => send({ t: "step", by: 1 })}
+            disabled={!state.awards.length}
+          >
+            Next: {NEXT_LABEL[state.scene]} →
+          </button>
+        </div>
+        <button type="button" className="text-xs font-bold underline" style={{ color: "var(--muted)" }} onClick={() => send({ t: "simple", on: false })}>
+          Full controls
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-2 text-sm">
       <div className="flex items-center gap-2">
@@ -162,26 +243,7 @@ export function ShowControls({
           ))}
         </select>
         {/* What the header gives, so full screen loses nothing. */}
-        <span className="flex shrink-0 items-center gap-1.5">
-          {remote ? (
-            <MusicBar small state={state.music} onToggle={() => send({ t: "music" })} onVolume={(v) => send({ t: "volume", v })} />
-          ) : (
-            <MusicBar small />
-          )}
-          <IconButton
-            on={state.chatOpen}
-            label={state.chatOpen ? "Hide the website chat" : "Show the website chat"}
-            onClick={() => send({ t: "chat", on: !state.chatOpen })}
-          >
-            <ChatBubbleIcon />
-          </IconButton>
-          <IconButton on={gearOn} label="Settings" onClick={onSettings ?? (() => send({ t: "settings", open: !state.settingsOpen }))}>
-            <GearIcon />
-          </IconButton>
-          <IconButton on={state.full} label={state.full ? "Leave full screen (Esc)" : "Full screen"} onClick={() => send({ t: "full", on: !state.full })}>
-            {state.full ? <ExitFullScreenIcon /> : <EnterFullScreenIcon />}
-          </IconButton>
-        </span>
+        {icons}
       </div>
       <nav aria-label="Scenes" className="flex gap-1">
         {SCENES.map((x, i) => (
@@ -248,6 +310,9 @@ export function ShowControls({
           {NEXT_LABEL[state.scene]} →
         </button>
       </div>
+      <button type="button" className="text-xs font-bold underline" style={{ color: "var(--muted)" }} onClick={() => send({ t: "simple", on: true })}>
+        Simple controls
+      </button>
     </div>
   );
 }
