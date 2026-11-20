@@ -19,6 +19,9 @@ export const SCENES = [
 ] as const;
 export type Scene = (typeof SCENES)[number]["id"];
 export const NEXT_LABEL: Record<Scene, string> = { title: "Nominees", options: "Results", results: "Winner", winner: "Next award" };
+/** What Next goes to: a showcase goes from its title to its video, then to the next award. */
+export const nextLabel = (state: Pick<ShowState, "scene" | "showcase">) =>
+  state.showcase ? (state.scene === "title" ? "The video" : "Next award") : NEXT_LABEL[state.scene];
 
 export type ShowState = {
   awards: string[];
@@ -42,6 +45,8 @@ export type ShowState = {
   simple: boolean;
   /** Simple controls: the runoff stepped by hand, round by round. */
   breakdown: boolean;
+  /** This award is a showcase (Bonus memes): its title, then its video. */
+  showcase: boolean;
   simulated: boolean;
   /** What the header used to give, for full screen: the music (it plays in the big screen's window), the chat, Settings. */
   music: MusicState;
@@ -216,7 +221,7 @@ export function ShowControls({
             onClick={() => send({ t: "step", by: 1 })}
             disabled={!state.awards.length}
           >
-            Next: {NEXT_LABEL[state.scene]} →
+            Next: {nextLabel(state)} →
           </button>
         </div>
         <button type="button" className="text-xs font-bold underline" style={{ color: "var(--muted)" }} onClick={() => send({ t: "simple", on: false })}>
@@ -307,7 +312,7 @@ export function ShowControls({
           onClick={() => send({ t: "step", by: 1 })}
           disabled={!state.awards.length}
         >
-          {NEXT_LABEL[state.scene]} →
+          {nextLabel(state)} →
         </button>
       </div>
       <button type="button" className="text-xs font-bold underline" style={{ color: "var(--muted)" }} onClick={() => send({ t: "simple", on: true })}>

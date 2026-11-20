@@ -127,6 +127,8 @@ export const categoryPatch = z.object({
   round: z.string().trim().max(60).nullable().optional(),
   /** Ranked awards: rank at most this many; null for any number. */
   rankLimit: z.number().int().min(1).max(50).nullable().optional(),
+  /** Shown at the end, not voted on. */
+  showcase: z.boolean().optional(),
 });
 
 /** Advancing DGGer: the plan to show, then the picks an admin confirmed. */

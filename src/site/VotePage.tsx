@@ -26,6 +26,8 @@ type Award = {
   opensAt: number | null;
   closesAt: number | null;
   rankLimit: number | null;
+  /** Shown at the end, not voted on (Bonus memes): never on the vote page. */
+  showcase: boolean;
 };
 
 const toAwards = (data: any[]): Award[] =>
@@ -42,6 +44,7 @@ const toAwards = (data: any[]): Award[] =>
       opensAt: c.opensAt ?? null,
       closesAt: c.closesAt ?? null,
       rankLimit: c.rankLimit ?? null,
+      showcase: !!c.showcase,
       nominees: c.options.map((o: any) => ({
         id: o.id,
         title: o.title,
@@ -110,7 +113,7 @@ export function VotePage({
 
   // What can be voted on now, as the server decides it (src/lib/rounds.ts):
   // during a round, only its awards, on a page of their own.
-  const list = awards === "locked" ? [] : awards;
+  const list = awards === "locked" ? [] : awards.filter((a) => !a.showcase);
   const votable = votableNow(
     list.map((a) => ({ ...a, nominees: a.nominees.length })),
     config,

@@ -364,6 +364,7 @@ function CategoryPanel({
   const [askDates, setAskDates] = useState(category.askDates);
   const [round, setRound] = useState(category.round ?? "");
   const [rankLimit, setRankLimit] = useState(category.rankLimit ? String(category.rankLimit) : "");
+  const [showcase, setShowcase] = useState(category.showcase);
   const [open, setOpen] = useState<string | null>(null);
   const options = shown ?? category.options;
   const only = openFirst ? options[0]?.id : undefined;
@@ -378,7 +379,8 @@ function CategoryPanel({
     style !== savedStyle ||
     askDates !== category.askDates ||
     round.trim() !== (category.round ?? "") ||
-    rankLimit !== (category.rankLimit ? String(category.rankLimit) : "");
+    rankLimit !== (category.rankLimit ? String(category.rankLimit) : "") ||
+    showcase !== category.showcase;
 
   const save = useMutation({
     mutationFn: () =>
@@ -390,6 +392,7 @@ function CategoryPanel({
         ...(askDates !== category.askDates ? { askDates } : {}),
         ...(round.trim() !== (category.round ?? "") ? { round: round.trim() || null } : {}),
         ...(rankLimit !== (category.rankLimit ? String(category.rankLimit) : "") ? { rankLimit: rankLimit ? Number(rankLimit) : null } : {}),
+        ...(showcase !== category.showcase ? { showcase } : {}),
       }),
     onSuccess: refresh,
   });
@@ -468,6 +471,16 @@ function CategoryPanel({
             )}
           </div>
           <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" className="mt-1" checked={showcase} onChange={(e) => setShowcase(e.currentTarget.checked)} />
+            <span>
+              Shown at the end, not voted on
+              <span className="block text-xs text-neutral-500">
+                Like Bonus memes: off the vote page, last on the results page and the big screen, where its video plays (set
+                below, under Video).
+              </span>
+            </span>
+          </label>
+          <label className="flex items-start gap-2 text-sm">
             <input
               type="checkbox"
               className="mt-1"
@@ -514,7 +527,7 @@ function CategoryPanel({
 
       <Section
         id="category-announcer"
-        title="Announcer video"
+        title={category.showcase ? "Video" : "Announcer video"}
         aside={category.announcerFileUrl || category.announcerUrl ? "Set" : "None"}
         defaultOpen={false}
         boxed={false}

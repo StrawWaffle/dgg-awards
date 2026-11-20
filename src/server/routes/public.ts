@@ -6,6 +6,7 @@ import {
   getCategoryForVoting,
   getConfig,
   getTimings,
+  getCategory,
   getRoundNames,
   getNominees,
   getNominee,
@@ -22,6 +23,7 @@ import { roundsOf, votableNow } from "@/lib/rounds";
 import { isChatterAward } from "@/lib/dgger";
 import { effectiveStyle, placesToRanks, validPlaces, withEffectiveStyles } from "@/lib/voting";
 import { categoriesWithMediaUrls, withMediaUrls } from "@/server/present";
+import { storage } from "@/server/storage";
 import { getCookie } from "hono/cookie";
 import { verifyAdminSession } from "@/lib/auth";
 import {
@@ -183,9 +185,18 @@ export const publicRoutes = new Hono<SessionEnv>()
     if (config.viewingMode !== "reviewing" && !preview) {
       return c.body(null, 401);
     }
+    const results = await getVotingResults();
+    // Showcases (Bonus memes) carry their video, public with the results.
+    const videos = new Map<string, { url: string | null; fileUrl: string | null }>();
+    for (const r of results) {
+      if (!r.showcase) continue;
+      const cat = await getCategory(r.categoryId);
+      if (cat) videos.set(r.categoryId, { url: cat.announcerUrl, fileUrl: cat.announcerKey ? storage.url(cat.announcerKey) : null });
+    }
     return c.json(
-      (await getVotingResults()).map((cat) => ({
+      results.map((cat) => ({
         ...cat,
+        ...(cat.showcase ? { video: videos.get(cat.categoryId) ?? null } : {}),
         options: cat.options.map((o) => ({ ...o, payload: withMediaUrls(o.payload) })),
       })),
       200,

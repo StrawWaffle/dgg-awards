@@ -82,6 +82,11 @@ export const categoriesTable = sqliteTable("categories", {
   closesAt: int(),
   /** Ranked awards: how many a voter may rank (3 for the DGGer groups and final); null for any number. */
   rankLimit: int(),
+  /**
+   * Shown at the end, not voted on (rinlux, 2026-11-20: Bonus memes, one
+   * video after the results). Its video is the announcer video's field.
+   */
+  showcase: int({ mode: "boolean" }).notNull().default(false),
 });
 
 export const optionsTable = sqliteTable(

@@ -15,6 +15,8 @@ export type Timing = {
   closesAt?: number | null;
   /** How many nominees it has; an empty award is never open. */
   nominees?: number;
+  /** Shown at the end, not voted on (Bonus memes): never open. */
+  showcase?: boolean;
 };
 export type SiteTimes = { startTime?: string | number | null; endTime?: string | number | null; viewingMode?: string | null };
 export type Round = { name: string; opensAt: number; closesAt: number };
@@ -28,7 +30,7 @@ export function windowOf(award: Timing, site: SiteTimes) {
 
 /** Within its window, the site in voting mode, and with nominees. */
 export function awardOpen(award: Timing, site: SiteTimes, now: number) {
-  if (site.viewingMode !== "voting" || award.nominees === 0) return false;
+  if (site.viewingMode !== "voting" || award.nominees === 0 || award.showcase) return false;
   const { opensAt, closesAt } = windowOf(award, site);
   return opensAt !== null && closesAt !== null && now >= opensAt && now <= closesAt;
 }

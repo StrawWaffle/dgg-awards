@@ -1057,7 +1057,10 @@ export function Stage({
   /** Moves between scenes; past the winner is the next award's title. */
   /** After an announcement: the winner of the award on show. Read from a ref, so it's the latest. */
   const toWinner = useRef(() => {});
-  toWinner.current = () => goTo(awardIndex, "winner");
+  // A showcase (Bonus memes) has no winner: after its video it stays.
+  toWinner.current = () => {
+    if (!show?.[awardIndex]?.showcase) goTo(awardIndex, "winner");
+  };
   const goTo = (index: number, next: Scene, backwards = false) => {
     if (!show?.length) return;
     const i = (index + show.length) % show.length;
@@ -1098,6 +1101,11 @@ export function Stage({
     setPlaying(a.announcer);
   };
   const step = (by: 1 | -1) => {
+    // A showcase: its title, then its video (the results scene), then the next award.
+    if (award?.showcase) {
+      if (by === 1) return scene === "title" ? goTo(awardIndex, "results") : goTo(awardIndex + 1, "title");
+      return scene === "title" ? goTo(awardIndex - 1, "winner", true) : goTo(awardIndex, "title", true);
+    }
     const at = SCENES.findIndex((x) => x.id === scene) + by;
     if (at >= SCENES.length) goTo(awardIndex + 1, "title");
     else if (at < 0) goTo(awardIndex - 1, "winner", true);
@@ -1155,6 +1163,7 @@ export function Stage({
     announcer: !!award?.announcer,
     simple,
     breakdown,
+    showcase: !!award?.showcase,
     simulated: votes === "simulated",
     music: { playing: musicState.playing, muted: musicState.muted, volume: musicState.volume },
     chatOpen,
@@ -1459,7 +1468,14 @@ export function Stage({
             >
               {scene === "title" && <TitleCard award={award} index={awardIndex} count={show!.length} />}
               {scene === "options" && <DvdMenu award={award} onPlay={setPlaying} keys={!playing} />}
-              {scene === "results" && (
+              {scene === "results" && award.showcase && (
+                <div className="cozy-panel p-6 text-center">
+                  <h2 className="text-3xl font-black">{award.title}</h2>
+                  {award.description && <p className="mt-2 font-semibold" style={{ color: "var(--muted)" }}>{award.description}</p>}
+                  {!award.announcer && <p className="mt-4 font-semibold">Its video isn't set yet (the award's Video, in the editor).</p>}
+                </div>
+              )}
+              {scene === "results" && !award.showcase && (
                 <div className="cozy-panel relative overflow-hidden p-6">
                   {bursts}
                   <div className="mb-4 flex flex-wrap items-center gap-2">

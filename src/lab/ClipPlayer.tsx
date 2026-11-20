@@ -73,6 +73,14 @@ export function ClipPlayer(props: { clip: Clip; autoPlay?: boolean; fill?: boole
   return props.clip.clipUrl ? <VideoPlayer key={props.clip.clipUrl} {...props} /> : <EmbedPlayer key={props.clip.embedUrl} {...props} />;
 }
 
+/** `url` with its autoplay setting turned off ("true" → "false", "1" → "0"). */
+function withoutAutoplay(url: string) {
+  const u = new URL(url);
+  const v = u.searchParams.get("autoplay");
+  if (v !== null) u.searchParams.set("autoplay", v === "true" ? "false" : "0");
+  return u.toString();
+}
+
 /** `url` with `params` added. */
 function withParams(url: string, params: Record<string, string>) {
   const u = new URL(url);
@@ -101,14 +109,16 @@ function Caption({ clip, fill }: { clip: Clip; fill: boolean }) {
  * when it ends (through its player API's messages); Twitch and Streamable
  * embeds stay until they're closed.
  */
-function EmbedPlayer({ clip, fill = false, onEnded }: { clip: Clip; fill?: boolean; onEnded?: () => void }) {
+function EmbedPlayer({ clip, fill = false, onEnded, autoPlay = true }: { clip: Clip; fill?: boolean; onEnded?: () => void; autoPlay?: boolean }) {
   useEffect(() => {
     music.setDucked(true);
     return () => music.setDucked(false);
   }, []);
   const frame = useRef<HTMLIFrameElement>(null);
   const youtube = /youtube(-nocookie)?\.com\/embed\//.test(clip.embedUrl ?? "");
-  const src = youtube ? withParams(clip.embedUrl!, { enablejsapi: "1", origin: location.origin }) : clip.embedUrl!;
+  // Embeds ask to autoplay in their address; a page that shouldn't start it (the results' Bonus memes) turns that off.
+  const base = autoPlay ? clip.embedUrl! : withoutAutoplay(clip.embedUrl!);
+  const src = youtube ? withParams(base, { enablejsapi: "1", origin: location.origin }) : base;
   const ended = useRef(onEnded);
   ended.current = onEnded;
   useEffect(() => {

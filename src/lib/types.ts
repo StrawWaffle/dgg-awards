@@ -40,7 +40,7 @@ export type NomineeDetails =
   | "winnerLine";
 
 // Rounds, dates and announcer videos are set on the site, not imported.
-export type ImportableData = (Omit<Category, "votingStyle" | "askDates" | "announcerKey" | "announcerUrl" | "round" | "opensAt" | "closesAt" | "rankLimit"> &
+export type ImportableData = (Omit<Category, "votingStyle" | "askDates" | "announcerKey" | "announcerUrl" | "round" | "opensAt" | "closesAt" | "rankLimit" | "showcase"> &
   Partial<Pick<Category, "votingStyle" | "askDates">> & { hidden?: boolean } & {
   options: (Omit<Option, "categoryId" | NomineeDetails> &
     Partial<Pick<Option, NomineeDetails>>)[];
@@ -148,6 +148,10 @@ export type ResultsData = {
   categoryTitle: string;
   categoryDescription: string;
   votingStyle: VotingStyle;
+  /** Shown at the end, not voted on (Bonus memes). */
+  showcase: boolean;
+  /** A showcase's video, sent with the results. */
+  video?: { url: string | null; fileUrl: string | null } | null;
   /** Voters in this category. */
   totalVotes: number;
   /** Ranked categories only: the instant-runoff rounds and winner. */

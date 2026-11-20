@@ -22,13 +22,25 @@ export type WinnerWords = { name: string; emote: string | null; lines: { text: s
  * and clips, and its announcer video (played as the results come up, which
  * then show all at once).
  */
-export type ShowAward = Award & { description: string; nominees: Nominee[]; announcer: Clip | null };
+export type ShowAward = Award & {
+  description: string;
+  nominees: Nominee[];
+  announcer: Clip | null;
+  /** Shown at the end, not voted on (Bonus memes): its title, then its video (the announcer field). */
+  showcase: boolean;
+};
 
 /**
  * The results joined to the nominees, in the awards' order. The nominees come
  * from the admin list, so pictures and clips show while the site is locked.
  */
 export async function loadShow(results: Award[]): Promise<ShowAward[]> {
+  const show = await loadAwards(results);
+  // Showcases (Bonus memes) come after every award voted on.
+  return [...show.filter((a) => !a.showcase), ...show.filter((a) => a.showcase)];
+}
+
+async function loadAwards(results: Award[]): Promise<ShowAward[]> {
   const data = await fetch("/api/admin/nominees").then((r) => (r.ok ? r.json() : []));
   const categories: any[] = Array.isArray(data) ? data : [];
   return results.map((award) => {
@@ -47,7 +59,7 @@ export async function loadShow(results: Award[]): Promise<ShowAward[]> {
     const announcer = category
       ? nomineeClip({ url: category.announcerUrl ?? null, clipUrl: category.announcerFileUrl ?? null }, `Announcing ${award.title}`)
       : null;
-    return { ...award, description: category?.description ?? "", nominees, announcer };
+    return { ...award, description: category?.description ?? "", nominees, announcer, showcase: !!category?.showcase };
   });
 }
 

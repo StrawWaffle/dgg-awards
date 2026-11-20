@@ -39,7 +39,13 @@ export type AwardResult = {
   /** Best first. */
   standings: Standing[];
   rounds: Round[] | null;
+  /** Shown at the end, not voted on (Bonus memes): its video, and its nominees as clips to watch. */
+  showcase?: { video: Clip | null };
 };
+
+/** A showcase's video, from its link or uploaded file. */
+const showcaseVideo = (title: string, url: string | null | undefined, fileUrl: string | null | undefined) =>
+  nomineeClip({ url: url ?? null, clipUrl: fileUrl ?? null }, title);
 
 /**
  * 2025's results, from the wiki (src/archive/2025.json): winners and
@@ -112,7 +118,17 @@ export async function loadSimulated(): Promise<AwardResult[]> {
           clip: nomineeClip(o, `${o.title} · ${c.title}`),
         }))
         .sort((a: Standing, b: Standing) => place(b.id) - place(a.id) || b.count! - a.count!);
-      return { id: c.id, title: c.title, description: c.description ?? "", ranked, points: isPoints, total: counted, standings, rounds: runoff?.rounds ?? null };
+      return {
+        id: c.id,
+        title: c.title,
+        description: c.description ?? "",
+        ranked,
+        points: isPoints,
+        total: counted,
+        standings,
+        rounds: runoff?.rounds ?? null,
+        ...(c.showcase ? { showcase: { video: showcaseVideo(c.title, c.announcerUrl, c.announcerFileUrl) } } : {}),
+      };
     });
 }
 
@@ -157,6 +173,7 @@ export async function loadSummary(): Promise<AwardResult[]> {
       clip: o.payload ? nomineeClip(o.payload, `${o.title} · ${c.categoryTitle}`) : null,
     })),
     rounds: c.runoff?.rounds ?? null,
+    ...(c.showcase ? { showcase: { video: showcaseVideo(c.categoryTitle, c.video?.url, c.video?.fileUrl) } } : {}),
   }));
 }
 
@@ -268,16 +285,19 @@ export function Summary({
 
   if (awards === null) return <div className="cozy-panel p-8">Loading…</div>;
   if (awards.length === 0) return <div className="cozy-panel p-8">No results to show.</div>;
+  // The awards voted on; then the showcases (Bonus memes), shown last and not counted.
+  const voted = awards.filter((a) => !a.showcase);
+  const showcases = awards.filter((a) => a.showcase);
 
-  const decided = awards.map((a) => ({ a, m: margin(a) })).filter((x) => x.m !== null) as { a: AwardResult; m: NonNullable<ReturnType<typeof margin>> }[];
+  const decided = voted.map((a) => ({ a, m: margin(a) })).filter((x) => x.m !== null) as { a: AwardResult; m: NonNullable<ReturnType<typeof margin>> }[];
   const closest = [...decided].sort((x, y) => x.m.points - y.m.points).slice(0, 3);
   const biggest = [...decided].sort((x, y) => y.m.points - x.m.points).slice(0, 3);
-  const counted = awards.every((a) => a.total !== null);
+  const counted = voted.every((a) => a.total !== null);
   const busiest = counted
-    ? [...awards].sort((x, y) => y.total! - x.total!).slice(0, 3)
-    : [...awards].sort((x, y) => y.standings.length - x.standings.length).slice(0, 3);
-  const ballots = awards.reduce((n, a) => n + (a.total ?? 0), 0);
-  const nominees = awards.reduce((n, a) => n + a.standings.length, 0);
+    ? [...voted].sort((x, y) => y.total! - x.total!).slice(0, 3)
+    : [...voted].sort((x, y) => y.standings.length - x.standings.length).slice(0, 3);
+  const ballots = voted.reduce((n, a) => n + (a.total ?? 0), 0);
+  const nominees = voted.reduce((n, a) => n + a.standings.length, 0);
   const jump = (id: string) => document.getElementById(`award-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   return (
@@ -308,8 +328,8 @@ export function Summary({
           Overview
         </a>
         <ol className="space-y-0.5">
-          {awards.map((a) => {
-            const winner = a.standings.find((s) => s.isWinner);
+          {[...voted, ...showcases].map((a) => {
+            const winner = a.showcase ? undefined : a.standings.find((s) => s.isWinner);
             return (
               <li key={a.id}>
                 <button
@@ -340,7 +360,7 @@ export function Summary({
             <Emote name="PepoG" size={1.2} title="" /> {title}
           </h2>
           <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Figure label="Awards" value={awards.length.toLocaleString()} />
+            <Figure label="Awards" value={voted.length.toLocaleString()} />
             {counted ? (
               <Figure label="Ballots cast" value={ballots.toLocaleString()} />
             ) : (
@@ -361,8 +381,11 @@ export function Summary({
           {extra}
         </section>
 
-        {awards.map((a) => (
+        {voted.map((a) => (
           <AwardSection key={a.id} award={a} onWatch={setWatching} />
+        ))}
+        {showcases.map((a) => (
+          <ShowcaseSection key={a.id} award={a} onWatch={setWatching} />
         ))}
         <p className="text-center text-xs" style={{ color: "var(--muted)" }}>
           {footer ??
@@ -418,6 +441,42 @@ function Highlights({
 }
 
 /** One award: its winner, the standings (bars grow as it scrolls into view), and the runoff. */
+/** A showcase (Bonus memes): its video, then its clips to watch one by one. Nothing is counted. */
+function ShowcaseSection({ award, onWatch }: { award: AwardResult; onWatch: (clip: Clip) => void }) {
+  const clips = award.standings.filter((s) => s.clip);
+  return (
+    <section id={`award-${award.id}`} className="cozy-panel scroll-mt-[calc(var(--lab-header,64px)+1rem)] space-y-5 p-6">
+      <header className="space-y-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="mr-2 text-2xl font-black">{award.title}</h2>
+          <span className="cozy-chip">Not voted on</span>
+        </div>
+        {award.description && (
+          <p className="font-semibold" style={{ color: "var(--muted)" }}>
+            {award.description}
+          </p>
+        )}
+      </header>
+      {award.showcase?.video ? (
+        <ClipPlayer clip={award.showcase.video} autoPlay={false} />
+      ) : (
+        <p className="font-semibold" style={{ color: "var(--muted)" }}>
+          The video is coming soon.
+        </p>
+      )}
+      {clips.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {clips.map((s) => (
+            <button key={s.id} type="button" className="cozy-btn" onClick={() => onWatch(s.clip!)}>
+              ▶ {s.title}
+            </button>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function AwardSection({ award, onWatch }: { award: AwardResult; onWatch: (clip: Clip) => void }) {
   const el = useRef<HTMLElement>(null);
   const [seen, setSeen] = useState(false);

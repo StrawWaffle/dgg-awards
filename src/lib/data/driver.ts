@@ -322,7 +322,7 @@ export async function getRoundNames() {
 /** Every shown award's timing (src/lib/rounds.ts): its round, own dates and how many nominees it has. */
 export async function getTimings() {
   const rows = await db.query.categoriesTable.findMany({
-    columns: { id: true, round: true, opensAt: true, closesAt: true, rankLimit: true },
+    columns: { id: true, round: true, opensAt: true, closesAt: true, rankLimit: true, showcase: true },
     where: (c, { eq }) => eq(c.hidden, false),
     with: { options: { columns: { id: true } } },
   });
@@ -790,12 +790,13 @@ export async function updateCategory({
   opensAt,
   closesAt,
   rankLimit,
+  showcase,
 }: Partial<InferInsertModel<typeof schema.categoriesTable>> & {
   id: string;
 }) {
   return await db
     .update(schema.categoriesTable)
-    .set({ description, title, votingStyle, hidden, askDates, announcerKey, announcerUrl, round, opensAt, closesAt, rankLimit })
+    .set({ description, title, votingStyle, hidden, askDates, announcerKey, announcerUrl, round, opensAt, closesAt, rankLimit, showcase })
     .where(eq(schema.categoriesTable.id, id));
 }
 
@@ -995,6 +996,7 @@ export function processVoteResults(
       categoryTitle: meta.title,
       categoryDescription: meta.description,
       votingStyle: style,
+      showcase: meta.showcase,
       totalVotes,
       options: ordered.map((opt) => {
         const count = firstChoices(opt);
