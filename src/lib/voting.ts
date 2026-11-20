@@ -91,6 +91,48 @@ export function instantRunoff(nominees: string[], ballots: string[][]): RunoffRe
   return { rounds, winners: [] };
 }
 
+/**
+ * The last `k` standing: instant runoff, eliminating last place round after
+ * round (ties broken the same way as `instantRunoff`) until `k` or fewer are
+ * left, without stopping for a majority. For "the top two of each group go
+ * through" (rinlux, 2026-11-20). If the last elimination is a tie that would
+ * leave fewer than `k`, `top` holds those already through and `tied` the
+ * nominees an admin has to choose between.
+ */
+export function runoffTop(nominees: string[], ballots: string[][], k: number): { top: string[]; tied: string[]; rounds: RunoffRound[] } {
+  const known = new Set(nominees);
+  const clean = ballots
+    .map((b) => b.filter((id, i) => known.has(id) && b.indexOf(id) === i))
+    .filter((b) => b.length > 0);
+  let remaining = [...nominees];
+  const rounds: RunoffRound[] = [];
+  const order = () => {
+    const last = rounds[rounds.length - 1]?.counts ?? {};
+    return [...remaining].sort((a, b) => (last[b] ?? 0) - (last[a] ?? 0));
+  };
+  while (true) {
+    const counts: Record<string, number> = Object.fromEntries(remaining.map((n) => [n, 0]));
+    let exhausted = 0;
+    for (const ballot of clean) {
+      const top = ballot.find((id) => id in counts);
+      if (top === undefined) exhausted++;
+      else counts[top]!++;
+    }
+    const round: RunoffRound = { counts, exhausted, eliminated: [] };
+    rounds.push(round);
+    if (remaining.length <= k) return { top: order(), tied: [], rounds };
+    let tied = lowest(remaining, counts);
+    for (let r = rounds.length - 2; r >= 0 && tied.length > 1; r--) tied = lowest(tied, rounds[r]!.counts);
+    if (remaining.length - tied.length < k) {
+      // Can't eliminate them all: some of the tied go through, an admin picks which.
+      remaining = remaining.filter((n) => !tied.includes(n));
+      return { top: order(), tied, rounds };
+    }
+    round.eliminated = tied;
+    remaining = remaining.filter((n) => !tied.includes(n));
+  }
+}
+
 function lowest(ids: string[], counts: Record<string, number>) {
   const min = Math.min(...ids.map((id) => counts[id] ?? 0));
   return ids.filter((id) => (counts[id] ?? 0) === min);

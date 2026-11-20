@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { effectiveStyle, instantRunoff, countPoints, placesToRanks, pointsForPlaces, ranksToPlaces, validPlaces } from "@/lib/voting";
+import { effectiveStyle, instantRunoff, runoffTop, countPoints, placesToRanks, pointsForPlaces, ranksToPlaces, validPlaces } from "@/lib/voting";
 
 const repeat = (n: number, ballot: string[]) => Array.from({ length: n }, () => ballot);
 
@@ -131,5 +131,30 @@ describe("points (a top 10, equals sharing places)", () => {
     expect(countPoints(["a"], []).winners).toEqual([]);
     const r = countPoints(["a", "b"], [[["a", "x"], ["a"], ["b"]]]);
     expect(r.points).toEqual({ a: 10, b: 9 });
+  });
+});
+
+describe("runoffTop", () => {
+  test("keeps eliminating past a majority until k are left, best first", () => {
+    // a has a majority from the start, but the top two are wanted.
+    const r = runoffTop(["a", "b", "c", "d"], [...repeat(6, ["a"]), ...repeat(3, ["b"]), ["c", "b"], ["d", "c"]], 2);
+    expect(r.top).toEqual(["a", "b"]);
+    expect(r.tied).toEqual([]);
+  });
+
+  test("ballots move on as nominees go out", () => {
+    // c's two voters prefer b next, so b passes a for second.
+    const ballots = [...repeat(6, ["x"]), ...repeat(4, ["a"]), ...repeat(3, ["b"]), ...repeat(2, ["c", "b"])];
+    expect(runoffTop(["x", "a", "b", "c"], ballots, 2).top).toEqual(["x", "b"]);
+  });
+
+  test("a tie at the cut is left for an admin", () => {
+    const r = runoffTop(["a", "b", "c"], [...repeat(3, ["a"]), ["b"], ["c"]], 2);
+    expect(r.top).toEqual(["a"]);
+    expect(r.tied.sort()).toEqual(["b", "c"]);
+  });
+
+  test("fewer nominees than k: all of them", () => {
+    expect(runoffTop(["a"], [["a"]], 2).top).toEqual(["a"]);
   });
 });

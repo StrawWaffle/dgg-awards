@@ -5,6 +5,7 @@ import { createMiddleware } from "hono/factory";
 import {
   getCategoryForVoting,
   getConfig,
+  getTimings,
   getNominees,
   getNominee,
   getUserBallots,
@@ -16,6 +17,7 @@ import {
   userVoteExists,
 } from "@/lib/data/driver";
 import { nowS } from "@/lib/util";
+import { roundsOf, votableNow } from "@/lib/rounds";
 import { effectiveStyle, placesToRanks, validPlaces, withEffectiveStyles } from "@/lib/voting";
 import { categoriesWithMediaUrls, withMediaUrls } from "@/server/present";
 import { getCookie } from "hono/cookie";
@@ -30,25 +32,24 @@ import {
 import { resultsQuery, voteSubmit } from "@/server/schemas";
 import { DGG_NAME, cachedDggProfile, chatterName } from "@/server/dgg-profile";
 
-/** 401 with no body unless voting is open right now. */
+/**
+ * 401 with no body unless voting is open right now: the site's dates, or a
+ * round's (src/lib/rounds.ts). Which award is open is checked with the ballot.
+ */
 const requireVotingOpen = createMiddleware(async (c, next) => {
   const now = nowS();
   const config = await getConfig();
-  if (!config.startTime || !config.endTime || !config.viewingMode) {
-    return c.body(null, 401);
-  }
-  // Stored as strings; compared as numbers, as before.
-  if (now < Number(config.startTime) || now > Number(config.endTime)) {
-    return c.body(null, 401);
-  }
-  if (config.viewingMode !== "voting") {
-    return c.body(null, 401);
-  }
+  if (config.viewingMode !== "voting") return c.body(null, 401);
+  if (votableNow(await getTimings(), config, now).length === 0) return c.body(null, 401);
   await next();
 });
 
 export const publicRoutes = new Hono<SessionEnv>()
-  .get("/api/config", async (c) => c.json(await getConfig(), 200))
+  // The settings, and the rounds' dates when there are rounds (src/lib/rounds.ts).
+  .get("/api/config", async (c) => {
+    const rounds = roundsOf(await getTimings());
+    return c.json({ ...(await getConfig()), ...(rounds.length ? { rounds } : {}) }, 200);
+  })
 
   .get("/api/nominees", async (c) => {
     const config = await getConfig();
@@ -108,7 +109,13 @@ export const publicRoutes = new Hono<SessionEnv>()
       if (!category) {
         return c.body(null, 400);
       }
-      const style = effectiveStyle(category.votingStyle, (await getConfig()).defaultVotingStyle);
+      const config = await getConfig();
+      // This award must be open now: during a round, only that round's awards are.
+      const open = votableNow(await getTimings(), config, nowS());
+      if (!open.some((a) => a.id === category.id)) {
+        return c.text("Voting on this award isn't open right now.", 403);
+      }
+      const style = effectiveStyle(category.votingStyle, config.defaultVotingStyle);
 
       // The ballot must match the category's style and name its nominees,
       // each once. A points ballot is a top 10 at most, equals sharing a place.
@@ -122,6 +129,7 @@ export const publicRoutes = new Hono<SessionEnv>()
         style !== shape ||
         ("places" in body && !validPlaces(body.places)) ||
         new Set(rows.map((r) => r.id)).size !== rows.length ||
+        (category.rankLimit != null && "ranking" in body && rows.length > category.rankLimit) ||
         !rows.every((r) => nominees.has(r.id))
       ) {
         return c.body(null, 400);

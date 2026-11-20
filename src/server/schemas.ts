@@ -123,7 +123,23 @@ export const categoryPatch = z.object({
   announcerUrl: z.string().trim().url().nullable().optional(),
   /** Only null: take the uploaded announcer video away (the file is kept, for undo). */
   announcerKey: z.null().optional(),
+  /** The round it belongs to (src/lib/rounds.ts); null or empty for none. */
+  round: z.string().trim().max(60).nullable().optional(),
+  /** Ranked awards: rank at most this many; null for any number. */
+  rankLimit: z.number().int().min(1).max(50).nullable().optional(),
 });
+
+/** Advancing DGGer: the plan to show, then the picks an admin confirmed. */
+export const advanceQuery = z.object({ step: z.enum(["groups", "final"]) });
+export const advanceBody = z.object({
+  step: z.enum(["groups", "final"]),
+  picks: z.array(z.object({ from: required, id: required, to: required })).min(1).max(20),
+});
+
+/** A round's dates, set on every award in it (seconds). */
+export const roundDates = z
+  .object({ name: required, opensAt: z.number().int().positive(), closesAt: z.number().int().positive() })
+  .refine((r) => r.opensAt < r.closesAt, "A round must close after it opens.");
 
 /** An announcer video for an award, uploaded as a file. */
 export const announcerUpload = z.object({ categoryId: required, file: z.instanceof(File) });

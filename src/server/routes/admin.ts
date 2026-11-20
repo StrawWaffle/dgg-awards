@@ -61,6 +61,7 @@ import {
 import { DGG_NAME, cachedDggProfile } from "@/server/dgg-profile";
 import { categoriesWithMediaUrls } from "@/server/present";
 import { chatReviewKey, getChatReview, saveChatReview } from "@/server/chat-review";
+import { AdvanceRefused, advance, advancePlan } from "@/server/advance";
 import { serveFile, storage } from "@/server/storage";
 import { libraryFile, listLibrary } from "@/server/library";
 import { RestoreError, restoreDatabase, snapshotDatabase } from "@/lib/data/driver";
@@ -69,6 +70,9 @@ import { backupDatabaseOffsite, backupMediaOffsite, offsiteEnabled, offsiteStatu
 import { type SessionEnv, rejectInvalid, requireAdmin, zValidator } from "@/server/middleware";
 import {
   announcerUpload,
+  advanceBody,
+  advanceQuery,
+  roundDates,
   categoryCreate,
   categoryForm,
   chatReviewSave,
@@ -653,6 +657,43 @@ export const adminRoutes = new Hono<SessionEnv>()
       after: data,
     });
     return c.body(null, 200);
+  })
+
+  /**
+   * A round's dates, on every award in it (src/lib/rounds.ts). Each award's
+   * change is recorded, so undo works per award.
+   */
+  .patch("/round", zValidator("json", roundDates, rejectInvalid), async (c) => {
+    const { name, opensAt, closesAt } = c.req.valid("json");
+    const awards = (await getNominees({ includeHidden: true, admin: true })).filter((a) => a.round === name);
+    if (!awards.length) return c.text(`No awards are in the round "${name}".`, 404);
+    const who = await actor(c);
+    for (const a of awards) {
+      const before = await getCategory(a.id);
+      await updateCategory({ id: a.id, opensAt, closesAt });
+      const after = await getCategory(a.id);
+      if (before && after) await record(who, { kind: "category", action: "update", label: after.title, categoryId: a.id, before, after });
+    }
+    return c.body(null, 200);
+  })
+
+  /** DGGer's next round: who goes through (src/server/advance.ts). Nothing changes. */
+  .get("/advance", zValidator("query", advanceQuery, rejectInvalid), async (c) => {
+    try {
+      return c.json(await advancePlan(c.req.valid("query").step), 200);
+    } catch (error) {
+      return c.text((error as Error).message, 409);
+    }
+  })
+  /** Advance DGGer with the picks an admin confirmed. One history entry; undo removes them. */
+  .post("/advance", zValidator("json", advanceBody, rejectInvalid), async (c) => {
+    const { step, picks } = c.req.valid("json");
+    try {
+      return c.json({ added: await advance(step, picks, await actor(c)) }, 200);
+    } catch (error) {
+      if (error instanceof AdvanceRefused) return c.text(error.message, 409);
+      throw error;
+    }
   })
 
   /** Edit history, newest first, 50 a page. A category filter includes its nominees. */

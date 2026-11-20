@@ -72,6 +72,16 @@ export const categoriesTable = sqliteTable("categories", {
    */
   announcerKey: text(),
   announcerUrl: text(),
+  /**
+   * A round of its own (src/lib/rounds.ts), such as "DGGer group stage":
+   * while it's open, only its awards can be voted on, on their own page.
+   */
+  round: text(),
+  /** Its own voting dates, in seconds; null follows the site's. */
+  opensAt: int(),
+  closesAt: int(),
+  /** Ranked awards: how many a voter may rank (3 for the DGGer groups and final); null for any number. */
+  rankLimit: int(),
 });
 
 export const optionsTable = sqliteTable(

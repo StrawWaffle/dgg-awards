@@ -39,7 +39,8 @@ export type NomineeDetails =
   | "chatName"
   | "winnerLine";
 
-export type ImportableData = (Omit<Category, "votingStyle" | "askDates" | "announcerKey" | "announcerUrl"> &
+// Rounds, dates and announcer videos are set on the site, not imported.
+export type ImportableData = (Omit<Category, "votingStyle" | "askDates" | "announcerKey" | "announcerUrl" | "round" | "opensAt" | "closesAt" | "rankLimit"> &
   Partial<Pick<Category, "votingStyle" | "askDates">> & { hidden?: boolean } & {
   options: (Omit<Option, "categoryId" | NomineeDetails> &
     Partial<Pick<Option, NomineeDetails>>)[];

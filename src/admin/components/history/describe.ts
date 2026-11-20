@@ -36,6 +36,10 @@ const fieldNames: Record<string, string> = {
   askDates: "asking for dates",
   announcerKey: "announcer video",
   announcerUrl: "announcer video link",
+  round: "round",
+  opensAt: "voting opens",
+  closesAt: "voting closes",
+  rankLimit: "most a voter ranks",
   ids: "order",
 };
 export const fieldName = (key: string) => fieldNames[key] ?? key;
@@ -47,7 +51,7 @@ const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeS
 
 export function formatValue(key: string, value: unknown): string {
   if (value === null || value === undefined || value === "") return "—";
-  if ((key === "startTime" || key === "endTime") && !Number.isNaN(Number(value))) {
+  if ((key === "startTime" || key === "endTime" || key === "opensAt" || key === "closesAt") && !Number.isNaN(Number(value))) {
     return dateTime.format(new Date(Number(value) * 1000));
   }
   if ((key === "clipStart" || key === "clipEnd") && typeof value === "number") return formatTimestamp(value);
