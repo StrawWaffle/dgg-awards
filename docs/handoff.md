@@ -67,8 +67,8 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 - **Locking the site before voting:** yes, so they can test, touch up and preview. Done with "locked" plus the countdown.
 - **The code is never to be public.**
 
-**rinlux's feedback (2026-11-19), with StrawWaffle's calls.** The last three are built and deployed (2026-11-19, backup `/data/backups/2026-11-19T20-19-43Z-before-deploy.db`). Test container `dgga-feedback` (3700) runs that build; its browser check is `tests/visual/out/feedback/check.mjs` (gitignored).
-- **Timing:** rinlux says it all comes after New Year's. They can move the voting dates themselves (Settings → "Voting opens" / "Voting closes").
+**rinlux's feedback (2026-11-19), with StrawWaffle's calls.** All of it is built and live (19–20 November; a backup before each deploy in `/data/backups/`). The browser checks for each part are in `tests/visual/out/` (gitignored): `feedback/`, `tools/`, `tutorial/`, `announcer/`, `rounds/`.
+- **Timing:** rinlux says it all comes after New Year's, and the dates are theirs to set (2026-11-20: "this is just dates"). rinlux is an admin (RiN_LuX): the rounds' dates in Admin → Rounds, the main vote's (day 12) and the mode in Settings. Nothing opens to the public until the mode is "voting".
 - **DGGer in rounds** (rinlux's answers 2026-11-20; all live 2026-11-20, `scripts/set-dgger-rounds.ts` run on live; dates not set yet):
   - **The flow:** days 1–7 the wildcards (top 10 by points, own page) → the top 5, drawn at random into Groups A–E, one each → days 8–11 the group stage (a page per group, rank your top 3, instant runoff) → the top 2 of each group (runoff until two are left, `runoffTop` in `src/lib/voting.ts`) → day 12 the main vote with the final, DGG Chatter of the Year (rank your top 3). Advancing happens only when an admin confirms.
   - **Step 1, live 2026-11-20** (`scripts/split-dgger-groups.ts`, backup `…00-28-47-571Z-before-split-dgger-groups.db`): DGGer's 55 went into `dgger_group_a`–`e` (ranked, 11 each, group name on the award, list numbers to `listNumber`), the blank "12." in Group A (a blank line in rinlux's list) was deleted, and `dgger` stays as the final, empty and ranked. Four history entries; undoing all four was tested.
@@ -77,8 +77,8 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
   - A round only counts once it has its own dates (`inARound`): until then its awards vote with the main vote, so an undated round can't hide the other awards. Unit tests: `tests/rounds.test.ts`.
   - `scripts/set-dgger-rounds.ts` puts the wildcards in "DGGer wildcards", the groups in "DGGer group stage" (rank up to 3) and the final at rank up to 3. Dates are set in the Rounds tab.
   - Tested end to end on a copy of live data (`tests/visual/out/rounds/flow.mjs`, gitignored): only the open round shows and others are refused, 4 ranked is refused, both advances through the admin page (groups 11 → 12, final 0 → 10), the main vote then shows the final and not the groups, and undo is refused once the final has votes. 134 unit tests (4 new for `runoffTop`) and 52 API tests pass; the public nominee list snapshot gained the four new fields, nothing else.
-  - **Still to ask rinlux:** "day 12: full awards": are the other awards open only on day 12? (Main voting is set to 15–26 December now.)
-- **Voting tutorials as steps** (built on branch `tutorial`, `src/site/VoteTutorial.tsx`): before the first ranked award not voted on, "How ranked voting works": rank four practice emotes, then a made-up count of 100 ballots over three rounds where your #1 goes out first and your vote carries your #2 to the win (half-way line on the bars). Before a points award, "How your top 10 works": swipe, compare, points, with an example of shared points. Each shows once a visit (state, not stored), has Skip / "Got it", and "How does this work?" on every ranked or points award brings it back. Nothing in them is a vote.
+  - **Dates:** not set yet. rinlux sets them (see Timing). Main voting is still 15–26 December in Settings; if day 12 is the only main day, those change too.
+- **Voting tutorials as steps** (live 2026-11-19, `src/site/VoteTutorial.tsx`): before the first ranked award not voted on, "How ranked voting works": rank four practice emotes, then a made-up count of 100 ballots over three rounds where your #1 goes out first and your vote carries your #2 to the win (half-way line on the bars). Before a points award, "How your top 10 works": swipe, compare, points, with an example of shared points. Each shows once a visit (state, not stored), has Skip / "Got it", and "How does this work?" on every ranked or points award brings it back. Nothing in them is a vote.
 - **Announcer videos** (built and deployed 2026-11-19; rinlux's idea, StrawWaffle's design). Migration 0015 adds `categories.announcerKey` (an uploaded file, stored under `announcers/`) and `announcerUrl` (a link: YouTube, Twitch, Streamable or a file); the upload wins if both are set. Admins only: the public nominee list leaves both out.
   - **Admin:** each award's page in the editor has "Announcer video" (collapsed; says Set or None): a preview, upload (`POST /api/admin/announcer`, up to 95 MB, mp4/webm/mov/m4v/mkv, stored as is, so mp4 or webm to be safe), "Remove the upload" (the file is kept, so undo brings it back), and a link field. Both are category updates in the history.
   - **Big screen:** going forward into Results on an award with one plays it over the scene like a clip (music fades). When it ends, or "Close the clip" is pressed, the board shows finished at once (`Board`'s new `instant`; the winner is circled; a runoff award still offers "Run the runoff"). Going back from Winner doesn't replay it; "Play the announcement" in the controls (also the pop-out, command `announce`) does. Awards without one reveal as before.
@@ -97,7 +97,8 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 
 **Still open:**
 - ~~How DGGer's groups and wildcards should vote~~: answered 2026-11-20, see "DGGer in rounds".
-- The test containers had all stopped (Docker restarted around 2026-11-15); started again 2026-11-19.
+- The test containers had all stopped (Docker restarted around 2026-11-15); started again 2026-11-19. If they're down, `docker start` them by name.
+- Nothing from rinlux's 2026-11-19 list is waiting on us. Next for DGGer: rinlux sets the dates, and an admin advances after each round.
 - ~~**Simulated results**~~: on the results preview and the big screen (see "Previews by stage").
 - ~~The new voting page~~: done, the site is one page now (see "One site").
 - ~~The public tally~~: done, on the results page.
@@ -139,6 +140,7 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
 | `dgga-main` | 3400 | an old live image, from before the editor. Rebuild it, or ignore it. |
 | `dgga-review` | 3500 | used for the admin work (`dgga:review`) |
 | `dgga-lab` | 3600 | the latest lab build (`dgga:lab`, same as live) |
+| `dgga-feedback` | 3700 | the 2026-11-20 build (`dgga:feedback`) on a copy of live data (volume `dgga-feedback-data`), set up as day 1 of the DGGer wildcards; `ADMIN_USERNAMES=Tester,StrawWaffle`. The API tests reseed it. |
 
 **Browser testing without the T3 preview** (it hung this session): Playwright in Docker (`mcr.microsoft.com/playwright:v1.56.1-noble`) on network `dgga-test`, signing in through the mock as in `tests/visual/capture.mjs`.
 - Plain Chromium there has no H.264, so test clip playback in Playwright's Firefox.
