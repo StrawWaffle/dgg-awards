@@ -62,6 +62,7 @@ import { DGG_NAME, cachedDggProfile } from "@/server/dgg-profile";
 import { categoriesWithMediaUrls } from "@/server/present";
 import { chatReviewKey, getChatReview, saveChatReview } from "@/server/chat-review";
 import { AdvanceRefused, advance, advancePlan } from "@/server/advance";
+import { ballotsCsv, resultsCsv } from "@/server/export-csv";
 import { serveFile, storage } from "@/server/storage";
 import { libraryFile, listLibrary } from "@/server/library";
 import { RestoreError, restoreDatabase, snapshotDatabase } from "@/lib/data/driver";
@@ -675,6 +676,20 @@ export const adminRoutes = new Hono<SessionEnv>()
       if (before && after) await record(who, { kind: "category", action: "update", label: after.title, categoryId: a.id, before, after });
     }
     return c.body(null, 200);
+  })
+
+  /** The results and the ballots as spreadsheets (src/server/export-csv.ts). */
+  .get("/export/results.csv", async (c) => {
+    c.header("Content-Type", "text/csv; charset=utf-8");
+    c.header("Content-Disposition", `attachment; filename="dgg-awards-results-${new Date().toISOString().slice(0, 10)}.csv"`);
+    c.header("Cache-Control", "private, no-store");
+    return c.body(await resultsCsv(), 200);
+  })
+  .get("/export/ballots.csv", async (c) => {
+    c.header("Content-Type", "text/csv; charset=utf-8");
+    c.header("Content-Disposition", `attachment; filename="dgg-awards-ballots-${new Date().toISOString().slice(0, 10)}.csv"`);
+    c.header("Cache-Control", "private, no-store");
+    return c.body(await ballotsCsv(), 200);
   })
 
   /** DGGer's next round: who goes through (src/server/advance.ts). Nothing changes. */

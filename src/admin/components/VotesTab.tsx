@@ -15,6 +15,15 @@ export function VotesTab() {
   const ipOn = config.data?.recordIp === "on";
   return (
     <div className="space-y-6">
+      <p className="flex flex-wrap items-center gap-3 text-sm">
+        <span className="text-neutral-600">Download as a spreadsheet (CSV):</span>
+        <a className="underline" href="/api/admin/export/results.csv">
+          Results
+        </a>
+        <a className="underline" href="/api/admin/export/ballots.csv" title="Every ballot's choices in order, voters as numbers: no names or times">
+          Ballots
+        </a>
+      </p>
       <Stats onFilterIp={(ip) => setFilter({ ip })} ipOn={ipOn} />
       <VoteList filter={filter} setFilter={setFilter} ipOn={ipOn} />
     </div>

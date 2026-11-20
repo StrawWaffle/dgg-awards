@@ -276,6 +276,28 @@ export async function setPage(key: string, data: Record<string, unknown>) {
     .onConflictDoUpdate({ target: schema.pagesTable.key, set: { data, updatedAt } });
 }
 
+/** Every ballot choice in shown awards, with the award's and nominee's titles (the CSV export). */
+export async function getAllBallots() {
+  return db
+    .select({
+      uid: schema.votesTable.uid,
+      categoryId: schema.votesTable.categoryId,
+      optionId: schema.votesTable.optionId,
+      rank: schema.votesTable.rank,
+      award: schema.categoriesTable.title,
+      position: schema.categoriesTable.position,
+      nominee: schema.optionsTable.title,
+    })
+    .from(schema.votesTable)
+    .innerJoin(schema.categoriesTable, eq(schema.categoriesTable.id, schema.votesTable.categoryId))
+    .innerJoin(
+      schema.optionsTable,
+      and(eq(schema.optionsTable.id, schema.votesTable.optionId), eq(schema.optionsTable.categoryId, schema.votesTable.categoryId)),
+    )
+    .where(eq(schema.categoriesTable.hidden, false))
+    .then((rows) => rows.map((r) => ({ ...r, uid: r.uid! })));
+}
+
 /** One award's ballots: each voter's choices with their ranks. */
 export async function getCategoryBallots(categoryId: string) {
   const rows = await db
