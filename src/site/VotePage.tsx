@@ -6,7 +6,7 @@ import { type Clip, ClipPlayer, nomineeClip } from "@/lab/ClipPlayer";
 import { Emote } from "@/lab/Emote";
 import { cssVar } from "@/lab/sketch";
 import { type Chatter, Final, TopTen } from "@/lab/RankChatters";
-import { nextOpening, votableNow, windowOf } from "@/lib/rounds";
+import { inARound, nextOpening, votableNow, windowOf } from "@/lib/rounds";
 import type { Places } from "@/lib/voting";
 import type { Me, SiteConfig } from "@/site/Site";
 import { PointsTutorial, RankedTutorial } from "@/site/VoteTutorial";
@@ -112,7 +112,7 @@ export function VotePage({
     now / 1000,
   ).map((t) => list.find((a) => a.id === t.id)!);
   const open = votable.length > 0;
-  const round = votable.find((a) => a.round)?.round ?? null;
+  const round = votable.find((a) => inARound(a))?.round ?? null;
   const roundEnd = round ? Math.max(...votable.map((a) => windowOf({ ...a, nominees: a.nominees.length }, config).closesAt ?? 0)) * 1000 : null;
   const end = roundEnd ?? seconds(config?.endTime);
   const next = nextOpening(config, rounds, now / 1000);

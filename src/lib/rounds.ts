@@ -34,12 +34,18 @@ export function awardOpen(award: Timing, site: SiteTimes, now: number) {
 }
 
 /**
+ * In a round that has its own dates. A round without dates yet votes with
+ * the main vote, like any other award, so it can't shut the others out.
+ */
+export const inARound = (a: Pick<Timing, "round" | "opensAt" | "closesAt">) => !!a.round && a.opensAt != null && a.closesAt != null;
+
+/**
  * The awards that can be voted on now: the open ones, except that while any
  * round is open, only the awards of open rounds.
  */
 export function votableNow<T extends Timing>(awards: T[], site: SiteTimes, now: number): T[] {
   const open = awards.filter((a) => awardOpen(a, site, now));
-  const inRound = open.filter((a) => a.round);
+  const inRound = open.filter(inARound);
   return inRound.length > 0 ? inRound : open;
 }
 
