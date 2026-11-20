@@ -979,7 +979,7 @@ function HeroCard({ chatter }: { chatter: Chatter }) {
  * a row of three when the card is wide enough (a container query), else
  * stack, so groups of equals in columns still fit.
  */
-function MatchCard({ chatter }: { chatter: Chatter }) {
+export function MatchCard({ chatter }: { chatter: Chatter }) {
   const p = useProfile(chatter.profile);
   const team = teamOf(p?.team ?? null);
   const tier = tierOf(p?.tier ?? null);

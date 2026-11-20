@@ -5,7 +5,8 @@ import { originOf, useBursts } from "@/lab/Bursts";
 import { type Clip, ClipPlayer, nomineeClip } from "@/lab/ClipPlayer";
 import { Emote } from "@/lab/Emote";
 import { cssVar } from "@/lab/sketch";
-import { type Chatter, Final, TopTen } from "@/lab/RankChatters";
+import { type Chatter, Final, MatchCard, TopTen } from "@/lab/RankChatters";
+import { isChatterAward } from "@/lib/dgger";
 import { inARound, nextOpening, votableNow, windowOf } from "@/lib/rounds";
 import type { Places } from "@/lib/voting";
 import type { Me, SiteConfig } from "@/site/Site";
@@ -184,6 +185,16 @@ function Ballot({
   const [casting, setCasting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [watching, setWatching] = useState<Clip | null>(null);
+  // DGGer's groups and final: a chatter's destiny.gg profile, as the wildcards show it (rinlux).
+  const [profileOf, setProfileOf] = useState<Chatter | null>(null);
+  const chatterOf = (a: Award, n: Nominee): Chatter => ({
+    id: n.id,
+    name: n.title,
+    emote: n.emote,
+    image: n.image,
+    // Admins (and previews) read profiles from the admin route; voters from the award's.
+    profile: me?.admin ? `/api/admin/dgg-profile/${encodeURIComponent(n.title)}` : `/api/nominees/${encodeURIComponent(a.id)}/${encodeURIComponent(n.id)}/profile`,
+  });
   // The how-it-works steps passed this visit (VoteTutorial.tsx).
   const [explained, setExplained] = useState<Set<"ranked" | "points">>(new Set());
   // Points ballots as cast (groups of equals), to show them back.
@@ -315,6 +326,21 @@ function Ballot({
       )}
 
       <div className="grid gap-5 md:grid-cols-[260px_1fr]">
+        <Dialog.Root open={!!profileOf} onOpenChange={(o) => !o && setProfileOf(null)}>
+          <Dialog.Portal>
+            <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40" />
+            <Dialog.Content
+              className="cozy-panel lab-pop fixed top-1/2 left-1/2 z-50 max-h-[90vh] w-[min(640px,94vw)] -translate-x-1/2 -translate-y-1/2 space-y-3 overflow-y-auto p-5"
+              aria-describedby={undefined}
+            >
+              <div className="flex items-center justify-between">
+                <Dialog.Title className="text-xl font-black">{profileOf?.name}'s profile</Dialog.Title>
+                <Dialog.Close className="cozy-btn">Close</Dialog.Close>
+              </div>
+              {profileOf && <MatchCard chatter={profileOf} />}
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog.Root>
         <Dialog.Root open={!!watching} onOpenChange={(o) => !o && setWatching(null)}>
           <Dialog.Portal>
             <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40" />
@@ -450,6 +476,7 @@ function Ballot({
                       single={!award.ranked}
                       onChoose={(e) => choose(e, n.id)}
                       onWatch={() => n.clip && setWatching(n.clip)}
+                      onProfile={isChatterAward(award.id) ? () => setProfileOf(chatterOf(award, n)) : undefined}
                     />
                   );
                 })}
@@ -547,6 +574,7 @@ function NomineeCard({
   single,
   onChoose,
   onWatch,
+  onProfile,
 }: {
   nominee: Nominee;
   rank: number | null;
@@ -555,6 +583,8 @@ function NomineeCard({
   single: boolean;
   onChoose: (e: React.MouseEvent) => void;
   onWatch: () => void;
+  /** A chatter award: open their destiny.gg profile. */
+  onProfile?: () => void;
 }) {
   const clip = !!n.clip;
   const frame = {
@@ -608,7 +638,7 @@ function NomineeCard({
   );
 
   if (!clip) {
-    return (
+    const card = (
       <button
         data-nominee={n.id}
         type="button"
@@ -620,6 +650,16 @@ function NomineeCard({
       >
         {body}
       </button>
+    );
+    if (!onProfile) return card;
+    return (
+      <div className="relative h-full">
+        {card}
+        {/* Beside the card's button, over its picture (a button can't hold another). */}
+        <button type="button" className="cozy-chip absolute top-4 right-4 cursor-pointer" onClick={onProfile}>
+          Profile
+        </button>
+      </div>
     );
   }
 

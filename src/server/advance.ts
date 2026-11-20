@@ -9,16 +9,9 @@
 import { getCategory, getCategoryNominees, getCategoryBallots, insertNominee } from "@/lib/data/driver";
 import { countPoints, ranksToPlaces, runoffTop } from "@/lib/voting";
 import { type Actor, record } from "@/server/history";
+import { DGGER } from "@/lib/dgger";
 
-export const DGGER = {
-  wildcards: "dgger_wildcards",
-  groups: ["dgger_group_a", "dgger_group_b", "dgger_group_c", "dgger_group_d", "dgger_group_e"],
-  final: "dgger",
-  /** Wildcards through: one per group. */
-  wildcardsThrough: 5,
-  /** Through from each group. */
-  groupThrough: 2,
-};
+export { DGGER };
 
 export type AdvanceStep = "groups" | "final";
 type Nominee = { id: string; title: string };

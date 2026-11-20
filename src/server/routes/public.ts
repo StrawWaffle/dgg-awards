@@ -18,6 +18,7 @@ import {
 } from "@/lib/data/driver";
 import { nowS } from "@/lib/util";
 import { roundsOf, votableNow } from "@/lib/rounds";
+import { isChatterAward } from "@/lib/dgger";
 import { effectiveStyle, placesToRanks, validPlaces, withEffectiveStyles } from "@/lib/voting";
 import { categoriesWithMediaUrls, withMediaUrls } from "@/server/present";
 import { getCookie } from "hono/cookie";
@@ -74,14 +75,16 @@ export const publicRoutes = new Hono<SessionEnv>()
     c.json(await getUserPlaces(c.get("session").uid), 200),
   )
 
-  // The destiny.gg profile of a nominee in a points award (the wildcards: the
-  // vote shows each chatter's card). Only those nominees, so it isn't an open
-  // proxy to destiny.gg, and only when the nominees are public. Cached.
+  // The destiny.gg profile of a nominee in a points award or one of DGGer's
+  // awards (the vote shows each chatter's card). Only those nominees, so it
+  // isn't an open proxy to destiny.gg, and only when the nominees are public. Cached.
   .get("/api/nominees/:category/:id/profile", async (c) => {
     const config = await getConfig();
     if (config.viewingMode === "locked") return c.body(null, 401);
     const category = await getCategoryForVoting(c.req.param("category"));
-    if (!category || effectiveStyle(category.votingStyle, config.defaultVotingStyle) !== "points") return c.body(null, 404);
+    if (!category || (effectiveStyle(category.votingStyle, config.defaultVotingStyle) !== "points" && !isChatterAward(category.id))) {
+      return c.body(null, 404);
+    }
     const nominee = await getNominee(category.id, c.req.param("id"));
     const name = nominee && chatterName(nominee.title);
     if (!name || !DGG_NAME.test(name)) return c.body(null, 404);
