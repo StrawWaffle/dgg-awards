@@ -8,6 +8,7 @@ import { cssVar } from "@/lab/sketch";
 import { type Chatter, Final, MatchCard, TopTen } from "@/lab/RankChatters";
 import { isChatterAward } from "@/lib/dgger";
 import { inARound, nextOpening, votableNow, windowOf } from "@/lib/rounds";
+import { type Stage, votingStages } from "@/lib/previews";
 import type { Places } from "@/lib/voting";
 import type { Me, SiteConfig } from "@/site/Site";
 import { PointsTutorial, RankedTutorial } from "@/site/VoteTutorial";
@@ -73,12 +74,15 @@ export function VotePage({
   preview,
   onHome,
   onResults,
+  previewStage = null,
 }: {
   me: Me | undefined;
   config: SiteConfig | null;
   preview: boolean;
   onHome: (e: React.MouseEvent) => void;
   onResults: (e: React.MouseEvent) => void;
+  /** In a preview, the stage previewed: a round's stage shows that round's awards; the main vote, the rest. */
+  previewStage?: Stage | null;
 }) {
   const admin = !!me?.admin;
   const now = Date.now();
@@ -144,15 +148,26 @@ export function VotePage({
   if (awards === "locked" || awards.length === 0) {
     return <div className="cozy-panel p-8">No awards to vote on yet.</div>;
   }
-  // A preview goes through every award; visitors get what's open now.
-  const shown = preview ? list : votable;
+  // A preview shows what its stage would (a round's awards, or the main
+  // vote's, rinlux); visitors get what's open now.
+  const names = [...new Set(list.map((a) => a.round).filter((r): r is string => !!r))];
+  const stageRound = previewStage ? votingStages[previewStage] : undefined;
+  const previewRound = stageRound === undefined || stageRound === null ? null : (names[stageRound] ?? null);
+  const shown = !preview
+    ? votable
+    : stageRound === undefined
+      ? list
+      : stageRound === null
+        ? list.filter((a) => !a.round)
+        : list.filter((a) => a.round === previewRound);
+  const bannerRound = preview ? previewRound : round;
   return (
     <>
-      {!preview && round && (
+      {bannerRound && (
         <div className="cozy-panel mb-4 flex flex-wrap items-center gap-3 px-5 py-3" style={{ background: "var(--highlight)" }}>
-          <span className="cozy-chip coral">{round}</span>
+          <span className="cozy-chip coral">{bannerRound}</span>
           <span className="font-semibold">
-            This round has its own vote{roundEnd ? `, open until ${when(roundEnd)}` : ""}. The other awards open later.
+            This round has its own vote{roundEnd && !preview ? `, open until ${when(roundEnd)}` : ""}. The other awards open later.
           </span>
         </div>
       )}
@@ -459,6 +474,13 @@ function Ballot({
                   casting={casting}
                   onCast={cast}
                 />
+              )}
+
+              {/* The DGGer final, before the groups advance (seen only in a preview: an empty award is never open). */}
+              {award.nominees.length === 0 && (
+                <p className="cozy-panel p-5 font-semibold" style={{ color: "var(--muted)" }}>
+                  No nominees yet. The finalists arrive here when the round before is advanced.
+                </p>
               )}
 
               {!award.points && (

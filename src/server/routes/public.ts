@@ -6,6 +6,7 @@ import {
   getCategoryForVoting,
   getConfig,
   getTimings,
+  getRoundNames,
   getNominees,
   getNominee,
   getUserBallots,
@@ -49,7 +50,8 @@ export const publicRoutes = new Hono<SessionEnv>()
   // The settings, and the rounds' dates when there are rounds (src/lib/rounds.ts).
   .get("/api/config", async (c) => {
     const rounds = roundsOf(await getTimings());
-    return c.json({ ...(await getConfig()), ...(rounds.length ? { rounds } : {}) }, 200);
+    const roundNames = await getRoundNames();
+    return c.json({ ...(await getConfig()), ...(rounds.length ? { rounds } : {}), ...(roundNames.length ? { roundNames } : {}) }, 200);
   })
 
   .get("/api/nominees", async (c) => {

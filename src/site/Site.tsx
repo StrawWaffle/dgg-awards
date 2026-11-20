@@ -1,10 +1,10 @@
 import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { type Round, firstOpening } from "@/lib/rounds";
+import { type Round, firstOpening, roundNow } from "@/lib/rounds";
 import { ChatBubbleIcon } from "@radix-ui/react-icons";
 import archive2025 from "@/archive/2025.json";
 import { EmoteBackdrop } from "@/lab/EmoteBackdrop";
 import { HeaderTools } from "@/lab/HeaderTools";
-import { type Stage, previewPath, stagePages, stages } from "@/lib/previews";
+import { type Stage, previewPath, stagePages, stages, votingStages } from "@/lib/previews";
 import { useHoverMenu } from "@/lib/useHoverMenu";
 import { Summary, loadArchive2025 } from "@/lab/Summary";
 import { ChatReviewPage } from "@/site/ChatReviewPage";
@@ -23,6 +23,8 @@ export type SiteConfig = {
   awardYear?: string;
   /** Rounds with their own dates (the DGGer wildcards and group stage), before the main vote. */
   rounds?: Round[];
+  /** Every round's name in award order, dated or not (for the previews). */
+  roundNames?: string[];
 };
 export type Me = { uid: number; name: string; admin: boolean } | null;
 
@@ -73,6 +75,11 @@ function stageNow(config: SiteConfig): Stage {
   const end = Number(config.endTime) || 0;
   if (config.viewingMode === "reviewing") return "results";
   if (end && now >= end) return "closed";
+  // A round open now is its own stage.
+  const open = config.viewingMode === "voting" ? roundNow(config.rounds ?? [], now) : undefined;
+  const at = open ? (config.roundNames ?? []).indexOf(open.name) : -1;
+  if (at === 0) return "wildcards";
+  if (at === 1) return "groups";
   if (config.viewingMode === "voting" && start && now >= start) return "voting";
   return "before";
 }
@@ -87,14 +94,25 @@ function stageConfig(config: SiteConfig, stage: Stage): SiteConfig {
   const start = Number(config.startTime) || 0;
   const end = Number(config.endTime) || 0;
   const dates = (s: number, e: number) => ({ startTime: String(s), endTime: String(e) });
+  // The rounds, laid out around now so the previewed one is open (or, before
+  // voting, all to come; once the main vote is on, all past).
+  const names = config.roundNames ?? [];
+  const laidOut = (first: number): Round[] =>
+    names.map((name, i) => ({ name, opensAt: first + i * 7 * DAY, closesAt: first + i * 7 * DAY + (i === 0 ? 7 : 4) * DAY }));
   switch (stage) {
+    case "wildcards":
+      return { ...config, viewingMode: "voting", rounds: laidOut(now - DAY), ...dates(now + 11 * DAY, now + 12 * DAY) };
+    case "groups":
+      return { ...config, viewingMode: "voting", rounds: laidOut(now - 8 * DAY), ...dates(now + 4 * DAY, now + 5 * DAY) };
     case "before": {
       const s = start > now ? start : now + 7 * DAY;
+      // With rounds, the main vote comes after them.
+      if (names.length) return { ...config, viewingMode: "locked", rounds: laidOut(s), ...dates(s + 12 * DAY, s + 13 * DAY) };
       return { ...config, viewingMode: "locked", ...dates(s, end > s ? end : s + 11 * DAY) };
     }
     case "voting": {
       const e = end > now ? end : now + 11 * DAY;
-      return { ...config, viewingMode: "voting", ...dates(start && start <= now ? start : now - DAY, e) };
+      return { ...config, viewingMode: "voting", rounds: laidOut(now - 30 * DAY), ...dates(start && start <= now ? start : now - DAY, e) };
     }
     case "closed": {
       const e = end && end < now ? end : now - 3600;
@@ -274,7 +292,14 @@ export function Site() {
         )}
         {p === "vote" && (
           <main className="mx-auto max-w-7xl px-4 py-6">
-            <VotePage me={me} config={shown} preview={previewing && stage === "voting"} onHome={go("home")} onResults={go("results")} />
+            <VotePage
+              me={me}
+              config={shown}
+              preview={previewing && !!stage && stage in votingStages}
+              previewStage={previewing ? stage : null}
+              onHome={go("home")}
+              onResults={go("results")}
+            />
           </main>
         )}
         {p === "results" && (

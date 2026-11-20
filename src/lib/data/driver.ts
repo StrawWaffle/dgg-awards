@@ -287,6 +287,16 @@ export async function getCategoryBallots(categoryId: string) {
   return ballots;
 }
 
+/** The rounds' names in award order, with or without dates (the previews take them in this order). */
+export async function getRoundNames() {
+  const rows = await db.query.categoriesTable.findMany({
+    columns: { round: true },
+    where: (c, { eq }) => eq(c.hidden, false),
+    orderBy: (c, { asc }) => [asc(c.position)],
+  });
+  return [...new Set(rows.map((r) => r.round).filter((r): r is string => !!r))];
+}
+
 /** Every shown award's timing (src/lib/rounds.ts): its round, own dates and how many nominees it has. */
 export async function getTimings() {
   const rows = await db.query.categoriesTable.findMany({
