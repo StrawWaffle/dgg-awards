@@ -446,7 +446,7 @@ function ChatReview({ data, preview, storyHref, onStory }: { data: ReviewDoc; pr
         <p>
           <C
             k="footer.notTags"
-            d="Names that are also everyday words weren't counted as tags, so a message about chicken doesn't count as tagging chicken:"
+            d="Names that are also everyday words count as tags only when written with their capitals, the way autocomplete types them: Pizza is a tag, pizza isn't. All-lower-case ones weren't counted at all, so a message about chicken doesn't count as tagging chicken:"
             style={{ color: "var(--text)" }}
           />{" "}
           <WordList at={["notTags"]} />.

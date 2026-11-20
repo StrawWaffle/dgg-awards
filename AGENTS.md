@@ -62,7 +62,7 @@ The live `.env` holds the real DGG OAuth app, `AUTH_SECRET`, the tunnel token, `
 ## Testing
 
 - `bun run typecheck` must pass.
-- **Unit tests** (no server): `tests/{links,checks,data,dgg-profile,voting,storage,ids,lab-chat,backup,rank,triage,rounds}.test.ts`. Run on Linux, since `data.test.ts` checks filename case.
+- **Unit tests** (no server): `tests/{links,checks,data,dgg-profile,voting,storage,ids,lab-chat,backup,rank,triage,rounds,dance}.test.ts`. Run on Linux, since `data.test.ts` checks filename case.
 - **API tests:** `bash tests/run.sh <app-container> --ci`. 36 characterization tests with snapshots, run over HTTP against a running app on the Docker network `dgga-test`. `tests/reset.sh` reseeds first.
 - **Screenshots:** `bash tests/visual/run.sh capture <container> <name>`, then `… compare <a> <b>`. These are full-page Playwright screenshots, pinned so two runs of the same code are pixel-identical (except the admin Votes tab, which shows vote times). They land in `tests/visual/out/` (gitignored): capture a "before" from `main` and an "after" from your branch, then compare.
 - **Data score:** `bun scripts/check-nominees.ts` (exits 1 while there are errors).

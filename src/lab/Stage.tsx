@@ -13,10 +13,11 @@ import { type ChatFilters, LONG_AT, Removals, RepeatGuard, badWords, cleanMessag
 import { ResultsBoard } from "@/lab/StageRunoff";
 import { loadSimulated } from "@/lab/Summary";
 import { type Box, type Layout, Movable, defaultLayout, loadLayout, rectStyle, saveLayout } from "@/lab/StageLayout";
+import { type Dancer, type Moves, MOVES, dance, jump, lift, squash, standing } from "@/lab/dance";
 import { SCENES, type Scene, type ShowCommand, ShowControls, type ShowState, popOutControls, useStageChannel } from "@/lab/StageControls";
 import type { ChatSummary } from "@/server/lab/chat-aggregator";
 
-type Npc = {
+type Npc = Dancer & {
   el: HTMLDivElement;
   /** The "text" span its emote (or group of emotes) is drawn in. */
   wrap: HTMLSpanElement;
@@ -38,9 +39,6 @@ type Npc = {
   home: number;
   roll: number;
   vx: number;
-  hop: number;
-  /** A small bounce on each beat, apart from the hop on the one. */
-  bob: number;
   opacity: number;
   /** Walking in from an edge to `targetX`, then wandering. */
   entering: boolean;
@@ -108,8 +106,21 @@ type Cast = {
   whenFull: "keep" | "swap";
   /** The share of newcomers who fly in the sky beside the scene. */
   fly: number;
+  /** How they move to the music (rinlux found everyone jumping at once jittery): see `Moves`. */
+  moves: Moves;
 };
-const CAST_DEFAULTS: Cast = { max: 60, names: true, showSaid: true, who: "everyone", stayMin: 5, arrivals: 2, whenFull: "keep", fly: 0.2, bubbles: "anyone" };
+const CAST_DEFAULTS: Cast = {
+  max: 60,
+  names: true,
+  showSaid: true,
+  who: "everyone",
+  stayMin: 5,
+  arrivals: 2,
+  whenFull: "keep",
+  fly: 0.2,
+  bubbles: "anyone",
+  moves: "some",
+};
 function loadCast(): Cast {
   try {
     return { ...CAST_DEFAULTS, ...JSON.parse(localStorage.getItem(CAST_KEY) ?? "{}") };
@@ -243,6 +254,7 @@ export function Stage({
   const [arrivalRate, setArrivalRate] = useState(saved.arrivals);
   const [whenFull, setWhenFull] = useState(saved.whenFull);
   const [flyShare, setFlyShare] = useState(saved.fly);
+  const [moves, setMoves] = useState(saved.moves);
   /** Emotes drawn together with the ones beside them (GIGACHAD BLADE), from destiny.gg's emotes.css. */
   const combos = useRef(new Set<string>());
   useEffect(() => {
@@ -264,9 +276,9 @@ export function Stage({
   const feedRef = useRef<FeedHandle | null>(null);
   useEffect(() => {
     try {
-      localStorage.setItem(CAST_KEY, JSON.stringify({ max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull, fly: flyShare, bubbles }));
+      localStorage.setItem(CAST_KEY, JSON.stringify({ max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull, fly: flyShare, bubbles, moves }));
     } catch {}
-  }, [max, names, showSaid, who, stayMin, arrivalRate, whenFull, flyShare, bubbles]);
+  }, [max, names, showSaid, who, stayMin, arrivalRate, whenFull, flyShare, bubbles, moves]);
   /** Who spoke lately: nick → when, their last emote, flair. Oldest first. */
   const roster = useRef(new Map<string, { at: number; emote: string | null; flair: string | null; platform?: string }>());
   /** What chat is spamming most: for someone who hasn't sent an emote. */
@@ -394,8 +406,8 @@ export function Stage({
   const sceneNow = useRef(scene);
   sceneNow.current = scene;
   const [bursts, fire] = useBursts();
-  const settings = useRef({ rate, emoteShare, max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull, filters, bad, flyShare, bubbles });
-  settings.current = { rate, emoteShare, max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull, filters, bad, flyShare, bubbles };
+  const settings = useRef({ rate, emoteShare, max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull, filters, bad, flyShare, bubbles, moves });
+  settings.current = { rate, emoteShare, max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull, filters, bad, flyShare, bubbles, moves };
   /** The nominees' destiny.gg usernames, for the simulator to chat as now and then. */
   const nomineeNames = useRef<string[]>([]);
   nomineeNames.current = (show ?? []).flatMap((a) => a.nominees.flatMap((n) => (n.chatName ? [n.chatName] : [])));
@@ -461,8 +473,7 @@ export function Stage({
       vx: (fromLeft ? 1 : -1) * (70 + Math.random() * 40),
       targetX: 40 + Math.random() * Math.max(40, width - 120),
       bornAt: performance.now(),
-      hop: 0,
-      bob: 0,
+      ...standing(performance.now()),
       opacity: 0,
       entering: true,
       leaving: false,
@@ -567,7 +578,7 @@ export function Stage({
           // During a winner moment everyone claps; they go back to this after.
           setEmote(npc, npc.clapUntil > now ? "Klappa" : shown);
           if (npc.clapUntil > now) npc.restore = shown;
-          if (!npc.entering && !clipOn.current) npc.hop = Math.max(npc.hop, 0.6);
+          if (!npc.entering && !clipOn.current) jump(npc, now, 0.6, Math.random() * 60);
         }
         npc.lastSeen = now;
       }
@@ -693,7 +704,7 @@ export function Stage({
       }
       // Everyone on the combo's emote jumps with it.
       if (summary.combo && summary.combo.count >= 3 && !clipOn.current) {
-        for (const n of all.values()) if (n.emote === summary.combo.emote && !n.entering) n.hop = 1.4;
+        for (const n of all.values()) if (n.emote === summary.combo.emote && !n.entering) jump(n, now, 1.3, Math.random() * 80);
       }
       // Characters walk off once they've been quiet for the stay time.
       if (!clipOn.current) for (const n of [...all.values()]) if (now - n.lastSeen > stayMs) leave(n);
@@ -844,7 +855,7 @@ export function Stage({
         const strip = strips[n.side];
         const lo = strip.from;
         const hi = Math.max(lo, strip.to - n.w * 0.8);
-        if (!n.entering && !n.leaving && !still && music.downbeat) n.hop = Math.max(n.hop, 0.5);
+        if (!n.entering && !n.leaving && !still) dance(n, now, settings.current.moves, music.downbeat, music.beat);
         if (n.leaving) n.x += n.vx * dt;
         else if (still) {
           // A clip: hover in place, out of its way.
@@ -872,10 +883,8 @@ export function Stage({
           leavingNpcs.current.delete(n);
           continue;
         }
-        n.hop = Math.max(0, n.hop - dt * 2.4);
-        n.bob = 0;
-        // Hovering: a slow rise and fall, and a little lift on the one of each bar.
-        const y = skyTop + n.alt * (skyBottom - skyTop) + Math.sin(now / 700 + n.phase) * 6 - Math.sin(n.hop * Math.PI) * 14 * n.hop;
+        // Hovering: a slow rise and fall, and a little lift when they jump.
+        const y = skyTop + n.alt * (skyBottom - skyTop) + Math.sin(now / 700 + n.phase) * 6 - lift(n, now) * 12;
         n.el.style.transform = `translate3d(${n.x}px, ${y}px, 0) scale(0.8)`;
         n.el.style.opacity = String(Math.max(0, n.opacity));
         n.el.style.zIndex = "0";
@@ -883,11 +892,8 @@ export function Stage({
       const lane = panel && cut > 0 && cut < 0.9 && n.home < cut && n.roll > stays ? cut + (n.home / cut) * (1 - cut) : n.home;
       n.depth += (lane - n.depth) * Math.min(1, dt * 1.5);
       const ground = top + n.depth * depthRange;
-      // The music: a jump on the one of each bar, a little bob on the others.
-      if (!n.entering && !n.leaving && !still) {
-        if (music.downbeat) n.hop = Math.max(n.hop, 0.75);
-        else if (music.beat) n.bob = 1;
-      }
+      // The music, by the setting (`dance`).
+      if (!n.entering && !n.leaving && !still) dance(n, now, settings.current.moves, music.downbeat, music.beat);
       const was = n.x;
       n.x += n.vx * dt;
       // Behind the scene's box is out of bounds for anyone in a row it covers:
@@ -946,12 +952,13 @@ export function Stage({
         leavingNpcs.current.delete(n);
         continue;
       }
-      n.hop = Math.max(0, n.hop - dt * 2.4);
-      n.bob = Math.max(0, n.bob - dt * 7);
+      // Just walking: a small step bounce while they move.
+      const step = settings.current.moves === "walk" && !still && Math.abs(n.vx) > 4 ? Math.abs(Math.sin(now / 160 + n.phase)) * 3 : 0;
       // On the grass: back row higher and smaller, front row lower and bigger.
-      const y = ground - Math.sin(n.hop * Math.PI) * 30 * n.hop - n.bob * 5;
-      // The bob squashes a little, like landing.
-      n.el.style.transform = `translate3d(${n.x}px, ${y}px, 0) scale(${scale * (1 + n.bob * 0.04)}, ${scale * (1 - n.bob * 0.06)})`;
+      const y = ground - lift(n, now) * 24 - step;
+      // Landing squashes a little.
+      const sq = squash(n, now);
+      n.el.style.transform = `translate3d(${n.x}px, ${y}px, 0) scale(${scale * (1 + sq * 0.04)}, ${scale * (1 - sq * 0.06)})`;
       n.el.style.opacity = String(Math.max(0, n.opacity));
       n.el.style.zIndex = String(Math.round(n.depth * 100));
       }
@@ -1046,7 +1053,7 @@ export function Stage({
       if (!n.clapUntil) n.restore = n.emote;
       setEmote(n, "Klappa");
       n.clapUntil = until;
-      if (!n.entering) n.hop = 1;
+      if (!n.entering) jump(n, performance.now(), 1, Math.random() * 120);
     }
     winnerTimers.current = [setTimeout(() => setWinner(null), 4000)];
   };
@@ -1259,6 +1266,16 @@ export function Stage({
           The controls sit in the camera slot, under the streamer's camera on stream. Popped out, they're in a small window of their own,
           and the slot shows only the frame.
         </p>
+        <label className="flex items-center justify-between gap-2" title="How the characters move to the music">
+          Dancing
+          <select value={moves} onChange={(e) => setMoves(e.currentTarget.value as Moves)} className="cozy-input py-1!">
+            {MOVES.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <details className="rounded-xl p-3" style={{ background: "var(--cream)" }}>
           <summary className="cursor-pointer">Advanced</summary>
           <div className="mt-3 grid gap-3">

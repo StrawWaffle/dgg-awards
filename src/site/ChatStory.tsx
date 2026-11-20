@@ -154,7 +154,7 @@ function ChatStory({ data, preview, allHref, onAll }: { data: Review; preview: b
             </button>
           </div>
           <p className="mx-auto mt-10 max-w-2xl text-xs font-semibold" style={{ color: "var(--muted)" }}>
-            <C k="story.notTags" d="Names that are also everyday words weren't counted as tags:" /> <WordList at={["notTags"]} />.
+            <C k="story.notTags" d="Names that are also everyday words count only with their capitals (Pizza, not pizza). These weren't counted at all:" /> <WordList at={["notTags"]} />.
           </p>
         </Screen>
       </div>

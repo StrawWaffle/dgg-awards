@@ -6,37 +6,37 @@
  "numbers": [
   {
    "label": "messages",
-   "value": 29099659,
+   "value": 29132708,
    "note": "About 93k a day: one every 0.93 seconds, for 313 days."
   },
   {
    "label": "chatters",
-   "value": 16024,
+   "value": 16038,
    "note": "Every one of them right, according to themselves."
   },
   {
    "label": "emotes",
-   "value": 26524887,
+   "value": 26554836,
    "note": "609 different ones. Close to one per message: words are optional."
   },
   {
    "label": "combos",
-   "value": 5012,
+   "value": 5021,
    "note": "The biggest had 196 people in it."
   },
   {
    "label": "links",
-   "value": 437390,
+   "value": 437924,
    "note": "Most of them now lead nowhere."
   },
   {
    "label": "greentexts",
-   "value": 519240,
+   "value": 519840,
    "note": "> be chat > quote everything"
   },
   {
    "label": "punishments",
-   "value": 33545,
+   "value": 33582,
    "note": "The bot handed out 84% of them and asked for nothing in return."
   },
   {
@@ -49,19 +49,19 @@
   "cards": [
    {
     "emote": "OMEGALUL",
-    "big": "2,740,498",
+    "big": "2,743,470",
     "title": "OMEGALUL of the year",
-    "text": "More than the next three (CINEMA, GIGACHAD, hesRight) put together (1,966,045). Chat laughed 8,756 times a day, at 6,942 people's hands. Drugflood alone did 26,787."
+    "text": "More than the next three (CINEMA, GIGACHAD, hesRight) put together (1,968,056). Chat laughed 8,765 times a day, at 6,948 people's hands. Drugflood alone did 26,909."
    },
    {
     "emote": "MMMM",
-    "big": "50,052",
+    "big": "50,068",
     "title": "Bing and MMMM",
     "text": "One in every 8 MMMMs in chat this year came from Bing. Mmmm."
    },
    {
     "emote": "VeryPog",
-    "big": "27,165",
+    "big": "27,180",
     "title": "aus_bits and VeryPog",
     "text": "About one in 10 of all VeryPogs. Very pog, very consistent."
    },
@@ -82,91 +82,91 @@
    {
     "name": "OMEGALUL",
     "emote": "OMEGALUL",
-    "value": 2740498,
-    "sub": "6,942 people · most by Drugflood (26,787)"
+    "value": 2743470,
+    "sub": "6,948 people · most by Drugflood (26,909)"
    },
    {
     "name": "CINEMA",
     "emote": "CINEMA",
-    "value": 716879,
-    "sub": "5,743 people · most by telescopebuilder (4,399)"
+    "value": 717463,
+    "sub": "5,744 people · most by telescopebuilder (4,399)"
    },
    {
     "name": "GIGACHAD",
     "emote": "GIGACHAD",
-    "value": 625770,
-    "sub": "5,274 people · most by adbrain (11,354)"
+    "value": 626549,
+    "sub": "5,275 people · most by adbrain (11,372)"
    },
    {
     "name": "hesRight",
     "emote": "hesRight",
-    "value": 623396,
-    "sub": "4,931 people · most by bean (5,338)"
+    "value": 624044,
+    "sub": "4,932 people · most by bean (5,338)"
    },
    {
     "name": "NAHH",
     "emote": "NAHH",
-    "value": 438002,
-    "sub": "4,165 people · most by adbrain (13,112)"
+    "value": 438339,
+    "sub": "4,168 people · most by adbrain (13,120)"
    },
    {
     "name": "omgBruh",
     "emote": "omgBruh",
-    "value": 390072,
-    "sub": "3,176 people · most by Maplestory (6,596)"
+    "value": 390784,
+    "sub": "3,177 people · most by Maplestory (6,608)"
    },
    {
     "name": "MMMM",
     "emote": "MMMM",
-    "value": 377770,
-    "sub": "3,792 people · most by Bing (50,052)"
+    "value": 378142,
+    "sub": "3,793 people · most by Bing (50,068)"
    },
    {
     "name": "LULW",
     "emote": "LULW",
-    "value": 369756,
-    "sub": "4,190 people · most by Readysetzerg (9,590)"
+    "value": 370156,
+    "sub": "4,194 people · most by Readysetzerg (9,592)"
    },
    {
     "name": "ShrimpleAs",
     "emote": "ShrimpleAs",
-    "value": 355615,
-    "sub": "4,400 people · most by Incruente (9,684)"
+    "value": 355933,
+    "sub": "4,400 people · most by Incruente (9,690)"
    },
    {
     "name": "PEPE",
     "emote": "PEPE",
-    "value": 355143,
-    "sub": "4,504 people · most by eagle (3,575)"
+    "value": 355876,
+    "sub": "4,512 people · most by eagle (3,575)"
    },
    {
     "name": "SpeedLaugh",
     "emote": "SpeedLaugh",
-    "value": 349773,
-    "sub": "2,982 people · most by Jihan (7,575)"
+    "value": 350633,
+    "sub": "2,985 people · most by Jihan (7,576)"
    },
    {
     "name": "KEK",
     "emote": "KEK",
-    "value": 322239,
-    "sub": "2,677 people · most by rep (6,213)"
+    "value": 322664,
+    "sub": "2,679 people · most by rep (6,215)"
    },
    {
     "name": "Cooked",
     "emote": "Cooked",
-    "value": 308384,
+    "value": 308495,
     "sub": "4,054 people · most by peciti (3,253)"
    },
    {
     "name": "REE",
     "emote": "REE",
-    "value": 297186,
-    "sub": "4,423 people · most by BawlsMcLongcack (5,680)"
+    "value": 297616,
+    "sub": "4,425 people · most by BawlsMcLongcack (5,684)"
    },
    {
     "name": "WWWWaiting",
     "emote": "WWWWaiting",
-    "value": 273905,
+    "value": 274117,
     "sub": "3,235 people · most by Eaze (9,478)"
    }
   ],
@@ -174,13 +174,13 @@
    {
     "name": "ArchdukeCyan",
     "emote": "OMEGALUL",
-    "value": 185397,
+    "value": 185648,
     "sub": "favourite: OMEGALUL"
    },
    {
     "name": "PuffPoropo",
     "emote": "OMEGALUL",
-    "value": 181600,
+    "value": 181738,
     "sub": "favourite: OMEGALUL"
    },
    {
@@ -192,25 +192,25 @@
    {
     "name": "Drugflood",
     "emote": "OMEGALUL",
-    "value": 162657,
+    "value": 163177,
     "sub": "favourite: OMEGALUL"
    },
    {
     "name": "denkkis",
     "emote": "OMEGALUL",
-    "value": 121352,
+    "value": 121353,
     "sub": "favourite: OMEGALUL"
    },
    {
     "name": "Jihan",
     "emote": "SpeedLaugh",
-    "value": 108835,
+    "value": 108876,
     "sub": "favourite: SpeedLaugh"
    },
    {
     "name": "LysergicAcid",
     "emote": "VeryPog",
-    "value": 106892,
+    "value": 107123,
     "sub": "favourite: VeryPog"
    },
    {
@@ -222,13 +222,13 @@
    {
     "name": "drewftg",
     "emote": "OMEGALUL",
-    "value": 106296,
+    "value": 106475,
     "sub": "favourite: OMEGALUL"
    },
    {
     "name": "peciti",
     "emote": "OMEGALUL",
-    "value": 104088,
+    "value": 104092,
     "sub": "favourite: OMEGALUL"
    }
   ]
@@ -255,9 +255,9 @@
    },
    {
     "emote": "Klappa",
-    "big": "480",
+    "big": "485",
     "title": "CaptainFerret, team player",
-    "text": "Joined 480 combos and typed only 4 extra messages in them. Never the hero, never the villain."
+    "text": "Joined 485 combos and typed only 4 extra messages in them. Never the hero, never the villain."
    },
    {
     "emote": "REE",
@@ -373,11 +373,11 @@
   "joiners": [
    {
     "name": "CaptainFerret",
-    "value": 480
+    "value": 485
    },
    {
     "name": "Camilo",
-    "value": 455
+    "value": 456
    },
    {
     "name": "diluted",
@@ -397,7 +397,7 @@
    },
    {
     "name": "chicken",
-    "value": 294
+    "value": 298
    },
    {
     "name": "NeulandEntdecker",
@@ -479,9 +479,9 @@
   "cards": [
    {
     "emote": "Stare",
-    "big": "3/3",
+    "big": "2/3",
     "title": "Trius, everywhere",
-    "text": "Said Destiny's, MrMouton's and dan's names more than anyone this year. Tagged Destiny 9,587 times and got 28 back: 342 to 1. MrMouton answered 147 of 7,725."
+    "text": "Said Destiny's and MrMouton's names more than anyone this year, and came 3 short of Umbraklaw on dan's. Tagged Destiny 9,590 times and got 28 back: 342 to 1. MrMouton answered 147 of 7,727."
    },
    {
     "emote": "PepoG",
@@ -514,7 +514,7 @@
     "target": "Destiny",
     "year": {
      "nick": "Trius",
-     "n": 9587
+     "n": 9590
     },
     "months": [
      {
@@ -559,7 +559,7 @@
      },
      {
       "nick": "Elmor_Fudd",
-      "n": 218
+      "n": 238
      }
     ]
    },
@@ -567,7 +567,7 @@
     "target": "MrMouton",
     "year": {
      "nick": "Trius",
-     "n": 7725
+     "n": 7727
     },
     "months": [
      {
@@ -612,15 +612,15 @@
      },
      {
       "nick": "Elmor_Fudd",
-      "n": 264
+      "n": 268
      }
     ]
    },
    {
     "target": "dan / dancantstream",
     "year": {
-     "nick": "Trius",
-     "n": 3490
+     "nick": "Umbraklaw",
+     "n": 3493
     },
     "months": [
      {
@@ -665,7 +665,7 @@
      },
      {
       "nick": "Umbraklaw",
-      "n": 102
+      "n": 125
      }
     ]
    }
@@ -675,9 +675,9 @@
   "cards": [
    {
     "emote": "DinkDonk",
-    "big": "699,242",
+    "big": "700,632",
     "title": "Destiny, tagged",
-    "text": "2,234 times a day, by 9,125 different people. He saw some of them."
+    "text": "2,238 times a day, by 9,133 different people. He saw some of them."
    }
   ],
   "duos": [
@@ -691,14 +691,14 @@
    {
     "a": "aus_bits",
     "b": "LysergicAcid",
-    "ab": 8575,
-    "ba": 8079,
+    "ab": 8598,
+    "ba": 8099,
     "note": "The most balanced relationship in chat: within 500 tags of each other all year."
    },
    {
     "a": "Proteus",
     "b": "ShawarmaFury",
-    "ab": 5617,
+    "ab": 5618,
     "ba": 5000,
     "note": "Nearly even. Healthy, by DGG standards."
    },
@@ -714,19 +714,19 @@
    {
     "a": "Trius",
     "b": "Destiny",
-    "ab": 9587,
+    "ab": 9590,
     "ba": 28
    },
    {
     "a": "Trius",
     "b": "MrMouton",
-    "ab": 7725,
+    "ab": 7727,
     "ba": 147
    },
    {
     "a": "Elmor_Fudd",
     "b": "MrMouton",
-    "ab": 6962,
+    "ab": 6966,
     "ba": 142
    },
    {
@@ -738,76 +738,76 @@
    {
     "a": "Eban",
     "b": "Destiny",
-    "ab": 5545,
+    "ab": 5591,
     "ba": 10
    },
    {
     "a": "Damon",
     "b": "Destiny",
-    "ab": 5174,
+    "ab": 5188,
     "ba": 7
    }
   ],
   "tagged": [
    {
     "name": "Destiny",
-    "value": 699242,
-    "sub": "by 9,125 people"
+    "value": 700632,
+    "sub": "by 9,133 people"
    },
    {
     "name": "MrMouton",
-    "value": 466541,
-    "sub": "by 5,525 people"
+    "value": 466717,
+    "sub": "by 5,527 people"
    },
    {
     "name": "Darius",
-    "value": 161157,
-    "sub": "by 4,168 people"
+    "value": 161282,
+    "sub": "by 4,169 people"
    },
    {
     "name": "dancantstream",
-    "value": 145826,
-    "sub": "by 4,343 people"
+    "value": 146012,
+    "sub": "by 4,347 people"
    },
    {
     "name": "PRSEK",
-    "value": 128322,
-    "sub": "by 3,275 people"
+    "value": 128380,
+    "sub": "by 3,276 people"
    },
    {
     "name": "Bing",
-    "value": 108818,
-    "sub": "by 2,938 people"
+    "value": 108964,
+    "sub": "by 2,939 people"
    },
    {
     "name": "RiN_LuX",
-    "value": 91696,
-    "sub": "by 2,834 people"
+    "value": 91899,
+    "sub": "by 2,838 people"
    },
    {
     "name": "drt0",
-    "value": 72346,
+    "value": 72455,
     "sub": "by 2,809 people"
    },
    {
     "name": "Radiant",
-    "value": 68958,
+    "value": 68971,
     "sub": "by 3,116 people"
    },
    {
     "name": "Emmia",
-    "value": 68181,
-    "sub": "by 2,516 people"
+    "value": 68300,
+    "sub": "by 2,517 people"
    },
    {
     "name": "JaydrVernanda",
-    "value": 58078,
+    "value": 58097,
     "sub": "by 2,387 people"
    },
    {
     "name": "Aristortle",
-    "value": 55602,
-    "sub": "by 2,271 people"
+    "value": 55722,
+    "sub": "by 2,272 people"
    }
   ]
  },
@@ -817,18 +817,18 @@
     "emote": "PepoG",
     "big": "55.5%",
     "title": "Aphotic, quoted",
-    "text": "More than half of everything Aphotic said started with >. 17,660 greentexts out of 31,831 messages."
+    "text": "More than half of everything Aphotic said started with >. 17,668 greentexts out of 31,848 messages."
    }
   ],
   "top": [
    {
     "name": "Aphotic",
-    "value": 17660,
+    "value": 17668,
     "sub": "55.5% of their messages"
    },
    {
     "name": "Aerith",
-    "value": 13564,
+    "value": 13568,
     "sub": "14.9% of their messages"
    },
    {
@@ -838,32 +838,32 @@
    },
    {
     "name": "Dreamgzer",
-    "value": 10090,
+    "value": 10091,
     "sub": "32.6% of their messages"
    },
    {
     "name": "ihuffduster",
-    "value": 9096,
+    "value": 9099,
     "sub": "15.5% of their messages"
    },
    {
     "name": "drug",
-    "value": 7842,
+    "value": 7878,
     "sub": "18.2% of their messages"
    },
    {
     "name": "Ivory",
-    "value": 7266,
+    "value": 7268,
     "sub": "20.6% of their messages"
    },
    {
     "name": "izuul",
-    "value": 6804,
+    "value": 6814,
     "sub": "12.3% of their messages"
    },
    {
     "name": "ChemLordTheGreat",
-    "value": 6468,
+    "value": 6470,
     "sub": "14.2% of their messages"
    },
    {
@@ -921,9 +921,9 @@
    },
    {
     "emote": "WWWWaiting",
-    "big": "11,708",
+    "big": "11,729",
     "title": "Overload, prolific",
-    "text": "Posted 11,708 links, the most of anyone, at 0.36 extra reactions each. Quantity is a quality of its own."
+    "text": "Posted 11,729 links, the most of anyone, at 0.36 extra reactions each. Quantity is a quality of its own."
    },
    {
     "emote": "OMEGALUL",
@@ -1021,27 +1021,27 @@
   "cards": [
    {
     "emote": "GIGACHAD",
-    "big": "597",
+    "big": "598",
     "title": "Destiny's justice",
-    "text": "597 IP bans, 108 meganukes, and not a single mute. Destiny doesn't mute."
+    "text": "598 IP bans, 109 meganukes, and not a single mute. Destiny doesn't mute."
    },
    {
     "emote": "MMMM",
-    "big": "1,214",
+    "big": "1,215",
     "title": "Bing's mute button",
-    "text": "1,214 mutes, the most of any mod, and worn smooth."
+    "text": "1,215 mutes, the most of any mod, and worn smooth."
    },
    {
     "emote": "peepoHug",
     "big": "414",
     "title": "RiN_LuX giveth",
-    "text": "The busiest mod (3,348 commands), and 414 of them were unbans. Also started 66 vote bans and sent 169 people to the gulag, so it evens out."
+    "text": "The busiest mod (3,353 commands), and 414 of them were unbans. Also started 67 vote bans and sent 169 people to the gulag, so it evens out."
    },
    {
     "emote": "PepoTurtle",
     "big": "0",
     "title": "crispy_waves, at peace",
-    "text": "1,300 messages, zero mod commands. The calmest mod in chat."
+    "text": "1,301 messages, zero mod commands. The calmest mod in chat."
    },
    {
     "emote": "Abathur",
@@ -1053,23 +1053,23 @@
   "mods": [
    {
     "name": "RiN_LuX",
-    "value": 3348,
+    "value": 3353,
     "sub": "!mute 590, !unban 414, !ip 409, !stalk 372, !um 293"
    },
    {
     "name": "Bing",
-    "value": 2031,
-    "sub": "!mute 1027, !ip 257, !unban 172, !nuke 74, !stalk 73"
+    "value": 2032,
+    "sub": "!mute 1028, !ip 257, !unban 172, !nuke 74, !stalk 73"
+   },
+   {
+    "name": "Destiny",
+    "value": 1109,
+    "sub": "!ipban 598, !stalk 354, !meganuke 109, !mutelinks 23, !aegis 7"
    },
    {
     "name": "MrMouton",
     "value": 1107,
     "sub": "!mute 261, !unban 186, !ip 153, !stalk 144, !voteban 97"
-   },
-   {
-    "name": "Destiny",
-    "value": 1105,
-    "sub": "!ipban 597, !stalk 352, !meganuke 108, !mutelinks 23, !aegis 7"
    },
    {
     "name": "Mitch",
@@ -1084,7 +1084,7 @@
    {
     "name": "JaydrVernanda",
     "value": 311,
-    "sub": "!mute 205, !unban 18, !duel 15, !ip 15, !stalk 13"
+    "sub": "!mute 205, !unban 18, !ip 15, !duel 15, !stalk 13"
    },
    {
     "name": "TitanOrdo",
@@ -1093,8 +1093,8 @@
    },
    {
     "name": "Fajosu",
-    "value": 128,
-    "sub": "!mute 42, !nuke 30, !unmute 25, !stalk 6, !voteban 5"
+    "value": 129,
+    "sub": "!mute 42, !nuke 30, !unmute 25, !stalk 7, !voteban 5"
    },
    {
     "name": "RightToBearArmsLOL",
@@ -1104,7 +1104,7 @@
    {
     "name": "tena",
     "value": 98,
-    "sub": "!mute 37, !ipban 18, !duel 17, !meganuke 11, !gulag 4"
+    "sub": "!mute 37, !ipban 18, !duel 17, !meganuke 11, !stalk 4"
    },
    {
     "name": "Titan",
@@ -1170,14 +1170,6 @@
    {
     "label": "ACKSHUALLY",
     "n": 5
-   },
-   {
-    "label": "FeelsWeirdMan",
-    "n": 4
-   },
-   {
-    "label": "peepoHug uhhh maybe dont say this/agree with it",
-    "n": 4
    }
   ],
   "nuked": [
@@ -1213,7 +1205,7 @@
    },
    {
     "label": "posting a link while link muting is on",
-    "n": 425
+    "n": 435
    },
    {
     "label": "posting a repeated link",
@@ -1251,120 +1243,40 @@
   "chicken",
   "rep",
   "eagle",
-  "Brandon",
-  "Bigger",
-  "Josh",
-  "Affair",
   "drug",
-  "EGO",
-  "Pizza",
-  "Hybrid",
   "fish",
   "basic",
-  "Spreading",
-  "John",
   "witness",
-  "HAM",
-  "Seek",
   "liberal",
-  "Anthony",
   "bills",
-  "Caps",
   "jon",
-  "Cake",
-  "Eventually",
-  "Bacon",
   "dish",
-  "Late",
-  "Crash",
   "device",
   "weekly",
-  "Ice",
-  "Metro",
-  "Sunset",
   "magnitude",
   "centre",
-  "Chains",
   "minimum",
   "feet",
-  "TriBute",
-  "Dragon",
-  "Predict",
-  "Wind",
-  "April",
-  "Mike",
-  "Kyle",
-  "Companion",
-  "Wallace",
   "carrier",
-  "Graham",
-  "Rest",
-  "Flames",
-  "Fixed",
-  "Food",
   "chairs",
-  "Slept",
   "wells",
-  "Rachel",
-  "North",
-  "Corporate",
   "breed",
-  "Parts",
-  "Gold",
-  "eveR",
-  "Lucky",
-  "Radar",
-  "Bible",
-  "EVOLVED",
   "morgan",
   "billy",
   "fourth",
-  "Ray",
   "expected",
   "rough",
-  "Steel",
-  "Sharp",
   "sign",
-  "Cable",
-  "Summer",
-  "Hung",
   "ann",
-  "Abused",
-  "Sacred",
-  "Civic",
-  "Shower",
-  "Scott",
   "switch",
-  "Beast",
-  "Downtown",
-  "Easy",
-  "Tension",
-  "Jeff",
-  "Familiar",
-  "Dude",
-  "Gut",
-  "Golden",
-  "Cult",
-  "James",
   "chase",
-  "Metropolitan",
   "vegas",
-  "Cloud",
-  "Neil",
-  "Sword",
   "log",
   "convert",
-  "maiL",
   "thing",
   "ghost",
-  "Solutions",
   "holy",
   "fifty",
-  "Cabin",
-  "organic",
-  "Cycle",
-  "Progress",
-  "Grey",
-  "Tyler"
+  "organic"
  ]
 }

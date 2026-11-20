@@ -112,9 +112,21 @@ tri_d = next(p for p in pairs if p["from_nick"] == "Trius" and p["to_nick"] == "
 tri_m = next(p for p in pairs if p["from_nick"] == "Trius" and p["to_nick"] == "MrMouton")
 destiny_oct = next(r for r in sm if r["target"] == "destiny" and r["month"] == "2026-10" and r["rank"] == 1)
 dan_oct = next(r for r in sm if r["target"] == "dan" and r["month"] == "2026-10" and r["rank"] == 1)
+# Trius's crowns for the year, and how close the miss was where someone else took one.
+tri_crowns = [r["target"] for r in crown_rows if r["year"]["nick"] == "Trius"]
+tri_missed = [(r, next(x for x in sm if x["target"] == t and x["month"] == "year" and x["nick"] == "Trius"))
+              for t, r in zip(TARGETS, crown_rows) if r["year"]["nick"] != "Trius"]
+said = {"Destiny": "Destiny's", "MrMouton": "MrMouton's", "dan / dancantstream": "dan's"}
+said_names = [said[t] for t in tri_crowns]
+said_list = ", ".join(said_names[:-1]) + " and " + said_names[-1] if len(said_names) > 1 else said_names[0]
+tri_lead = f"Said {said_list} names more than anyone this year"
+if tri_missed:
+    r, mine = tri_missed[0]
+    gap = r["year"]["n"] - mine["messages"]
+    tri_lead += f", and came {gap} short of {r['year']['nick']} on {said[r['target']]}"
 names_cards = [
-    {"emote": "Stare", "big": "3/3", "title": "Trius, everywhere",
-     "text": f"Said Destiny's, MrMouton's and dan's names more than anyone this year. Tagged Destiny {fmt(tri_d['tags'])} times and got {tri_d['tags_back']} back: {round(tri_d['tags'] / max(1, tri_d['tags_back']))} to 1. MrMouton answered {tri_m['tags_back']} of {fmt(tri_m['tags'])}."},
+    {"emote": "Stare", "big": f"{len(tri_crowns)}/{len(crown_rows)}", "title": "Trius, everywhere",
+     "text": f"{tri_lead}. Tagged Destiny {fmt(tri_d['tags'])} times and got {tri_d['tags_back']} back: {round(tri_d['tags'] / max(1, tri_d['tags_back']))} to 1. MrMouton answered {tri_m['tags_back']} of {fmt(tri_m['tags'])}."},
     {"emote": "PepoG", "big": fmt(destiny_oct["messages"]), "title": f"{destiny_oct['nick']}'s October",
      "text": f"Took the Destiny crown off Trius for a month with {fmt(destiny_oct['messages'])} mentions. Trius held every other month from February to September."},
     {"emote": "WWWWaiting", "big": fmt(dan_oct["messages"]), "title": f"{dan_oct['nick']} and dan",
