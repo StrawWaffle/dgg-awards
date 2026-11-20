@@ -3,8 +3,10 @@
 exports[`static and public routes nominees match the seed exactly 1`] = `
 [
   {
+    "closesAt": null,
     "description": "Which collaborator had Destiny's back the most consistently?",
     "id": "ally",
+    "opensAt": null,
     "options": [
       {
         "categoryId": "ally",
@@ -183,13 +185,17 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
         "videoId": null,
       },
     ],
+    "rankLimit": null,
+    "round": null,
     "title": "Ally of the Year",
     "usesDefaultStyle": true,
     "votingStyle": "single",
   },
   {
+    "closesAt": null,
     "description": "Most entertaining rival of the stream.",
     "id": "antagonist",
+    "opensAt": null,
     "options": [
       {
         "categoryId": "antagonist",
@@ -324,13 +330,17 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
         "videoId": null,
       },
     ],
+    "rankLimit": null,
+    "round": null,
     "title": "Antagonist of the Year",
     "usesDefaultStyle": true,
     "votingStyle": "single",
   },
   {
+    "closesAt": null,
     "description": "The NoBullshit Award. Which orbiter routinely and continuously lowered everyone's IQ?",
     "id": "brainlet",
+    "opensAt": null,
     "options": [
       {
         "categoryId": "brainlet",
@@ -509,13 +519,17 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
         "videoId": null,
       },
     ],
+    "rankLimit": null,
+    "round": null,
     "title": "Brainlet of the Year",
     "usesDefaultStyle": true,
     "votingStyle": "single",
   },
   {
+    "closesAt": null,
     "description": "Friendliest co-stream partner.",
     "id": "buddy",
+    "opensAt": null,
     "options": [
       {
         "categoryId": "buddy",
@@ -650,13 +664,17 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
         "videoId": null,
       },
     ],
+    "rankLimit": null,
+    "round": null,
     "title": "Buddy of the Year",
     "usesDefaultStyle": true,
     "votingStyle": "single",
   },
   {
+    "closesAt": null,
     "description": "",
     "id": "community",
+    "opensAt": null,
     "options": [
       {
         "categoryId": "community",
@@ -769,13 +787,17 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
         "videoId": null,
       },
     ],
+    "rankLimit": null,
+    "round": null,
     "title": "Community Member of the Year",
     "usesDefaultStyle": true,
     "votingStyle": "single",
   },
   {
+    "closesAt": null,
     "description": "Who deserves the most blue chats?",
     "id": "dgger",
+    "opensAt": null,
     "options": [
       {
         "categoryId": "dgger",
@@ -1020,13 +1042,17 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
         "videoId": null,
       },
     ],
+    "rankLimit": null,
+    "round": null,
     "title": "DGG Chatter of the Year",
     "usesDefaultStyle": true,
     "votingStyle": "single",
   },
   {
+    "closesAt": null,
     "description": "Behind-the-scenes or on-stream member who kept things running.",
     "id": "employee",
+    "opensAt": null,
     "options": [
       {
         "categoryId": "employee",
@@ -1205,13 +1231,17 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
         "videoId": null,
       },
     ],
+    "rankLimit": null,
+    "round": null,
     "title": "Employee of the Year",
     "usesDefaultStyle": true,
     "votingStyle": "single",
   },
   {
+    "closesAt": null,
     "description": "Who did we hate that we loved?",
     "id": "frenemy",
+    "opensAt": null,
     "options": [
       {
         "categoryId": "frenemy",
@@ -1390,13 +1420,17 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
         "videoId": null,
       },
     ],
+    "rankLimit": null,
+    "round": null,
     "title": "Frenemy of the Year",
     "usesDefaultStyle": true,
     "votingStyle": "single",
   },
   {
+    "closesAt": null,
     "description": "Mental Health Awareness Award",
     "id": "neurodivergent",
+    "opensAt": null,
     "options": [
       {
         "categoryId": "neurodivergent",
@@ -1553,13 +1587,17 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
         "videoId": null,
       },
     ],
+    "rankLimit": null,
+    "round": null,
     "title": "Neurodivergent of the Year",
     "usesDefaultStyle": true,
     "votingStyle": "single",
   },
   {
+    "closesAt": null,
     "description": "Best long-form conversation or interview.",
     "id": "conversation",
+    "opensAt": null,
     "options": [
       {
         "categoryId": "conversation",
@@ -1716,13 +1754,17 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
         "videoId": "yt:aPV3hhyIVvQ",
       },
     ],
+    "rankLimit": null,
+    "round": null,
     "title": "Conversation of the Year",
     "usesDefaultStyle": true,
     "votingStyle": "single",
   },
   {
+    "closesAt": null,
     "description": "Cutest moment from this year.",
     "id": "cutestiny",
+    "opensAt": null,
     "options": [
       {
         "categoryId": "cutestiny",
@@ -1813,13 +1855,17 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
         "videoId": "fagqgh",
       },
     ],
+    "rankLimit": null,
+    "round": null,
     "title": "Cutestiny of the Year",
     "usesDefaultStyle": true,
     "votingStyle": "single",
   },
   {
+    "closesAt": null,
     "description": "The dankest meme moment from this year.",
     "id": "dankmemes",
+    "opensAt": null,
     "options": [
       {
         "categoryId": "dankmemes",
@@ -1954,13 +2000,17 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
         "videoId": "4geqkh",
       },
     ],
+    "rankLimit": null,
+    "round": null,
     "title": "Dankmemes of the Year",
     "usesDefaultStyle": true,
     "votingStyle": "single",
   },
   {
+    "closesAt": null,
     "description": "Best debate or panel of the year.",
     "id": "debate",
+    "opensAt": null,
     "options": [
       {
         "categoryId": "debate",
@@ -2205,13 +2255,17 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
         "videoId": "yt:-6S629HRPS8",
       },
     ],
+    "rankLimit": null,
+    "round": null,
     "title": "Debate of the Year",
     "usesDefaultStyle": true,
     "votingStyle": "single",
   },
   {
+    "closesAt": null,
     "description": "The most temmiedank moment from this year.",
     "id": "derp",
+    "opensAt": null,
     "options": [
       {
         "categoryId": "derp",
@@ -2302,13 +2356,17 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
         "videoId": "g1t9ei",
       },
     ],
+    "rankLimit": null,
+    "round": null,
     "title": "Derpstiny of the Year",
     "usesDefaultStyle": true,
     "votingStyle": "single",
   },
   {
+    "closesAt": null,
     "description": "Biggest arc, or saga from the community.",
     "id": "drama",
+    "opensAt": null,
     "options": [
       {
         "categoryId": "drama",
@@ -2465,13 +2523,17 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
         "videoId": null,
       },
     ],
+    "rankLimit": null,
+    "round": null,
     "title": "Drama of the Year",
     "usesDefaultStyle": true,
     "votingStyle": "single",
   },
   {
+    "closesAt": null,
     "description": "The most EPIC moment of the stream.",
     "id": "godstiny",
+    "opensAt": null,
     "options": [
       {
         "categoryId": "godstiny",
@@ -2584,13 +2646,17 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
         "videoId": "t35qc8",
       },
     ],
+    "rankLimit": null,
+    "round": null,
     "title": "Godstiny of the Year",
     "usesDefaultStyle": true,
     "votingStyle": "single",
   },
   {
+    "closesAt": null,
     "description": "The funniest LOL moment of the stream.",
     "id": "omegalul",
+    "opensAt": null,
     "options": [
       {
         "categoryId": "omegalul",
@@ -2747,13 +2813,17 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
         "videoId": "dggfyl",
       },
     ],
+    "rankLimit": null,
+    "round": null,
     "title": "Omegalul of the Year",
     "usesDefaultStyle": true,
     "votingStyle": "single",
   },
   {
+    "closesAt": null,
     "description": "The most anyone ever got mad.",
     "id": "ree",
+    "opensAt": null,
     "options": [
       {
         "categoryId": "ree",
@@ -2866,13 +2936,17 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
         "videoId": "zlcnog",
       },
     ],
+    "rankLimit": null,
+    "round": null,
     "title": "REE of the Year",
     "usesDefaultStyle": true,
     "votingStyle": "single",
   },
   {
+    "closesAt": null,
     "description": "The absolute mess you could not look away from.",
     "id": "shitshow",
+    "opensAt": null,
     "options": [
       {
         "categoryId": "shitshow",
@@ -3095,13 +3169,17 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
         "videoId": "wa5yh3",
       },
     ],
+    "rankLimit": null,
+    "round": null,
     "title": "Shitshow of the Year",
     "usesDefaultStyle": true,
     "votingStyle": "single",
   },
   {
+    "closesAt": null,
     "description": "Chat emote that defined 2025.",
     "id": "emote",
+    "opensAt": null,
     "options": [
       {
         "categoryId": "emote",
@@ -3720,13 +3798,17 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
         "videoId": null,
       },
     ],
+    "rankLimit": null,
+    "round": null,
     "title": "New Emote of the Year",
     "usesDefaultStyle": true,
     "votingStyle": "single",
   },
   {
+    "closesAt": null,
     "description": "Yikes... why post this.",
     "id": "yikestiny",
+    "opensAt": null,
     "options": [
       {
         "categoryId": "yikestiny",
@@ -3839,13 +3921,17 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
         "videoId": "8isj96",
       },
     ],
+    "rankLimit": null,
+    "round": null,
     "title": "Yikestiny of the Year",
     "usesDefaultStyle": true,
     "votingStyle": "single",
   },
   {
+    "closesAt": null,
     "description": "One-liner, or chat meme of the year.",
     "id": "meme-phrase",
+    "opensAt": null,
     "options": [
       {
         "categoryId": "meme-phrase",
@@ -4024,6 +4110,8 @@ exports[`static and public routes nominees match the seed exactly 1`] = `
         "videoId": "1us5ip",
       },
     ],
+    "rankLimit": null,
+    "round": null,
     "title": "Meme Phrase of the Year",
     "usesDefaultStyle": true,
     "votingStyle": "single",
