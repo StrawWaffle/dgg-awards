@@ -95,6 +95,14 @@ The goal is the 2026 awards. Last year's nominees (`src/data.ts`) are sample dat
   - The cover line "what N of you did with M million messages" is worked out from the numbers until someone rewrites it.
   - Tested: typecheck, 130 unit tests, 52 API tests, and a Playwright run (`tests/visual/out/feedback/check.mjs` in the main checkout, not in git): edit, add, remove, save, reload, the story, undo, a bad save refused (400) and a signed-out one (401), and the clip cards (play, pick). No API test covers the save yet.
 
+**rinlux's second round of feedback (2026-11-20).** Done (quick wins, 2026-11-20):
+- The vote type is the bright chip ("Ranked: rank your top 3", "Ranked: rank as many as you like", "Pick one", "Top 10: points for your favourites"); the "N nominees" chip is gone, and "Voted" is a plain chip.
+- The ranked tutorial shows all three rounds at once, with dividers, to scroll through ("Rank them again", "Got it").
+- A clip card's "Pick this" is tinted (`.cozy-btn.pick` in `lab.css`).
+- The year in chat's "most reacted to" messages keep their links as sent, as live links (`linkify` in `ChatReviewPage.tsx`), instead of "[link]"; Discord images keep "[self-destructed Discord image]", and links found dead get a note (`DEAD` in `scripts/build-chat-review.py`: the Streamable clip, #17, whose caption now says it was taken down). The separate "label ↗" after the caption is gone.
+- Big screen: after the announcement video (ended or closed), it moves on to the winner by itself. Going back from the winner to Results shows the board finished at once, for every award.
+Waiting on answers from rinlux (StrawWaffle has asked): votes saved automatically with a review on Finish (locked on submit, or changeable until close?), Bonus memes and Other clips not voted on (and DuckerZ?), who gets a results download, and whether the year in chat's tag numbers may change with case-exact names. Also to do once answered: previews per round, profile cards in the group stage, a simple mode for the big screen with the runoff playing by itself, chatters hopping at random instead of together, and GIFs stopping during clips.
+
 **Still open:**
 - ~~How DGGer's groups and wildcards should vote~~: answered 2026-11-20, see "DGGer in rounds".
 - The test containers had all stopped (Docker restarted around 2026-11-15); started again 2026-11-19. If they're down, `docker start` them by name.

@@ -979,14 +979,11 @@ export function Stage({
   const closeClip = () => {
     const clip = playingRef.current;
     if (!clip) return;
-    // The announcement is over (or closed): the board shows finished at once,
-    // as it does coming back from the winner.
-    if (announcing.current?.clip === clip) {
-      setTarget(announcing.current.rows);
-      setInstant(true);
-      setRun((r) => r + 1);
-    }
+    // The announcement is over (or closed): on to the winner (rinlux). The
+    // board is still there, finished, going back from the winner.
+    const announced = announcing.current?.clip === clip;
     announcing.current = null;
+    if (announced) setTimeout(() => toWinner.current(), 0);
     playingRef.current = null;
     setRaising(clip);
     setPlaying(null);
@@ -1025,17 +1022,20 @@ export function Stage({
   const sceneAt = SCENES.findIndex((x) => x.id === scene);
 
   /** Moves between scenes; past the winner is the next award's title. */
+  /** After an announcement: the winner of the award on show. Read from a ref, so it's the latest. */
+  const toWinner = useRef(() => {});
+  toWinner.current = () => goTo(awardIndex, "winner");
   const goTo = (index: number, next: Scene, backwards = false) => {
     if (!show?.length) return;
     const i = (index + show.length) % show.length;
     announcing.current = null;
     closeClip();
-    setInstant(false);
+    // Coming back from the winner, the board is shown finished, all at once.
+    setInstant(backwards);
     endCheer();
     setAwardIndex(i);
     setScene(next);
     if (next === "results") {
-      // Coming back from the winner, the board is shown finished.
       setTarget(backwards ? boardOf(show[i]!).award.results.length : 0);
       setRevealed(backwards);
       setBoardDone(backwards);

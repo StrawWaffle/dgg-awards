@@ -382,9 +382,17 @@ function Ballot({
                 <span className="cozy-chip coral">
                   Award {step + 1} of {awards.length}
                 </span>
-                <span className="cozy-chip">{award.points ? "Your top 10" : award.ranked ? (award.rankLimit ? `Rank your top ${award.rankLimit}` : "Rank as many as you like") : "Pick one"}</span>
-                <span className="cozy-chip green">{award.nominees.length} nominees</span>
-                {mine && <span className="cozy-chip green">Voted</span>}
+                {/* How this award is voted, bright, since it changes from award to award (rinlux). */}
+                <span className="cozy-chip green">
+                  {award.points
+                    ? "Top 10: points for your favourites"
+                    : award.ranked
+                      ? award.rankLimit
+                        ? `Ranked: rank your top ${award.rankLimit}`
+                        : "Ranked: rank as many as you like"
+                      : "Pick one"}
+                </span>
+                {mine && <span className="cozy-chip">Voted</span>}
               </div>
               <div>
                 <h2 className="text-3xl font-black">{award.title}</h2>
@@ -628,7 +636,7 @@ function NomineeCard({
       {!mine && (
         <button
           type="button"
-          className={`cozy-btn mt-2 justify-center ${on ? "primary" : ""}`}
+          className={`cozy-btn mt-2 justify-center ${on ? "primary" : "pick"}`}
           onClick={onChoose}
           aria-pressed={on}
         >

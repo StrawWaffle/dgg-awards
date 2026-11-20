@@ -176,6 +176,14 @@
 .cozy-btn.primary:active:not(:disabled) {
   box-shadow: 0 1px 0 var(--primary-shadow);
 }
+/* A clip card's "Pick this": tinted, so it stands out from the cream card (rinlux). */
+.cozy-btn.pick {
+  background: var(--highlight);
+  border-color: color-mix(in oklab, var(--highlight), var(--text) 25%);
+}
+.cozy-btn.pick:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--highlight), var(--text) 10%);
+}
 .cozy-btn.round {
   padding: 0.45rem;
   justify-content: center;

@@ -53,10 +53,9 @@ function rounds(ranking: string[]): Round[] {
 
 export function RankedTutorial({ onDone }: { onDone: () => void }) {
   const [ranking, setRanking] = useState<string[]>([]);
-  const [round, setRound] = useState<number | null>(null);
+  const [counted, setCounted] = useState(false);
   const toggle = (id: string) => setRanking((r) => (r.includes(id) ? r.filter((x) => x !== id) : [...r, id]));
   const all = ranking.length >= 2 ? rounds(ranking) : [];
-  const shown = round !== null ? all[round] : undefined;
 
   return (
     <div className="space-y-5">
@@ -73,7 +72,7 @@ export function RankedTutorial({ onDone }: { onDone: () => void }) {
         </p>
       </div>
 
-      {round === null ? (
+      {!counted ? (
         <>
           <p className="font-black">Try it: rank the emotes for "Emote of the Year (practice)". Click them in order, your favourite first.</p>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -108,7 +107,7 @@ export function RankedTutorial({ onDone }: { onDone: () => void }) {
             })}
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <button type="button" className="cozy-btn primary" disabled={ranking.length < 2} onClick={() => setRound(0)}>
+            <button type="button" className="cozy-btn primary" disabled={ranking.length < 2} onClick={() => setCounted(true)}>
               Count the votes
             </button>
             <span className="text-sm font-semibold" style={muted}>
@@ -117,65 +116,62 @@ export function RankedTutorial({ onDone }: { onDone: () => void }) {
           </div>
         </>
       ) : (
-        shown && (
-          <>
-            <div>
-              <p className="font-black">
-                Round {round + 1} of {all.length}: 100 made-up voters
-              </p>
-              <p className="mt-1 max-w-3xl font-semibold" style={muted}>
-                {shown.note}
-              </p>
-            </div>
-            <ol className="max-w-2xl space-y-2">
-              {Object.entries(shown.counts).map(([id, count]) => {
-                const yours = ranking.indexOf(id);
-                return (
-                  <li key={id}>
-                    <div className="flex items-center justify-between gap-3 text-sm font-bold">
-                      <span className="flex items-center gap-2">
-                        <Emote name={named(id).emote} size={0.5} title="" />
-                        {named(id).title}
-                        {yours >= 0 && <span className="cozy-chip">your #{yours + 1}</span>}
-                        {shown.out === id && <span className="cozy-chip coral">out</span>}
-                        {shown.winner === id && <span className="cozy-chip green">wins</span>}
-                      </span>
-                      <span className="hand text-lg tabular-nums">{count}</span>
-                    </div>
-                    <div className="relative mt-0.5 h-3 overflow-hidden rounded-full" style={{ background: "var(--cream)" }}>
-                      <div
-                        className="h-full rounded-full transition-[width] duration-700 ease-out"
-                        style={{
-                          width: `${count}%`,
-                          background: shown.winner === id ? "var(--primary)" : shown.out === id ? "var(--coral)" : "var(--panel-border)",
-                        }}
-                      />
-                      {/* Half of the votes: past this line wins. */}
-                      <span className="absolute top-0 bottom-0 left-1/2 w-0.5" style={{ background: "var(--text)" }} aria-hidden />
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
-            <p className="text-xs font-semibold" style={muted}>
-              The line is half the votes.
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <button type="button" className="cozy-btn" onClick={() => setRound(round === 0 ? null : round - 1)}>
-                Back
-              </button>
-              {round < all.length - 1 ? (
-                <button type="button" className="cozy-btn primary" onClick={() => setRound(round + 1)}>
-                  Next round
-                </button>
-              ) : (
-                <button type="button" className="cozy-btn primary" onClick={onDone}>
-                  Got it, on to the vote
-                </button>
-              )}
-            </div>
-          </>
-        )
+        <>
+          {/* Every round at once, one under another (rinlux: scroll, not click). */}
+          {all.map((shown, round) => (
+            <section key={round} className="space-y-3 border-t-2 border-dashed pt-5" style={{ borderColor: "var(--panel-border)" }}>
+              <div>
+                <p className="font-black">
+                  Round {round + 1} of {all.length}: 100 made-up voters
+                </p>
+                <p className="mt-1 max-w-3xl font-semibold" style={muted}>
+                  {shown.note}
+                </p>
+              </div>
+              <ol className="max-w-2xl space-y-2">
+                {Object.entries(shown.counts).map(([id, count]) => {
+                  const yours = ranking.indexOf(id);
+                  return (
+                    <li key={id}>
+                      <div className="flex items-center justify-between gap-3 text-sm font-bold">
+                        <span className="flex items-center gap-2">
+                          <Emote name={named(id).emote} size={0.5} title="" />
+                          {named(id).title}
+                          {yours >= 0 && <span className="cozy-chip">your #{yours + 1}</span>}
+                          {shown.out === id && <span className="cozy-chip coral">out</span>}
+                          {shown.winner === id && <span className="cozy-chip green">wins</span>}
+                        </span>
+                        <span className="hand text-lg tabular-nums">{count}</span>
+                      </div>
+                      <div className="relative mt-0.5 h-3 overflow-hidden rounded-full" style={{ background: "var(--cream)" }}>
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${count}%`,
+                            background: shown.winner === id ? "var(--primary)" : shown.out === id ? "var(--coral)" : "var(--panel-border)",
+                          }}
+                        />
+                        {/* Half of the votes: past this line wins. */}
+                        <span className="absolute top-0 bottom-0 left-1/2 w-0.5" style={{ background: "var(--text)" }} aria-hidden />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            </section>
+          ))}
+          <p className="text-xs font-semibold" style={muted}>
+            The line on each bar is half the votes.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <button type="button" className="cozy-btn" onClick={() => setCounted(false)}>
+              Rank them again
+            </button>
+            <button type="button" className="cozy-btn primary" onClick={onDone}>
+              Got it, on to the vote
+            </button>
+          </div>
+        </>
       )}
 
       <button type="button" className="text-sm font-bold underline" style={muted} onClick={onDone}>

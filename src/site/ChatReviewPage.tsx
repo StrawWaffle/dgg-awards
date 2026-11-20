@@ -11,6 +11,19 @@ export type Card = { emote: string; big: string; title: string; text: string };
 type Bar = { name: string; value: number; sub?: string; emote?: string };
 
 export const fmt = (n: number) => n.toLocaleString("en-US");
+
+/** A chat message with its web addresses as links. */
+export function linkify(text: string) {
+  return text.split(/(https?:\/\/\S+)/).map((part, i) =>
+    i % 2 ? (
+      <a key={i} className="underline" href={part} target="_blank" rel="noopener noreferrer">
+        {part}
+      </a>
+    ) : (
+      part
+    ),
+  );
+}
 export const day = (iso: string, year = false) =>
   new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "long", ...(year ? { year: "numeric" } : {}), timeZone: "UTC" });
 export const monthName = (m: string) => new Date(`${m}-15T12:00:00Z`).toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" });
@@ -381,24 +394,9 @@ function ChatReview({ data, preview, storyHref, onStory }: { data: ReviewDoc; pr
                     <T at={["links", "top", i, "reactions"]} format={fmt} /> <C k="links.reactions" d="reactions" />
                   </span>
                 </div>
-                <T at={["links", "top", i, "text"]} as="p" className="mt-1 block font-semibold break-words" />
-                <p className="mt-1 text-sm font-semibold" style={{ color: "var(--muted)" }}>
-                  <T at={["links", "top", i, "note"]} />
-                  {l.link && !editing && (
-                    <>
-                      {" "}
-                      <a className="underline" href={l.link.url} target="_blank" rel="noopener noreferrer">
-                        {l.link.label} ↗
-                      </a>
-                    </>
-                  )}
-                </p>
-                {l.link && editing && (
-                  <p className="mt-1 text-xs font-semibold break-all" style={{ color: "var(--muted)" }}>
-                    Link: <T at={["links", "top", i, "link", "label"]} placeholder="what it is" /> at{" "}
-                    <T at={["links", "top", i, "link", "url"]} placeholder="https://…" />
-                  </p>
-                )}
+                {/* The message as it was sent, its links live (rinlux). */}
+                <T at={["links", "top", i, "text"]} format={linkify} as="p" className="mt-1 block font-semibold break-words" />
+                <T at={["links", "top", i, "note"]} as="p" className="mt-1 block text-sm font-semibold" style={{ color: "var(--muted)" }} />
               </li>
             ))}
           </ul>

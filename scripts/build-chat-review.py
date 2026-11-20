@@ -206,27 +206,32 @@ PICKED = {
     1: "A Discord image. It self-destructed within a day, but 108 people saw it and none of them will say what it was.",
     4: "Destiny, laughing at a screenshot that has since self-destructed. Chat laughed with him, 79 times.",
     14: "A UK visa application form. No further comment from chat, just 55 reactions.",
-    17: "Four letters, spaced out. The clip still plays.",
+    17: "Four letters, spaced out. The clip has since been taken down.",
     24: "Destiny shares his own ban appeal from a year ago.",
     3: "Relayed from DimitriMG1, who was too scared to send it to Tiny themselves.",
     7: "A timestamped Bulwark episode. Chat, briefly, listened to a podcast.",
 }
+# Links checked by hand (2026-11-20) and found gone: they get a note instead.
+DEAD = {"https://streamable.com/xu64u0": "[deleted Streamable clip]"}
 top_links = []
 for r in d["link_reactions"]:
     if r["rank"] not in PICKED:
         continue
     words, kept, link = [], None, None
     for w in r["message"].split():
-        if w.startswith("http"):
+        if w in DEAD:
+            words.append(DEAD[w])
+        elif w.startswith("http"):
             lab = label_for(w)
             if lab and link is None:
                 link = {"url": w, "label": lab}
-            words.append("[link]" if lab else "[self-destructed Discord image]")
+            # As sent, link and all (rinlux); only Discord images, which expire, get a note.
+            words.append(w if lab else "[self-destructed Discord image]")
         else:
             words.append(w)
     text = " ".join(words)
-    if len(text) > 160:
-        text = text[:157] + "…"
+    if len(text) > 300:
+        text = text[:297] + "…"
     top_links.append({"rank": r["rank"], "who": r["nick"], "reactions": r["reactions"], "people": r["people"],
                       "date": r["ts"][:10], "text": text, "link": link, "note": PICKED[r["rank"]]})
 
