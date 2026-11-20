@@ -199,7 +199,24 @@ function Ballot({
   const [layer, fire] = useBursts();
   // Start at the first award not voted on yet.
   const [step, setStep] = useState(() => Math.max(0, awards.findIndex((a) => !voted[a.id])));
-  const [picks, setPicks] = useState<Record<string, string[]>>({});
+  // Picks not saved yet, kept in this browser until they are (rinlux: saved
+  // when you move on, then final), so a closed tab or signing in loses nothing.
+  const picksKey = `${preview ? "preview" : "vote"}.picks`;
+  const [picks, setPicksState] = useState<Record<string, string[]>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(picksKey) ?? "{}");
+    } catch {
+      return {};
+    }
+  });
+  const setPicks = (next: Record<string, string[]>) => {
+    setPicksState(next);
+    try {
+      localStorage.setItem(picksKey, JSON.stringify(next));
+    } catch {}
+  };
+  // Saved already: nothing pending for it.
+  const pending = awards.filter((a) => !voted[a.id] && !a.points && (picks[a.id]?.length ?? 0) > 0);
   const [casting, setCasting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [watching, setWatching] = useState<Clip | null>(null);
@@ -262,10 +279,75 @@ function Ballot({
     if (r.top < box.top || r.bottom > box.bottom) el.scrollTo({ top: el.scrollTop + (r.top - box.top) - box.height / 3, behavior: "smooth" });
   }, [step, done]);
 
-  const go = (i: number) => {
+  const moveTo = (i: number) => {
     setError(null);
     setStep(i);
     box.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+  };
+  /**
+   * Save one award's picks. In a preview nothing is sent, but it counts as
+   * saved for this visit. Throws the reason it couldn't be saved.
+   */
+  const save = async (a: Award, ids: string[]) => {
+    if (!preview) {
+      const res = await fetch("/api/vote", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(a.ranked ? { category_id: a.id, ranking: ids } : { category_id: a.id, nominee_id: ids[0] }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(
+          // The server answers 401 both when signed out and when voting is closed.
+          res.status === 401
+            ? me
+              ? "Voting isn't open right now, or your sign-in has expired: reload the page."
+              : "Sign in to vote."
+            : text || "Couldn't save your vote. Try again.",
+        );
+      }
+    }
+    setVoted((v) => ({ ...v, [a.id]: ids }));
+  };
+  /** Leave for award `i` (or Finish): this award's picks are saved on the way, unless signed out. */
+  const go = async (i: number, e?: React.MouseEvent) => {
+    if (i === step) return;
+    const leaving = award && !mine && !award.points ? (picks[award.id] ?? []) : [];
+    // Where the click was, read now: after the save the event's target is gone.
+    const at = e ? originOf(e, box.current) : null;
+    if (leaving.length && (me || preview)) {
+      setCasting(true);
+      try {
+        await save(award!, leaving);
+        const { [award!.id]: _, ...rest } = picks;
+        setPicks(rest);
+        if (at) fire("CHEERSTINY", ...at, 6);
+      } catch (err) {
+        setError((err as Error).message);
+        return;
+      } finally {
+        setCasting(false);
+      }
+    }
+    moveTo(i);
+  };
+  /** Finish: save every pick not saved yet. */
+  const saveAll = async () => {
+    setCasting(true);
+    setError(null);
+    let rest = { ...picks };
+    try {
+      for (const a of pending) {
+        await save(a, picks[a.id]!);
+        const { [a.id]: _, ...left } = rest;
+        rest = left;
+      }
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setPicks(rest);
+      setCasting(false);
+    }
   };
   const choose = (e: React.MouseEvent, id: string) => {
     if (!award || mine) return;
@@ -318,7 +400,7 @@ function Ballot({
       }
       fire("CHEERSTINY", x, y, 6);
       setTimeout(() => fire("Klappa", x + 60, y, 6), 200);
-      setTimeout(() => go(step + 1), 900);
+      setTimeout(() => moveTo(step + 1), 900);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -509,35 +591,32 @@ function Ballot({
               )}
 
               <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  className="cozy-btn"
-                  onClick={(e) => {
-                    if (!mine) fire("Skip", ...originOf(e, box.current), 3);
-                    go(step + 1);
-                  }}
-                >
-                  {mine ? "Next award" : "Skip for now"}
-                </button>
                 {!mine && award.ranked && chosen.length > 0 && (
                   <button type="button" className="cozy-btn" onClick={() => setPicks({ ...picks, [award.id]: [] })}>
                     Clear
                   </button>
                 )}
-                {!mine &&
-                  !award.points &&
-                  (me || preview ? (
-                    <button type="button" className="cozy-btn primary" disabled={chosen.length === 0 || casting} onClick={cast}>
-                      {casting ? "Casting…" : award.ranked && chosen.length > 1 ? `Cast my ranking (${chosen.length})` : "Cast my vote"}
-                    </button>
-                  ) : (
-                    <a className="cozy-btn primary" href="/signin?next=/vote">
-                      Sign in to vote
-                    </a>
-                  ))}
+                <button
+                  type="button"
+                  className={`cozy-btn ${mine || chosen.length > 0 ? "primary" : ""}`}
+                  disabled={casting}
+                  onClick={(e) => {
+                    if (!mine && chosen.length === 0) fire("Skip", ...originOf(e, box.current), 3);
+                    void go(step + 1, e);
+                  }}
+                >
+                  {casting ? "Saving…" : mine || chosen.length > 0 ? (step + 1 < awards.length ? "Next award →" : "Finish →") : "Skip for now"}
+                </button>
+                {!mine && !award.points && !me && !preview && (
+                  <a className="cozy-btn primary" href="/signin?next=/vote">
+                    Sign in to vote
+                  </a>
+                )}
                 {!mine && !award.points && (
                   <span className="text-sm font-semibold" style={{ color: "var(--muted)" }}>
-                    Votes are final.
+                    {me || preview
+                      ? "Your picks are saved when you move on. After that they can't be changed."
+                      : "Your picks are kept in this browser until you sign in."}
                   </span>
                 )}
               </div>
@@ -546,32 +625,66 @@ function Ballot({
           )}
 
           {done && (
-            <div className="flex min-h-[22rem] flex-col items-center justify-center gap-4 text-center">
-              <div className="flex gap-4">
-                <Emote name="CHEERSTINY" size={1.6} />
-                <Emote name="Klappa" size={1.6} />
-                <Emote name="widepeepoHappy" size={1.6} />
-              </div>
-              {votedCount === awards.length ? (
-                <>
-                  <h2 className="text-3xl font-black">Thanks for voting!</h2>
-                  <p className="font-semibold" style={{ color: "var(--muted)" }}>
-                    You voted in all {awards.length} awards. The winners are revealed on stream.
-                  </p>
-                </>
-              ) : (
-                <>
+            <div className="space-y-5">
+              <div className="flex flex-wrap items-center gap-4">
+                <Emote name={votedCount === awards.length ? "CHEERSTINY" : "PepoG"} size={1.4} />
+                <div>
                   <h2 className="text-3xl font-black">
-                    {votedCount === 0 ? "Nothing voted yet" : `You voted in ${votedCount} of ${awards.length} awards`}
+                    {votedCount === awards.length ? "Thanks for voting!" : `You've voted in ${votedCount} of ${awards.length}`}
                   </h2>
                   <p className="font-semibold" style={{ color: "var(--muted)" }}>
-                    The rest are still open until voting closes.
+                    {votedCount === awards.length
+                      ? "Every award is in. The winners are revealed on stream."
+                      : "Here's your ballot. Anything skipped is still open until voting closes: click it to fill it in."}
                   </p>
-                  <button type="button" className="cozy-btn primary" onClick={() => go(awards.findIndex((a) => !voted[a.id]))}>
-                    Go to the next open award
-                  </button>
-                </>
+                </div>
+              </div>
+              {/* Your ballot: what's saved, what's picked but not saved yet, and what's skipped. */}
+              <ol className="space-y-1.5">
+                {awards.map((a, i) => {
+                  const saved = voted[a.id];
+                  const picked = !saved ? picks[a.id] : undefined;
+                  const names = (ids: string[]) =>
+                    ids.map((id, n) => `${a.ranked ? `${n + 1}. ` : ""}${a.nominees.find((x) => x.id === id)?.title ?? id}`).join(a.ranked ? ", " : " · ");
+                  return (
+                    <li key={a.id}>
+                      <button
+                        type="button"
+                        onClick={() => void go(i)}
+                        className="cozy-row grid w-full grid-cols-[1fr_auto] items-center gap-3 rounded-2xl px-3 py-2 text-left"
+                        style={{ background: saved ? "var(--cream)" : picked?.length ? "var(--highlight)" : undefined }}
+                      >
+                        <span className="min-w-0">
+                          <span className="block font-extrabold">{a.title}</span>
+                          <span className="block truncate text-sm font-semibold" style={{ color: "var(--muted)" }}>
+                            {saved ? names(saved) : picked?.length ? names(picked) : a.points ? "Your top 10 isn't cast yet" : "Skipped"}
+                          </span>
+                        </span>
+                        <span className={`cozy-chip ${saved ? "green" : picked?.length ? "coral" : ""}`}>
+                          {saved ? "Saved" : picked?.length ? "Not saved yet" : "Fill in"}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+              {pending.length > 0 && (
+                <div className="flex flex-wrap items-center gap-3">
+                  {me || preview ? (
+                    <button type="button" className="cozy-btn primary" disabled={casting} onClick={() => void saveAll()}>
+                      {casting ? "Saving…" : `Submit all (${pending.length})`}
+                    </button>
+                  ) : (
+                    <a className="cozy-btn primary" href="/signin?next=/vote">
+                      Sign in to submit your picks
+                    </a>
+                  )}
+                  <span className="text-sm font-semibold" style={{ color: "var(--muted)" }}>
+                    Once submitted, votes can't be changed.
+                  </span>
+                </div>
               )}
+              {error && <p className="font-semibold" style={{ color: "var(--coral)" }}>{error}</p>}
             </div>
           )}
         </section>
