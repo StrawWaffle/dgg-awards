@@ -143,9 +143,14 @@ function Upload({ year, data }: { year: number; data: ClipFinder | null }) {
   );
 }
 
+/** How far before the moment to start: the default from the file, and a few more. */
+const befores = [10, 20, 30, 60, 120];
+const beforeLabel = (b: number) => (b < 60 ? `${b} s` : `${b / 60} min`);
+
 function Moment({ spike: s, vod, lead }: { spike: Spike; vod: Vod | undefined; lead: number }) {
-  const [playing, setPlaying] = useState(false);
-  const start = Math.max(0, s.offset - lead);
+  // null: not playing. Otherwise seconds before the spike's busiest 10 s.
+  const [before, setBefore] = useState<number | null>(null);
+  const start = Math.max(0, s.offset - (before ?? lead));
   const topic = vod?.topics.filter((t) => t[0] <= s.offset).at(-1);
   const top = s.emotes[0];
   const drowned = top && top[0] !== s.emote && top[1] > s.users;
@@ -176,7 +181,13 @@ function Moment({ spike: s, vod, lead }: { spike: Spike; vod: Vod | undefined; l
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2 pl-9">
-        <Button onClick={() => setPlaying(!playing)}>{playing ? "Close" : `Play from ${clock(start)}`}</Button>
+        <span className="text-xs text-neutral-500">Play from before it:</span>
+        {[...new Set([...befores, lead])].sort((a, b) => a - b).map((b) => (
+          <Button key={b} variant={before === b ? "primary" : "default"} onClick={() => setBefore(b)} title={`From ${clock(s.offset - b)}`}>
+            {beforeLabel(b)}
+          </Button>
+        ))}
+        {before !== null && <Button onClick={() => setBefore(null)}>Close</Button>}
         <a className="underline" href={`https://youtu.be/${s.vod}?t=${start}`} target="_blank" rel="noopener">
           YouTube ↗
         </a>
@@ -185,10 +196,11 @@ function Moment({ spike: s, vod, lead }: { spike: Spike; vod: Vod | undefined; l
         </a>
         {vod && !vod.pinned && <span className="text-xs text-amber-700">Start time to the minute only</span>}
       </div>
-      {playing && (
+      {before !== null && (
         <div className="pl-9">
           <iframe
             className="aspect-video w-full max-w-2xl rounded border border-neutral-200"
+            key={start}
             src={`https://www.youtube-nocookie.com/embed/${s.vod}?start=${start}&autoplay=1`}
             title={vod?.title ?? "VOD"}
             allow="autoplay; encrypted-media; fullscreen"
