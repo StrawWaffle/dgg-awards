@@ -221,3 +221,54 @@ export function simulatedFeed(
   }, 250);
   return { stop: () => clearInterval(timer), recent: async (names) => aggregator.recentFor(names) };
 }
+
+/**
+ * Real destiny.gg chat from one of its busiest moments (src/lab/replays.ts),
+ * fed through the same aggregator as the live relay, in step with the
+ * original timing at `speed()` times as fast. It starts 45 s in, just before
+ * the busiest minute, and plays the whole file each time after that.
+ * The messages carry no flairs or subscriptions, so names show plain.
+ */
+export function replayFeed(id: string, speed: () => number, emotes: string[], onSummary: OnSummary): FeedHandle {
+  // destiny.gg emotes by name; tier 0, since the replayed messages carry no subscription.
+  const aggregator = new ChatAggregator(new Map(emotes.map((e) => [e, 0])));
+  let msgs: { t: number; raw: string }[] | null = null;
+  let problem = "";
+  let i = 0;
+  // Each file's busiest minute is its middle one: start a little before it,
+  // so the test gets there quickly. Later loops play the whole file.
+  let clock = 45_000;
+  let loops = 0;
+  fetch(`/api/lab/replay/${id}`)
+    .then((r) => (r.ok ? r.text() : Promise.reject(new Error(`the server said ${r.status}`))))
+    .then((text) => {
+      const lines = text.trim().split("\n").map((l) => JSON.parse(l) as { ts: string; nick: string; text: string });
+      const t0 = Date.parse(lines[0]!.ts);
+      msgs = lines.map((m) => ({ t: Date.parse(m.ts) - t0, raw: `MSG ${JSON.stringify({ nick: m.nick, data: m.text, features: [] })}` }));
+      while (i < msgs.length && msgs[i]!.t <= clock) i++;
+    })
+    .catch((e: Error) => (problem = `Couldn't load the replay: ${e.message}`));
+  const length = () => (msgs?.length ? msgs[msgs.length - 1]!.t : 0);
+  const mmss = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")}`;
+  const timer = setInterval(() => {
+    if (!msgs) {
+      onSummary(EMPTY(), { connected: false, note: problem || "Loading the replay…" });
+      return;
+    }
+    clock += 250 * speed();
+    const started = performance.now();
+    while (i < msgs.length && msgs[i]!.t <= clock) aggregator.ingest(msgs[i++]!.raw);
+    const ingestMs = performance.now() - started;
+    if (i >= msgs.length) {
+      i = 0;
+      clock = 0;
+      loops++;
+    }
+    onSummary(aggregator.flush(), {
+      connected: true,
+      note: `Replaying real chat at ${speed()}×: ${mmss(clock)} of ${mmss(length())}${loops ? `, time ${loops + 1}` : ""}.`,
+      ingestMs,
+    });
+  }, 250);
+  return { stop: () => clearInterval(timer), recent: async (names) => aggregator.recentFor(names) };
+}

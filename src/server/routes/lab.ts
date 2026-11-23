@@ -10,12 +10,14 @@ import { isChatSource, relayFor } from "@/server/lab/chat-relay";
 import { emoteCatalogue, emoteCombos } from "@/server/lab/emotes";
 import { SESSION_COOKIE } from "@/server/middleware";
 import { serveFile } from "@/server/storage";
+import { isReplay } from "@/lab/replays";
 
 const { upgradeWebSocket, websocket } = createBunWebSocket();
 /** For Bun.serve, which handles the socket once Hono has upgraded it. */
 export { websocket };
 
 const assets = join(import.meta.dir, "..", "..", "lab", "assets");
+const peaks = join(import.meta.dir, "..", "..", "archive", "chat-peaks");
 
 export const labRoutes = new Hono()
   // Byte ranges, so the browser can seek and loop it. AAC, and MP3 for
@@ -26,6 +28,13 @@ export const labRoutes = new Hono()
   .get("/api/lab/emotes", async (c) => {
     if (!(await verifyAdminSession(getCookie(c, SESSION_COOKIE)))) return c.body(null, 401);
     return c.json([...((await emoteCatalogue())?.keys() ?? [])], 200);
+  })
+  // Real chat from its busiest moments, for the big screen's simulator (src/lab/replays.ts).
+  .get("/api/lab/replay/:id", async (c) => {
+    if (!(await verifyAdminSession(getCookie(c, SESSION_COOKIE)))) return c.body(null, 401);
+    const id = c.req.param("id");
+    if (!isReplay(id)) return c.body(null, 404);
+    return c.body(await Bun.file(join(peaks, `${id}.jsonl`)).text(), 200, { "content-type": "application/x-ndjson; charset=utf-8" });
   })
   // The emotes drawn differently beside others (GIGACHAD BLADE), from emotes.css.
   .get("/api/lab/emote-combos", async (c) => {

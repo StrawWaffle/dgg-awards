@@ -3,7 +3,8 @@ import { createPortal } from "react-dom";
 import { ChatText, Emote, EmoteRow, addEmotePictures, emoteElement, paintEmotes } from "@/lab/Emote";
 import { type Clip, ClipPlayer } from "@/lab/ClipPlayer";
 import { Sketch } from "@/lab/sketch";
-import { type FeedHandle, type FeedStatus, liveFeed, simulatedFeed } from "@/lab/chatFeed";
+import { type FeedHandle, type FeedStatus, liveFeed, replayFeed, simulatedFeed } from "@/lab/chatFeed";
+import { REPLAYS } from "@/lab/replays";
 import { type Levels, type Source, music, useFrame, useMusic } from "@/lab/music";
 import { toggleMusic } from "@/lab/MusicBar";
 import { useBursts } from "@/lab/Bursts";
@@ -210,7 +211,7 @@ function PlatformMark({ platform }: { platform?: string }) {
   );
 }
 
-type Feed = "sim" | "omnichat" | "dgg" | "gum";
+type Feed = "sim" | "replay" | "omnichat" | "dgg" | "gum";
 
 /**
  * The presentation's big screen: chatters as their emotes, walking about,
@@ -241,6 +242,9 @@ export function Stage({
   const [feed, setFeed] = useState<Feed>("omnichat");
   const [rate, setRate] = useState(300);
   const [emoteShare, setEmoteShare] = useState(0.5);
+  // Replaying real chat from one of its busiest moments, and how much faster.
+  const [replayId, setReplayId] = useState<string>(REPLAYS[0].id);
+  const [replaySpeed, setReplaySpeed] = useState(1);
   // Who's on stage, remembered per browser (the gear's settings).
   const [saved] = useState(loadCast);
   const [max, setMax] = useState(saved.max);
@@ -406,8 +410,8 @@ export function Stage({
   const sceneNow = useRef(scene);
   sceneNow.current = scene;
   const [bursts, fire] = useBursts();
-  const settings = useRef({ rate, emoteShare, max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull, filters, bad, flyShare, bubbles, moves });
-  settings.current = { rate, emoteShare, max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull, filters, bad, flyShare, bubbles, moves };
+  const settings = useRef({ replaySpeed, rate, emoteShare, max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull, filters, bad, flyShare, bubbles, moves });
+  settings.current = { replaySpeed, rate, emoteShare, max, names, showSaid, who, stayMin, arrivals: arrivalRate, whenFull, filters, bad, flyShare, bubbles, moves };
   /** The nominees' destiny.gg usernames, for the simulator to chat as now and then. */
   const nomineeNames = useRef<string[]>([]);
   nomineeNames.current = (show ?? []).flatMap((a) => a.nominees.flatMap((n) => (n.chatName ? [n.chatName] : [])));
@@ -727,7 +731,9 @@ export function Stage({
 
   useEffect(() => {
     let handle: FeedHandle | null = null;
-    if (feed !== "sim") handle = liveFeed(onSummary, feed);
+    if (feed === "replay") {
+      if (emotes.length > 0) handle = replayFeed(replayId, () => settings.current.replaySpeed, emotes, onSummary);
+    } else if (feed !== "sim") handle = liveFeed(onSummary, feed);
     else if (emotes.length > 0) {
       handle = simulatedFeed(emotes, () => settings.current.rate, () => settings.current.emoteShare, onSummary, () => nomineeNames.current);
     }
@@ -736,7 +742,7 @@ export function Stage({
       handle?.stop();
       if (feedRef.current === handle) feedRef.current = null;
     };
-  }, [feed, emotes, onSummary]);
+  }, [feed, replayId, emotes, onSummary]);
 
   // Beside the winner: their last few messages in chat (asked for every few
   // seconds while the scene is up, through the chat window's filters), or the
@@ -1283,6 +1289,7 @@ export function Stage({
               Chat from
               <select value={feed} onChange={(e) => setFeed(e.currentTarget.value as Feed)} className="cozy-input py-1!">
                 <option value="sim">Simulator</option>
+                <option value="replay">Replay real chat</option>
                 <option value="omnichat">Live: destiny.gg, Kick and YouTube (omnichat)</option>
                 <option value="dgg">Live: destiny.gg chat only</option>
                 <option value="gum">Test: gum.vyneer.me (Anything Else's chat)</option>
@@ -1317,6 +1324,30 @@ export function Stage({
               <input type="range" min={0.5} max={10} step={0.5} value={arrivalRate} onChange={(e) => setArrivalRate(Number(e.currentTarget.value))} className="cozy-range min-w-0 flex-1" />
               <span className="w-12 text-right tabular-nums">{arrivalRate}/s</span>
             </label>
+            {feed === "replay" && (
+              <>
+                <label className="flex items-center justify-between gap-2" title={REPLAYS.find((r) => r.id === replayId)?.about}>
+                  Moment
+                  <select value={replayId} onChange={(e) => setReplayId(e.currentTarget.value)} className="cozy-input min-w-0 py-1!">
+                    {REPLAYS.map((r) => (
+                      <option key={r.id} value={r.id} title={r.about}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex items-center justify-between gap-2" title="Faster than real, to test beyond destiny.gg's records">
+                  Speed
+                  <select value={replaySpeed} onChange={(e) => setReplaySpeed(Number(e.currentTarget.value))} className="cozy-input py-1!">
+                    {[1, 2, 4, 10].map((x) => (
+                      <option key={x} value={x}>
+                        {x === 1 ? "As it happened" : `${x}× as fast`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </>
+            )}
             {feed === "sim" && (
               <>
                 <label className="flex items-center gap-2">
@@ -1397,9 +1428,9 @@ export function Stage({
             </label>
             <p className="text-xs font-semibold" style={{ color: "var(--muted)" }}>
               {stats.fps} fps · {stats.npcs} on stage · {stats.perSecond.toLocaleString()} messages/s ·{" "}
-              {feed !== "sim" ? (status.connected ? "live chat connected" : "live chat waiting") : "simulator"}. {status.note}{" "}
+              {feed === "sim" ? "simulator" : feed === "replay" ? "replay" : status.connected ? "live chat connected" : "live chat waiting"}. {status.note}{" "}
               {stats.chatting.toLocaleString()} chatting in the last {stayMin} min.
-              {feed === "sim" && ` ${stats.emoteOnly.toLocaleString()} emote-only/s; the aggregator takes ${stats.ingestMs.toFixed(1)} ms each ¼ s.`}
+              {(feed === "sim" || feed === "replay") && ` ${stats.emoteOnly.toLocaleString()} emote-only/s; the aggregator takes ${stats.ingestMs.toFixed(1)} ms each ¼ s.`}
             </p>
           </div>
         </details>
