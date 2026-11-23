@@ -139,6 +139,10 @@ Items 9 and 13 (deployed 2026-11-21, commit e6b6649):
 - ~~The new voting page~~: done, the site is one page now (see "One site").
 - ~~The public tally~~: done, on the results page.
 
+**Waiting on rinlux (2026-11-23):** the rounds' and main vote's dates; whether DuckerZ as a showcase is right; whether to leave out common names that now match (North, Mike, John, Ice) in the year in chat.
+
+**Not started (2026-11-23):** the community recap (decide showcase per platform or one award, and whether to use StrawWaffle's twitter-search on his own account); an "Add as nominee" button on clip finder moments (StrawWaffle hasn't said yes or no).
+
 **Ideas from StrawWaffle, not built (some need rinlux's say):**
 - **Roles:** presentation mode for an allowlist (the stream screen, admins included; the lab's chat relay is admins-only for now), moderators or editors with fewer rights, and letting chosen people preview pages.
 - **Site lock:** the site behind sign-in, with a countdown to voting.
@@ -147,9 +151,7 @@ Items 9 and 13 (deployed 2026-11-21, commit e6b6649):
 - **Archive:** wait for the full 2025 votes; the wiki has only percentages.
 
 **Next, roughly in StrawWaffle's order:**
-1. Bring the lab's voting page and presentation into the real site, once rinlux approves.
-   - Voting: the one-award-at-a-time flow with ballot progress, and a ranked-voting interface.
-   - Presentation: the big screen and the results reveal. Room for the stream camera and the runoff rounds are done in the lab (2026-11-10, see "The big screen for the stream").
+1. ~~Bring the lab's voting page and presentation into the real site~~: done 2026-11-09 (see "One site").
 2. Re-check the double-count fix against the original code (`dgga-base`), and against the real 2025 votes if they turn up.
 3. Smaller items:
    - re-pull emotes from the DGG CDN
