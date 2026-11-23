@@ -61,6 +61,7 @@ import {
 import { DGG_NAME, cachedDggProfile } from "@/server/dgg-profile";
 import { categoriesWithMediaUrls } from "@/server/present";
 import { chatReviewKey, getChatReview, saveChatReview } from "@/server/chat-review";
+import { clipFinderKey, getClipFinder, saveClipFinder } from "@/server/clip-finder";
 import { AdvanceRefused, advance, advancePlan } from "@/server/advance";
 import { ballotsCsv, resultsCsv } from "@/server/export-csv";
 import { serveFile, storage } from "@/server/storage";
@@ -77,6 +78,8 @@ import {
   categoryCreate,
   categoryForm,
   chatReviewSave,
+  clipFinderDoc,
+  clipFinderQuery,
   categoryOrder,
   nomineeOrder,
   categoryPatch,
@@ -656,6 +659,29 @@ export const adminRoutes = new Hono<SessionEnv>()
       nomineeId: chatReviewKey(year),
       before,
       after: data,
+    });
+    return c.body(null, 200);
+  })
+
+  /** The clip finder's current upload for a year (null if none). */
+  .get("/clip-finder", zValidator("query", clipFinderQuery, rejectInvalid), async (c) =>
+    c.json(await getClipFinder(c.req.valid("query").year)),
+  )
+
+  /**
+   * Upload the clip finder's clips.json. It's kept, and becomes the current
+   * one; the history records which upload was current, so undo goes back.
+   */
+  .put("/clip-finder", zValidator("json", clipFinderDoc, rejectInvalid), async (c) => {
+    const doc = c.req.valid("json");
+    const { before, after } = await saveClipFinder(doc);
+    await record(await actor(c), {
+      kind: "page",
+      action: "update",
+      label: `Clip finder ${doc.year}`,
+      nomineeId: clipFinderKey(doc.year),
+      before,
+      after,
     });
     return c.body(null, 200);
   })

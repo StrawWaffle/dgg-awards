@@ -356,3 +356,52 @@ export const chatReview = z.object({
     .optional(),
 });
 export const chatReviewSave = z.object({ year: z.string().regex(/^\d{4}$/), data: chatReview });
+
+/**
+ * The clip finder's output (dgg-scs tools/clip-finder, clips.json): emote
+ * spikes in the year's chat, each tied to a moment in a VOD.
+ */
+const short = z.string().max(1000);
+const clipSpike = z.object({
+  emote: short,
+  window: z.number().int().positive(),
+  list: z.enum(["chatters", "stands out"]),
+  rank: z.number().int().positive(),
+  users: z.number().int().nonnegative(),
+  other: z.number().int().nonnegative(),
+  vod: short,
+  offset: z.number().int(),
+  at: short,
+  peak: short,
+  firstTs: short,
+  firstNick: short,
+  chatters: z.number().int().nonnegative(),
+  emotes: z.array(z.tuple([short, z.number().int()])).max(20),
+  before: z.array(z.tuple([short, short])).max(20),
+  during: z.array(z.tuple([short, short])).max(20),
+});
+export const clipFinderDoc = z.object({
+  year: z.number().int().min(2000).max(2100),
+  built: z.string().regex(/^[\d\-T:+Z.]+$/),
+  chatThrough: short,
+  lead: z.number().int(),
+  spacing: z.number().int(),
+  perVod: z.number().int(),
+  windows: z.array(z.number().int().positive()).max(10),
+  vodCount: z.number().int(),
+  pinned: z.number().int(),
+  emotes: z.array(z.object({ emote: short, award: short.nullable() })).max(50),
+  vods: z.record(
+    short,
+    z.object({
+      date: short,
+      title: short,
+      start: short.nullable(),
+      pinned: z.boolean(),
+      topics: z.array(z.tuple([z.number().int(), short, short, z.number().int()])).max(2000),
+    }),
+  ),
+  spikes: z.array(clipSpike).max(20000),
+});
+export type ClipFinderDoc = z.infer<typeof clipFinderDoc>;
+export const clipFinderQuery = z.object({ year: z.coerce.number().int().min(2000).max(2100) });

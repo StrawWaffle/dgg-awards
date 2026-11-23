@@ -331,3 +331,17 @@ export type AdvancePlan = Awaited<ReturnType<typeof fetchAdvancePlan>>;
 export async function advanceDgger(body: { step: "groups" | "final"; picks: { from: string; id: string; to: string }[] }) {
   await ok(await client.api.admin.advance.$post({ json: body }), "Couldn't advance");
 }
+
+/** The clip finder's current upload for a year (null if none). */
+export async function fetchClipFinder(year: number) {
+  const res = await client.api.admin["clip-finder"].$get({ query: { year: String(year) } });
+  if (!res.ok) throw new Error((await res.text()) || `Couldn't load the clip finder (${res.status})`);
+  return res.json();
+}
+export type ClipFinder = NonNullable<Awaited<ReturnType<typeof fetchClipFinder>>>;
+
+/** Upload the clip finder's clips.json. */
+export type ClipFinderUpload = Parameters<(typeof client.api.admin)["clip-finder"]["$put"]>[0]["json"];
+export async function uploadClipFinder(doc: ClipFinderUpload) {
+  await ok(await client.api.admin["clip-finder"].$put({ json: doc }), "Couldn't load the file");
+}

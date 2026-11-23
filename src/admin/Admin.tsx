@@ -1,6 +1,7 @@
 import "@/admin/admin.css";
 import { useEffect, useState } from "react";
 import { AdminsTab } from "@/admin/components/AdminsTab";
+import { ClipFinderTab } from "@/admin/components/ClipFinderTab";
 import { HistoryTab } from "@/admin/components/history/HistoryTab";
 import { NomineeEditor } from "@/admin/components/editor/NomineeEditor";
 import { PreviewMenu } from "@/admin/components/PreviewMenu";
@@ -25,6 +26,7 @@ import {
   StackIcon,
   SunIcon,
   LayersIcon,
+  VideoIcon,
 } from "@radix-ui/react-icons";
 import { Tabs } from "radix-ui";
 import clsx from "clsx";
@@ -38,7 +40,7 @@ const queryClient: QueryClient = new QueryClient({
   }),
 });
 
-const tabs = ["nominees", "rounds", "settings", "admins", "votes", "history"] as const;
+const tabs = ["nominees", "rounds", "clips", "settings", "admins", "votes", "history"] as const;
 type Tab = (typeof tabs)[number];
 const tabFromHash = (): Tab => {
   const hash = location.hash.slice(1);
@@ -140,6 +142,9 @@ function AdminPage() {
           <TabTrigger value="rounds" icon={<LayersIcon />} collapsed={collapsed}>
             Rounds
           </TabTrigger>
+          <TabTrigger value="clips" icon={<VideoIcon />} collapsed={collapsed}>
+            Clip finder
+          </TabTrigger>
           <TabTrigger value="settings" icon={<GearIcon />} collapsed={collapsed}>
             Settings
           </TabTrigger>
@@ -179,6 +184,9 @@ function AdminPage() {
         </Tabs.Content>
         <Tabs.Content value="rounds" className="outline-none">
           <RoundsTab />
+        </Tabs.Content>
+        <Tabs.Content value="clips" className="outline-none">
+          <ClipFinderTab />
         </Tabs.Content>
         <Tabs.Content value="settings" className="outline-none">
           <SettingsTab />

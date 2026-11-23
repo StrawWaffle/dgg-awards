@@ -126,6 +126,8 @@ export function describe(entry: HistoryEntry): string {
     case "import":
       return entry.action === "create" ? `${importSummary(after)}:` : "Removed the import of";
     case "page": {
+      // The clip finder's history only says which upload is current.
+      if (entry.nomineeId?.startsWith("clips-")) return "Loaded clips.json into";
       const n = diffRows(entry).length;
       return `Edited ${n} ${n === 1 ? "bit" : "bits"} of`;
     }
