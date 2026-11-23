@@ -116,11 +116,19 @@ const STYLE = `
     background: #4f8cc9; color: #10131a; font: inherit; font-weight: 600;
     border: 0; border-radius: 4px; padding: .6rem 1.2rem; cursor: pointer;
   }
+  .quick { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin: 0 0 2rem; }
+  .quick form { margin: 0; }
+  .quick button.plain { background: #1c1f25; color: inherit; border: 1px solid #333941; }
   .error {
     border-left: 3px solid #d05353; background: #1c1f25;
     padding: .6rem .9rem; margin-bottom: 1.5rem;
   }
 `;
+
+const QUICK_USERS = [
+  ['Tester', 'Tester (admin)'],
+  ['Voter', 'Voter (not an admin)'],
+];
 
 function authorizePage(params, error) {
   // Every parameter of the request comes back on the submit, so the POST is
@@ -135,6 +143,17 @@ function authorizePage(params, error) {
   ]
     .map((name) => `<input type="hidden" name="${name}" value="${escapeHtml(params.get(name) ?? '')}">`)
     .join('\n      ');
+
+  // One click for the usual accounts: test containers run with ADMIN_USERNAMES=Tester.
+  const quick = QUICK_USERS.map(
+    ([username, label], i) => `
+      <form method="post" action="/oauth/authorize">
+        ${hidden}
+        <input type="hidden" name="username" value="${escapeHtml(username)}">
+        <input type="hidden" name="roles" value="USER">
+        <button type="submit"${i ? ' class="plain"' : ''}>${escapeHtml(label)}</button>
+      </form>`,
+  ).join('');
 
   const checkboxes = FEATURES.map(
     ([value, label]) => `
@@ -158,12 +177,13 @@ function authorizePage(params, error) {
     <p class="lede">Not destiny.gg. This is <strong>dev/dgg-oauth</strong>, and it signs the local
       room in as whoever you describe here.</p>
     ${error ? `<p class="error">${escapeHtml(error)}</p>` : ''}
+    <div class="quick"><span>Quick sign-in:</span>${quick}</div>
     <form method="post" action="/oauth/authorize">
       ${hidden}
       <label class="field">
         <span>Username</span>
         <input type="text" name="username" required autofocus autocomplete="off" placeholder="StrawWaffle">
-        <small>A name in ADMIN_DGG_USERNAMES signs in as an admin, the same as on the real site.</small>
+        <small>A name in ADMIN_USERNAMES signs in as an admin, the same as on the real site.</small>
       </label>
       <label class="field">
         <span>Destiny user id</span>
