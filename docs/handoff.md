@@ -164,8 +164,7 @@ Items 9 and 13 (deployed 2026-11-21, commit e6b6649):
 
 **Deploying (what was done each time):**
 - Back up the live database first: `VACUUM INTO /data/backups/<time>-before-deploy.db` inside `dgg-awards-app-1`. Imports also make their own backups there, and the newest 20 are kept.
-- Fast-forward `main`, run `docker compose --profile tunnel up -d --build app`, then check `/`, `/api/config`, `/lab`, `/admin` (200), `/api/admin/checks` and `/api/lab/emotes` (401), and `/signin` (to destiny.gg).
-- Push `main`.
+- Push `main` (since 2026-11-25 Komodo deploys it on the server through a GitHub webhook; before that it was `docker compose --profile tunnel up -d --build app` on StrawWaffle's PC), then check `/`, `/api/config`, `/lab`, `/admin` (200), `/api/admin/checks` and `/api/lab/emotes` (401), and `/signin` (to destiny.gg).
 
 **Worktrees:** none; all merged ones were removed on 2026-11-09.
 
@@ -198,7 +197,7 @@ Items 9 and 13 (deployed 2026-11-21, commit e6b6649):
 - **R2 cost:** StrawWaffle wants to stay on the free tier. As of 2026-11, the free tier is 10 GB storage, 1M writes and 10M reads a month, and bandwidth is always free. The estimate for 2026 is ~1–2 GB and ~2M reads at worst, before Cloudflare's cache. Quality doesn't affect cost. A payment method is on file, so StrawWaffle was advised to set up a Cloudflare usage notification. Separate presenter-only or mobile versions were considered and not needed. Revisit only if usage grows.
 
 - **Sign-in is real destiny.gg OAuth** (switched 2026-11-09, verified by StrawWaffle signing in and reaching `/admin`). The app is registered on the DGG account StrawWaffle set up for this, with the redirect `https://dgg-awards.strawwaffle.dev/oauth`. The credentials are only in `.env` (gitignored). `DGG_CLIENT_SECRET` contains `$`, so it's wrapped in single quotes there, which stops Compose from expanding it.
-- Docker Compose runs `app` (Bun, with SQLite in the `awards_data` volume) and `tunnel` (cloudflared, profile `tunnel`). The `dgg-oauth` stand-in (profile `mock-auth`) is no longer run on the live stack. It's kept for local and test use, see `tests/`. Its `dgg-awards-login` Cloudflare route has been deleted.
+- Docker Compose runs `app` (Bun, with SQLite in `/data`: a bind mount on the server via `AWARDS_DATA`, the `awards_data` volume locally) and `tunnel` (cloudflared, profile `tunnel`). The `dgg-oauth` stand-in (profile `mock-auth`) is no longer run on the live stack. It's kept for local and test use, see `tests/`. Its `dgg-awards-login` Cloudflare route has been deleted.
 - Cloudflare dashboard route: `dgg-awards` → `http://app:3000`.
 - It's set up for 2026 and **locked** (see "At a glance"). Admins switch modes under Settings in `/admin`.
 - `ADMIN_USERNAMES` in `.env` has StrawWaffle, RiN_LuX, JaydrVernanda and bing. Anyone on that list becomes admin when they sign in.

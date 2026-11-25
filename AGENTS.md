@@ -1,6 +1,6 @@
 # DGG Awards — agent guide
 
-Voting and results site for the yearly destiny.gg community awards (DGG Awards). Live preview: https://dgg-awards.strawwaffle.dev (StrawWaffle's PC, Cloudflare tunnel). Private repo: https://github.com/StrawWaffle/dgg-awards.
+Voting and results site for the yearly destiny.gg community awards (DGG Awards). Live: https://dgg-awards.strawwaffle.dev (a home server; Komodo deploys `main` on every push, behind a Cloudflare tunnel). Private repo: https://github.com/StrawWaffle/dgg-awards.
 
 **Read `docs/handoff.md` first.** It has the current state, the people involved, decisions, open questions, the planned features in order and the backlog of problems from the 2025 awards stream. Update it at the end of every session.
 
@@ -50,14 +50,14 @@ Voting and results site for the yearly destiny.gg community awards (DGG Awards).
 - `drizzle/`: migrations, applied at container start by `scripts/migrate.ts`. **Always read a generated migration before committing.** drizzle-kit once generated a copy step that selected a column which didn't exist yet (0003, fixed by hand).
 - `src/data.ts`: last year's (2025) nominees, used as sample data by `scripts/seed.ts`.
 
-## Deploying (live preview)
+## Deploying
 
-From the repo root on `main`: `docker compose --profile tunnel up -d --build app`. Migrations run on start. Then check:
+Push `main`. A GitHub webhook makes Komodo pull, rebuild the image and restart `app` (about a minute); migrations run on start. For a risky change, back up the database first (see `docs/handoff.md`, Deploying). Then check:
 - `https://dgg-awards.strawwaffle.dev` and `/api/config` answer 200
 - `/admin` answers 200 (the page checks for an admin itself) and `/api/admin/checks` answers 401 when signed out
 - `/signin` redirects to www.destiny.gg
 
-The live `.env` holds the real DGG OAuth app, `AUTH_SECRET`, the tunnel token, `ADMIN_USERNAMES` and the five `R2_*` settings (see `.env.example` for names). Its database is the `dgg-awards_awards_data` volume.
+The live `.env` holds the real DGG OAuth app, `AUTH_SECRET`, the tunnel token, `ADMIN_USERNAMES` and the five `R2_*` settings (see `.env.example` for names). The live `.env` is kept in the Komodo stack `dgg-awards`, not on disk in a checkout. Its database is `/data` in `dgg-awards-app-1`: a bind mount on the server (`AWARDS_DATA`), the `awards_data` volume locally.
 
 ## Testing
 

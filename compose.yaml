@@ -13,9 +13,10 @@ services:
     environment:
       DB_FILE_NAME: /data/sqlite.db
     ports:
-      - "127.0.0.1:3000:3000"
+      # On the server AWARDS_PORT and AWARDS_DATA come from .env (a free local port, a bind mount).
+      - "${AWARDS_PORT:-127.0.0.1:3000}:3000"
     volumes:
-      - awards_data:/data
+      - ${AWARDS_DATA:-awards_data}:/data
     restart: unless-stopped
 
   # Stand-in for destiny.gg's OAuth endpoints (copied from dggradio). The app
